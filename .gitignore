@@ -1,4 +1,5 @@
 .pydevproject
+*.*~
 .Rhistory
 .project
 .git/
