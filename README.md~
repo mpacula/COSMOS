@@ -11,4 +11,4 @@ Here are some working examples.  see testflow.py and call_varaints/cv.py
 * [my_workflows](my_workflows)
 
 ## Web Interface
-`./manage runserver 0.0.0.0:8000`
+`./manage runserver 0.0.0.0:8000
