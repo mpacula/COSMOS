@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load extras %}
+{%block content%}
+
+<h1>{{workflow}}</h1>
+<p>
+<a href="{% url workflow_view_log workflow.id %}" class="btn btn-info">View Log</a>
+</p>
+{% for batch in workflow.batches %}
+          <div class="alert alert-info">
+            <a href="{{batch.url}}">
+                <h3>
+                {{batch.order_in_workflow}}. {{batch}}
+                {%if batch.status == "successful"%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
+                {%if batch.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
+                {%if batch.status == "in_progress"%}<i class="icon-refresh" rel="tooltip" title="In Progress"></i>{%endif%}
+                </h3>
+           </a>
+           <p>
+	           <div class="progress progress-{% status2csstype batch.status %} progress-striped" rel="tooltip" title="{{batch.percent_done}}% Completed" data-placement="right">
+	              <div class="bar" style="opacity:.75;width:{{batch.percent_done}}%"%></div>
+	           </div>
+			   Nodes: {{batch.numNodes}},
+			   successful: {{batch.successful}},
+			   status: {{batch.status}},
+			   {{batch.percent_done}}% done,
+			   file_size: {{batch.file_size}},
+			   max_time_to_run: {{batch.max_time_to_run|format_time}},
+               total_time_to_run: {{batch.total_time_to_run|format_time}}
+			</p>
+         </div>
+{% endfor %}
+{%endblock%}

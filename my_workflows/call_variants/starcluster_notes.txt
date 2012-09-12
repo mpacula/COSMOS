@@ -1,0 +1,31 @@
+
+#upload gatkV2 .jar
+scp workspace/Erik/gatk/Genome* NODE
+
+ssh NODE
+
+#install Java
+sudo add-apt-repository ppa:webupd8team/java
+sudo apt-get update
+sudo apt-get install oracle-java7-installer -y
+
+sudo apt-get upgrade -y
+
+#install misc
+sudo apt-get install -y git xfsprogs glusterfs-client
+
+#download GATK sting
+cd /DATA
+git clone https://github.com/broadgsa/gatk.git
+cd gatk
+
+#download GATK resource bundle
+wget -r ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/1.5/b37/*
+cd ftp.broadinstitute.org/bundle/1.5/b37
+gunzip human_g1k_v37*gz
+gunzip dbsnp_135*gz
+gunzip 1000G**gz
+
+
+#mount gluster volume?
+#lsync Cosmos?

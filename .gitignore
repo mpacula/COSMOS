@@ -1,0 +1,9 @@
+.git/
+build/
+.metadata/
+migrations/
+.settings/
+.ropeproject/
+*.pyc
+*.swp
+venv/

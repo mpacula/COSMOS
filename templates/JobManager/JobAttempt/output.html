@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{%block content%}
+
+<ul class="breadcrumb">
+  <li><a href="/">Home</a> <span class="divider">/</span></li>
+  <li><a href="{{jobAttempt.node.batch.workflow.url}}">{{jobAttempt.node.batch.workflow}}</a> <span class="divider">/</span></li>
+  <li><a href="{{jobAttempt.node.batch.url}}">{{jobAttempt.node.batch}}</a><span class="divider">/</span></li>
+  <li>{{jobAttempt.node}}<span class="divider">/</span></li>
+  <li><a href="{{jobAttempt.url}}">{{jobAttempt}}</a><span class="divider">/</span></li>
+  <li class="active">{{output_name}}</li>
+</ul>
+<h1>Viewing File <small>(the first .1MB anyway)</small></h1>
+<p>
+{{output_name}} : <code>{{output_path}}</code>
+</p>
+<pre class="pre-scrollable">{{output|safe}}</pre>
+{%endblock%}
