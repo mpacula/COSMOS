@@ -1,9 +1,9 @@
 ## Install
 This probably won't work yet
-	`-git clone this
+	-git clone this
 	-cd Cosmos
 	-virtualenv venv
-	-pip install -r pip_requirements.txt`
+	-pip install -r pip_requirements.txt
 
 ## Example Workflows
 
