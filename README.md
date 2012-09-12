@@ -8,8 +8,10 @@ This probably won't work yet
 
 ## Example Workflows
 
-Here are some working examples.  see testflow.py and call_varaints/cv.py
-* [my_workflows](my_workflows)
+Here are some working examples.  see
+* myworkflows/testflow.py
+* myworkflows/call_varaints/cv.py
+
 
 ## Tutorial
 
