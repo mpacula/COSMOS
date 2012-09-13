@@ -1,4 +1,4 @@
-import settings #magic line
+import cosmos_settings #magic line
 
 import os
 from Workflow.models import Workflow, Batch

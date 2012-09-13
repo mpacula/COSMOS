@@ -11,6 +11,12 @@ Core Requirements:
 	source venv/bin/activate
 	pip install -r pip_requirements.txt
 
+#### configuration file:
+edit `Cosmos/cosmos_settings.py`
+set:
+	home_path = '/path/to/Cosmos'
+	default_root_output_dir = '/mnt'
+
 # Example Workflows
 
 Here are some working examples.  see

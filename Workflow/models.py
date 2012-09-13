@@ -9,7 +9,7 @@ import stat
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField
 import shutil
-from Cosmos import cosmos
+from Cosmos import cosmos_settings
 
 from django.dispatch import receiver
     
@@ -101,15 +101,14 @@ class Workflow(models.Model):
     @staticmethod
     def restart(name=None,root_output_dir=None,):
         """
-        
-        """
-        if Workflow.objects.filter(name=name).count() == 0:
-            log.warning('Tried to restart a workflow that doesn\'t exists'.format(name))
-            wf_id = None
-        else:
-            wf = Workflow.objects.get(name=name)
-            wf_id = wf.id
-            wf.delete(delete_files=True)
+        Restarts a workflow.  Will delete the old workflow and all of its files
+        but will retain the old workflow id for convenience
+        """            
+        wf, created = Workflow.objects.get_or_create(name=name)
+        wf_id = wf.id
+        if created:
+            wf.warning('Tried to restart a workflow that doesn\'t exists'.format(name))
+        wf.delete(delete_files=True)
         
         new_wf = Workflow.create(_wf_id=wf_id,name=name,root_output_dir=root_output_dir)
         new_wf.log.info('Restarting this Workflow.')
@@ -159,7 +158,7 @@ class Workflow(models.Model):
             if not batch_exists:
                 raise ValidationError("Batch does not exist.  Cannot proceed with a hard_reset.  Please set hard_reset to True in order to continue.")
             else:
-                log.info("Doing a hard reset on batch {}".format(name))
+                self.log.info("Doing a hard reset on batch {}".format(name))
                 Batch.objects.get(workflow=self,name=name).delete()
                 
         if self.resume_from_last_failure:
@@ -432,11 +431,11 @@ class Batch(models.Model):
             self.successful = True
             self.status = 'successful'
             self.save()
-            log.info('Batch {} successful!'.format(self))
+            self.log.info('Batch {} successful!'.format(self))
         elif num_nodes_failed + num_nodes_successful == num_nodes:
             self.status='failed'
             self.save()
-            log.info('Batch {} failed!'.format(self))
+            self.log.warning('Batch {} failed!'.format(self))
                 
     
           

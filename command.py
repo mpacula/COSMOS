@@ -1,5 +1,5 @@
 from argh import arg,ArghParser,command,CommandError
-from Cosmos import cosmos
+cosmos_settings
 from Workflow.models import Workflow
 import os
 

@@ -1,12 +1,5 @@
 #Cosmos Settings
-Cosmos_home_path = '/home2/erik/workspace/Cosmos'
-
-import sys
-path = Cosmos_home_path
-if path not in sys.path:
-    sys.path.append(path)
-    
-from Cosmos import cosmos #the magic line to import Cosmos and Django compatibility
+import cosmos_settings #the magic line to import Cosmos and Django compatibility
 
 
 import re

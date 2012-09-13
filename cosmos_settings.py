@@ -1,5 +1,5 @@
 import os, sys
-from helpers import check_and_create_output_dir, get_logger
+from Cosmos.helpers import check_and_create_output_dir, get_logger
 
 #Cosmos Settings
 home_path = '/home2/erik/workspace/Cosmos'
