@@ -20,12 +20,5 @@ omni_path = os.path.join(resource_bundle_path,'1000G_omni2.5.b37.sites.vcf')
 mills_path = os.path.join(resource_bundle_path,'Mills_and_1000G_gold_standard.indels.b37.sites.vcf')
 #Setup Cosmos
 
-#Cosmos Settings
-Cosmos_home_path = '/home2/erik/workspace/Cosmos'
-
-import sys
-path = Cosmos_home_path
-if path not in sys.path:
-    sys.path.append(path)
-    
+   
 from Cosmos import cosmos #the magic line to import Cosmos and Django compatibility
