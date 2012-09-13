@@ -1,5 +1,4 @@
 # Install
-This probably won't work yet
 
 Core Requirements:
 - mysql
@@ -39,6 +38,8 @@ or terminate a running workflow.  It is in the root directory of Cosmos.
 	  -h, --help          show this help message and exit
 
 
-Start the webserver: `python command.py runweb`
+Start the webserver:
+`python command.py runweb`
 
-Terminate workflow: `python command.py terminate -n Workflow_Name` or `python command.py terminate -i Workflow_ID#`
+Terminate a running workflow:
+`python command.py terminate -n Workflow_Name` or `python command.py terminate -i Workflow_ID#`
