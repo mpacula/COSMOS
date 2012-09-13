@@ -5,7 +5,7 @@ Core Requirements:
 - mysql
 - most be run on a DRMAA enabled cluster (GridEngine, LSF, Condor, etc.)
 
-# install instructions:
+#### install instructions:
 	git clone this
 	cd Cosmos
 	virtualenv venv
@@ -40,4 +40,5 @@ or terminate a running workflow.  It is in the root directory of Cosmos.
 
 
 Start the webserver: `python command.py runweb`
+
 Terminate workflow: `python command.py terminate -n Workflow_Name` or `python command.py terminate -i Workflow_ID#`
