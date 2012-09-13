@@ -13,8 +13,6 @@ from Cosmos import cosmos
 
 from django.dispatch import receiver
     
-log = cosmos.log
-
 status_choices=(
                 ('successful','Executed successfully.'),
                 ('no_attempt','No attempt has been made to execute this node.'),
@@ -33,6 +31,18 @@ class Workflow(models.Model):
     resume_from_last_failure = models.BooleanField(default=False,help_text='resumes from last failed node')
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
+    _terminating = models.BooleanField(default=False,help_text='this workflow is terminating')
+    
+    def terminate(self):
+        """
+        terminates this workflow
+        """
+        self.log.warning("Terminating this workflow...")
+        self._terminating = True
+        self.save()
+        self.jobManager.terminate_all_queued_or_running_jobAttempts()
+        self.log.warning("Terminated.")
+        
     
     @property
     def _batches(self):
@@ -81,6 +91,7 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=name).count() == 0:
             raise ValidationError('Workflow {} does not exist, cannot resume it'.format(name))
         wf = Workflow.objects.get(name=name)
+        wf._terminating=False
         wf.resume_from_last_failure=True
         wf.save()
         wf.log.info('Resuming this workflow.')
@@ -92,7 +103,6 @@ class Workflow(models.Model):
         """
         
         """
-        cosmos.log.info("Restarting workflow {} from scratch".format(name))
         if Workflow.objects.filter(name=name).count() == 0:
             log.warning('Tried to restart a workflow that doesn\'t exists'.format(name))
             wf_id = None
@@ -109,7 +119,6 @@ class Workflow(models.Model):
     def create(name=None,dry_run=False,root_output_dir=None,_wf_id=None):
         if name is None:
             raise ValidationError('Name of a workflow cannot be None')
-        cosmos.log.info("CREATING workflow {}".format(name))
         #set default output_dir?
         if root_output_dir is None:
             root_output_dir = cosmos.default_root_output_dir
@@ -166,7 +175,6 @@ class Workflow(models.Model):
         return b
         
     def delete(self, *args, **kwargs):
-        cosmos.log.info('Deleting Workflow {0}'.format(self.name))
         self.close_session()
         self.jobManager.delete()
         self.save()
@@ -246,9 +254,6 @@ class Workflow(models.Model):
             else:
                 self.log.info('{0} has not been executed successfully.'.format(node))
                 self._runNode(node)
-    
-
-         
                 
     def wait_on_all_nodes(self):
         """
@@ -262,11 +267,31 @@ class Workflow(models.Model):
             nodes.append(jobAttempt_node)
             jobAttempt_node._jobAttempt_done_receiver(jobAttempt)
         self.log.info('All nodes for this wait have completed.')
+        if self._terminating:
+            self.log.warning("Termination complete, exiting with exit code 2")
+            self._terminating=False
+            self.save()
+            import sys; sys.exit(2)
         return nodes 
             
     def wait_on_batch(self,batch):
         raise NotImplemented()        
             
+
+    def clean_up(self):
+        """
+        executed ONLY at the end of a workflow.  right now just removes old batches that weren't used in last resume
+        """
+        self.log.info("Cleaning up workflow")
+        Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
+    
+    def restart_from_here(self):
+        """
+        Deletes any batches in the history that haven't been added yet
+        """
+        self.log.info('Restarting Workflow from here.')
+        Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
+    
     def __str__(self):
         return 'Workflow[{}] {}'.format(self.id,self.name)
             
@@ -351,12 +376,6 @@ class Batch(models.Model):
     
     def numNodes(self):
         return Node.objects.filter(batch=self).count()
-    
-    def clean_up(self):
-        """
-        executed ONLY at the end of a workflow.  right now just removes old batches that weren't used in last resume
-        """
-        Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
     
     def add_node(self, name, pre_command, outputs, hard_reset=False):
         """
@@ -514,10 +533,9 @@ class Node(models.Model):
         pass
 
     def _jobAttempt_done_receiver(self,jobAttempt):
-        #re run if job failed
         batch = self.batch
         numAttempts = self._jobAttempts.count()
-        if not jobAttempt.successful:
+        if not jobAttempt.successful and self.batch.workflow._terminating==False: #ReRun jobAttempt
             if numAttempts < self.workflow.max_reattempts:
                 self.log.warning("JobAttempt {} of self {} failed, this is attempt # {}, so retrying".format(jobAttempt, self,numAttempts))
                 self.workflow._runNode(jobAttempt.node)
@@ -525,13 +543,12 @@ class Node(models.Model):
                 self.log.warning("Node {} has reached max_reattempts of {}.  This self has failed".format(self, self.workflow.max_reattempts))
                 self.status = 'failed'
                 self.save()
-                batch._nodeAttempt_done_receiver(self)
         else:
             if jobAttempt.successful:
                 self.status = 'successful'
                 self.successful = True
                 self.save()    
-                batch._nodeAttempt_done_receiver(self)
+        batch._nodeAttempt_done_receiver(self)
 
     def delete(self, *args, **kwargs):
         self.log.info('Deleting node {} and its output directory {}'.format(self.name,self.output_dir))

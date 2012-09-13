@@ -20,9 +20,11 @@ def parse_command_string(txt,**kwargs):
         s = '\n'.join(x).format(**kwargs)
     except KeyError:
         log.warning('*'*76)
-        log.warning("format() error occurred here")
+        log.warning("format() error occurred here:")
+        log.warning('txt is:'*76)
         log.warning('\n'.join(x))
         log.warning('-'*76)
+        log.warning('keys available are:'*76)
         log.warning(kwargs.keys())
         log.warning('*'*76)
         raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
@@ -91,9 +93,14 @@ def UnifiedGenotyper_SNP(input_bam,output_bam,interval):
 def UnifiedGenotyper_INDEL(input_bam,output_bam,interval):
     return _UnifiedGenotyper(input_bam=input_bam, output_bam=output_bam, interval=interval, glm='INDEL')
 
-def CombineVariants(input_vcfs,output_vcf):
+def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
     """
     :param input_vcfs: a list of (sample.name,file_path_to_vcf) tuples
+    :param: genotypemergeoptions: select from the following
+        UNIQUIFY - Make all sample genotypes unique by file. Each sample shared across RODs gets named sample.ROD.
+        PRIORITIZE - Take genotypes in priority order (see the priority argument).
+        UNSORTED - Take the genotypes in any order.
+        REQUIRE_UNIQUE - Require that all samples/genotypes be unique between all inputs.
     """
     INPUTs = " \\\n".join(["--variant:{},VCF {}".format(vcf[0],vcf[1]) for vcf in input_vcfs])
     s = r"""
@@ -102,10 +109,9 @@ def CombineVariants(input_vcfs,output_vcf):
     -R {settings.reference_fasta_path} \
     {INPUTs} \
     -o {output_vcf} \
-    -genotypeMergeOptions UNSORTED \
-    --assumeIdenticalSamples
+    -genotypeMergeOptions {genotypeMergeOptions}
     """ 
-    return parse_command_string(s,INPUTs=INPUTs,output_vcf=output_vcf)
+    return parse_command_string(s,INPUTs=INPUTs,output_vcf=output_vcf,genotypeMergeOptions=genotypeMergeOptions)
 
 def VariantQualityRecalibration(input_vcf,output_recal,output_tranches,output_rscript,mode,exome_or_wgs,haplotypeCaller_or_unifiedGenotyper,inbreedingcoeff=True):
     """

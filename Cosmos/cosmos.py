@@ -28,9 +28,3 @@ import drmaa
 drmaa_session = drmaa.Session()
 drmaa_session.initialize()
 
-
-#Logger
-log_dir = os.path.join(home_path,'log')
-check_and_create_output_dir(log_dir)
-log = get_logger('cosmos_main', os.path.join(log_dir,'main.log'))
-log.info('Starting new cosmos session')

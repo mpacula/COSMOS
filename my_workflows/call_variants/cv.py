@@ -72,21 +72,23 @@ workflow.wait_on_all_nodes()
 ### Combine Variants
 # first combine chromosomes into samples, then combine samples into a master vcf
 
+workflow.restart_from_here()
+
 CV_sample_batch = workflow.add_batch(name="CombineVariants_into_Sample_VCFs",hard_reset=False)
 for sample in samples:
     split_vcfs = [(sample.name,node.outputs_fullpaths['output_file']) for node in sample.nodes['UnifiedGenotyper_SNP']]
     split_vcfs = split_vcfs + [(sample.name,node.outputs_fullpaths['output_file']) for node in sample.nodes['UnifiedGenotyper_INDEL']]
     node = CV_sample_batch.add_node(name=sample.name,
-                              pre_command=commands.CombineVariants(input_vcfs=split_vcfs, output_vcf="{output_dir}/{outputs[vcf]}"),
+                              pre_command=commands.CombineVariants(input_vcfs=split_vcfs, output_vcf="{output_dir}/{outputs[vcf]}",genotypeMergeOptions='REQUIRE_UNIQUE'),
                               outputs={'vcf':'raw_variants.vcf'})
     sample.nodes['CombineVariants_into_Sample_VCFs'] = node
 workflow.run_batch(CV_sample_batch)
 workflow.wait_on_all_nodes()
 
-CV_master_batch = workflow.add_batch(name="CombineVariants_into_MasterVCF",hard_reset=True)
+CV_master_batch = workflow.add_batch(name="CombineVariants_into_MasterVCF",hard_reset=False)
 sample_vcfs = [ (sample.name,sample.nodes['CombineVariants_into_Sample_VCFs'].outputs_fullpaths['vcf']) for sample in samples ]
 node = CV_master_batch.add_node(name='master.vcf',
-                          pre_command=commands.CombineVariants(input_vcfs=sample_vcfs, output_vcf="{output_dir}/{outputs[vcf]}"),
+                          pre_command=commands.CombineVariants(input_vcfs=sample_vcfs, output_vcf="{output_dir}/{outputs[vcf]}",genotypeMergeOptions='PRIORITIZE'),
                           outputs={'vcf':'raw_variants.vcf'})
 master_vcf_node = node 
 workflow.run_batch(CV_master_batch)
@@ -95,7 +97,7 @@ workflow.wait_on_all_nodes()
 #### Variant Recalibration
 #Recalibrate SNPs then Recalibrate INDELs
 
-VR_batch = workflow.add_batch(name="VariantRecalibration",hard_reset=True)
+VR_batch = workflow.add_batch(name="VariantRecalibration",hard_reset=False)
 input_vcf = master_vcf_node.outputs_fullpaths['vcf']
 node = VR_batch.add_node(name='SNP',
                           pre_command=commands.VariantQualityRecalibration(input_vcf=input_vcf,
@@ -107,7 +109,7 @@ node = VR_batch.add_node(name='SNP',
                                                                            exome_or_wgs='exome',
                                                                            haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'
                                                                            ),
-                          outputs={'recal':'output.recal','tranches':'output.trances','rscript':'plot.R'})
+                          outputs={'recal':'output.recal','tranches':'output.tranches','rscript':'plot.R'})
 variantRecalibration_SNP_node = node
 node = VR_batch.add_node(name='INDEL',
                          pre_command=commands.VariantQualityRecalibration(input_vcf=input_vcf,
@@ -119,7 +121,7 @@ node = VR_batch.add_node(name='INDEL',
                                                                            exome_or_wgs='exome',
                                                                            haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'
                                                                            ),
-                         outputs={'recal':'output.recal','tranches':'output.trances','rscript':'plot.R'})
+                         outputs={'recal':'output.recal','tranches':'output.tranches','rscript':'plot.R'})
 
 variantRecalibration_INDEL_node = node
 workflow.run_batch(VR_batch)
@@ -127,7 +129,7 @@ workflow.wait_on_all_nodes()
 
 ### Apply Recalibration
 
-AR_batch = workflow.add_batch(name="ApplyRecalibration",hard_reset=True)
+AR_batch = workflow.add_batch(name="ApplyRecalibration",hard_reset=False)
 node = AR_batch.add_node(name='SNP',
                          pre_command=commands.ApplyRecalibration(input_vcf=input_vcf,
                                                                        input_recal=variantRecalibration_SNP_node.outputs_fullpaths['recal'],

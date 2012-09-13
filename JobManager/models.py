@@ -207,6 +207,10 @@ class JobManager(models.Model):
     def close_session(self):
         #TODO delete all jobtemplates
         cosmos.drmaa_session.exit()
+
+    def terminate_all_queued_or_running_jobAttempts(self):
+        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):
+            self.terminate_jobAttempt(jobAttempt)
         
     def terminate_jobAttempt(self,jobAttempt):
         cosmos.drmaa_session.control(jobAttempt.drmaa_job_id, drmaa.JobControlAction.TERMINATE)
