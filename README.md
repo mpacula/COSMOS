@@ -12,10 +12,16 @@ Core Requirements:
 	pip install -r pip_requirements.txt
 
 #### configuration file:
-edit `Cosmos/cosmos_settings.py`
-set:
+* edit `cosmos_settings.py`
+* set:
+
 	home_path = '/path/to/Cosmos'
-	default_root_output_dir = '/mnt'
+	default_root_output_dir = '/mnt/output_dir'
+
+* set any SGE or LSF specific environment variables, if necessary.  For example:
+
+`os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge6/lib/linux-x64/libdrmaa.so'`
+
 
 # Example Workflows
 
