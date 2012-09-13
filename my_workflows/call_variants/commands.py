@@ -1,16 +1,7 @@
 import settings
-from argh import arg,ArghParser,plain_signature,command
-import os
 import inspect
-import sys
 from django.core.exceptions import ValidationError
 
-"""
-issues with blueprint:
-unified genotyper calls being generated before indel realignment
-RealignerTargetCreator is using unified genotyper calls
-not using inbreedingcoeff for recalibration
-"""
 
 from Cosmos import cosmos
 
@@ -37,8 +28,6 @@ def parse_command_string(txt,**kwargs):
         raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
     return s
 
-@command
-@plain_signature
 def list_annotations():
     s = r"""
     {settings.GATK_cmd} \
@@ -49,9 +38,6 @@ def list_annotations():
     return parse_command_string(s)
 
 
-@arg('input_bam')
-@arg('output_bam')
-@plain_signature
 def ReduceBam(input_bam,output_bam,interval):
     s = r"""
     {settings.GATK_cmd} \
@@ -121,7 +107,7 @@ def CombineVariants(input_vcfs,output_vcf):
     """ 
     return parse_command_string(s,INPUTs=INPUTs,output_vcf=output_vcf)
 
-def VariantQualityRecalibration(input_vcf,recal,tranches,rscript,mode,exome_or_wgs,haplotypeCaller_or_unifiedGenotyper,inbreedingcoeff=True):
+def VariantQualityRecalibration(input_vcf,output_recal,output_tranches,output_rscript,mode,exome_or_wgs,haplotypeCaller_or_unifiedGenotyper,inbreedingcoeff=True):
     """
     note that inbreedingcoeff is only calculated if there were more than 20 samples
     mode should probably be SNP or INDEL
@@ -151,9 +137,9 @@ def VariantQualityRecalibration(input_vcf,recal,tranches,rscript,mode,exome_or_w
                 -resource:dbsnp,known=true,training=false,truth=false,prior=6.0 {settings.dbsnp_path} \
                 -an QD -an HaplotypeScore -an MQRankSum -an ReadPosRankSum -an FS -an MQ {InbreedingCoeff} \
                 -mode SNP \
-                -recalFile {recal} \
-                -tranchesFile {tranches} \
-                -rscriptFile {rscript}
+                -recalFile {output_recal} \
+                -tranchesFile {output_tranches} \
+                -rscriptFile {output_rscript}
                 """
             elif mode == 'INDEL':
                 s = r"""
@@ -165,11 +151,11 @@ def VariantQualityRecalibration(input_vcf,recal,tranches,rscript,mode,exome_or_w
                 -resource:mills,known=true,training=true,truth=true,prior=12.0 {settings.mills_path} \
                 -an QD -an FS -an HaplotypeScore -an ReadPosRankSum -an {InbreedingCoeff} \
                 -mode INDEL \
-                -recalFile {recal} \
-                -tranchesFile {tranches} \
-                -rscriptFile {rscript}
+                -recalFile {output_recal} \
+                -tranchesFile {output_tranches} \
+                -rscriptFile {output_rscript}
                 """
-        elif haplotypeCaller_or_unifiedGenotyper == 'UnifiedGenotyper':
+        elif haplotypeCaller_or_unifiedGenotyper == 'HaplotypeCaller':
             raise NotImplementedError()
             if mode == 'SNP' or mode == 'INDEL': 
                 s = r"""
@@ -188,18 +174,54 @@ def VariantQualityRecalibration(input_vcf,recal,tranches,rscript,mode,exome_or_w
     elif mode == 'wgs':
         raise NotImplementedError()
             
+    return parse_command_string(s,input_vcf=input_vcf,output_recal=output_recal,InbreedingCoeff=InbreedingCoeff,output_tranches=output_tranches,output_rscript=output_rscript)
+
+def ApplyRecalibration(input_vcf,input_recal,input_tranches,output_recalibrated_vcf,mode,haplotypeCaller_or_unifiedGenotyper):
+    """
+    """
+    if mode not in ['SNP','INDEL']:
+        raise ValidationError('invalid parameter')
+    if haplotypeCaller_or_unifiedGenotyper not in ['HaplotypeCaller','UnifiedGenotyper']:
+        raise ValidationError('invalid parameter')
+    
+    if haplotypeCaller_or_unifiedGenotyper == 'UnifiedGenotyper':
+        if mode == 'SNP': 
+            s = r"""
+            {settings.GATK_cmd} \
+            -T ApplyRecalibration \
+            -R {settings.reference_fasta_path} \
+            -input {input_vcf} \
+            -tranchesFile {input_tranches} \
+            -recalFile {input_recal} \
+            -o {output_recalibrated_vcf} \
+            --ts_filter_level 99.0 \
+            -mode SNP
+            """
+        elif mode == 'INDEL':
+            s = r"""
+            {settings.GATK_cmd} \
+            -T ApplyRecalibration \
+            -R {settings.reference_fasta_path} \
+            -input {input_vcf} \
+            -tranchesFile {input_tranches} \
+            -recalFile {input_recal} \
+            -o {output_recalibrated_vcf} \
+            --ts_filter_level 95.0 \
+            -mode INDEL
+            """
+    elif haplotypeCaller_or_unifiedGenotyper == 'HaplotypeCaller':
+        raise NotImplementedError()
+        if mode == 'SNP' or mode == 'INDEL': 
+            s = r"""
+            {settings.GATK_cmd} \
+            -T ApplyRecalibration \
+            -R {settings.reference_fasta_path} \
+            -input {input_vcf} \
+            -tranchesFile {input_tranches} \
+            -recalFile {input_recal} \
+            -o {output_recalibrated_vcf} \
+            --ts_filter_level 97.0 \
+            -mode BOTH
+            """
             
-    return parse_command_string(s,input_vcf=input_vcf,InbreedingCoeff=InbreedingCoeff,recal=recal,tranches=tranches,rscript=rscript)
-
-parser = ArghParser()
-parser.add_commands([list_annotations,ReduceBam])
-
-if __name__=='__main__':
-    #will run the command if executing this file directly
-    output_file = file('/tmp/command.sh','wb')
-    output_file.write('#!/bin/sh\n')
-    os.system('chmod 750 %s'%output_file.name)
-    parser.dispatch(output_file=output_file,raw_output=True)
-    os.system('cat %s'%output_file.name)
-    output_file.close()
-    os.system('%s'%output_file.name)
+    return parse_command_string(s,input_vcf=input_vcf,output_recalibrated_vcf=output_recalibrated_vcf,input_recal=input_recal,input_tranches=input_tranches)

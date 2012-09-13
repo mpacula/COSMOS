@@ -8,7 +8,8 @@ resource_bundle_path = '/home2/erik/gatk/bundle/b37'
 queue_output_dir = '/vol3/cai_testgluster'
 tmp_dir='/mnt/tmp'
 
-#auto generated
+
+### auto generated
 GATK_cmd = 'java -Xmx5g -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(gatk_jar = os.path.join(GATK_path,'GenomeAnalysisTK.jar'),tmp_dir=tmp_dir)
 def get_Picard_cmd(jar,memory="5g"):
     return 'java -Xmx5g -jar {picard_jar}'.format(picard_jar = os.path.join(Picard_path,jar))

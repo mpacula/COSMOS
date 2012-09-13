@@ -145,6 +145,7 @@ class Workflow(models.Model):
             order_in_workflow = m+1
         
         batch_exists = Batch.objects.filter(workflow=self,name=name)
+        
         if hard_reset:
             if not batch_exists:
                 raise ValidationError("Batch does not exist.  Cannot proceed with a hard_reset.  Please set hard_reset to True in order to continue.")
@@ -350,6 +351,12 @@ class Batch(models.Model):
     
     def numNodes(self):
         return Node.objects.filter(batch=self).count()
+    
+    def clean_up(self):
+        """
+        executed ONLY at the end of a workflow.  right now just removes old batches that weren't used in last resume
+        """
+        Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
     
     def add_node(self, name, pre_command, outputs, hard_reset=False):
         """

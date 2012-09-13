@@ -24,11 +24,3 @@ coming soon.
 
 ## Web Interface
 `./manage runserver 0.0.0.0:8000`
-
-## License
-
-non-commercial use only
-
-## Author
-
-[Erik Gafni](mailto:erik_gafni@hms.harvard.edu)
