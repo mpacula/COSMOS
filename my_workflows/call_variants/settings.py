@@ -21,4 +21,4 @@ mills_path = os.path.join(resource_bundle_path,'Mills_and_1000G_gold_standard.in
 #Setup Cosmos
 
    
-from Cosmos import cosmos #the magic line to import Cosmos and Django compatibility
+from Cosmos import cosmos_session #the magic line to import Cosmos and Django compatibility

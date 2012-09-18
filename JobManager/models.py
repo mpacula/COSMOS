@@ -7,8 +7,7 @@ import re
 from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
 from Cosmos.helpers import check_and_create_output_dir
-import time
-from Cosmos import cosmos
+import cosmos_session
 
 import django.dispatch
 jobAttempt_done = django.dispatch.Signal(providing_args=["jobAttempt"])
@@ -58,9 +57,6 @@ class JobAttempt(models.Model):
     drmaa_jobID = models.BigIntegerField(null=True) #drmaa drmaa_jobID, note: not database primary key
     drmaa_exitStatus = models.SmallIntegerField(null=True)
     drmaa_utime = models.IntegerField(null=True) #in seconds
-    stdout_head = models.TextField(null=True,max_length=500, help_text="First 500 chars of STDOUT")
-    stderr_head = models.TextField(null=True,max_length=500, help_text="First 500 chars of STDERR")
-    
     
     _drmaa_info = PickledObjectField(null=True) #drmaa_info object returned by python-drmaa will be slow to access
     
@@ -92,10 +88,13 @@ class JobAttempt(models.Model):
         
     def update_from_drmaa_info(self):
         """takes _drmaa_info objects and updates a JobAttempt's attributes like utime and exitStatus"""
-        if 'ru_utime' in self._drmaa_info['resourceUsage']:      
-            self.drmaa_utime = math.ceil(float(self._drmaa_info['resourceUsage']['ru_utime']))
-        self.drmaa_exitStatus = self._drmaa_info['exitStatus']
-        self.successful = self.drmaa_exitStatus == 0 and self._drmaa_info['wasAborted'] == False
+        if self._drmaa_info is None:
+            self.successful = False
+        else:
+            if 'ru_utime' in self._drmaa_info['resourceUsage']:
+                self.drmaa_utime = math.ceil(float(self._drmaa_info['resourceUsage']['ru_utime']))
+            self.drmaa_exitStatus = self._drmaa_info['exitStatus']
+            self.successful = self.drmaa_exitStatus == 0 and self._drmaa_info['wasAborted'] == False
         self.save()
     
     def get_drmaa_STDOUT_filepath(self):
@@ -119,7 +118,7 @@ class JobAttempt(models.Model):
     @property
     def get_drmaa_status(self):
         try:
-            s = decode_drmaa_state[cosmos.drmaa_session.jobStatus(str(self.drmaa_jobID))]
+            s = decode_drmaa_state[cosmos_session.drmaa_session.jobStatus(str(self.drmaa_jobID))]
         except drmaa.InvalidJobException:
             if self.queue_status == 'completed':
                 if self.successful:
@@ -127,7 +126,7 @@ class JobAttempt(models.Model):
                 else:
                     s = decode_drmaa_state[drmaa.JobState.FAILED]
             else:
-                s = 'not sure'
+                s = 'not sure' #job doesnt exist in queue anymore but didn't succeed or fail
         return s
     
     def get_drmaa_info(self):
@@ -163,17 +162,11 @@ class JobAttempt(models.Model):
     def hasFinished(self,drmaa_info):
         """Function for JobManager to Run when this JobAttempt finishes"""
         self.queue_status = 'completed'
-        self._drmaa_info = drmaa_info._asdict()
+        if drmaa_info is not None:
+            self._drmaa_info = drmaa_info._asdict()
         self.update_from_drmaa_info()
         
-        with open(self.get_drmaa_STDOUT_filepath()) as f:
-            self.stdout_head = f.read(500)
-            
-        with open(self.get_drmaa_STDERR_filepath()) as f:
-            self.stderr_head = f.read(500)
-        
         self.save()
-        jobAttempt_done.send(sender=self)
     
     @models.permalink    
     def url(self):
@@ -200,20 +193,21 @@ class JobManager(models.Model):
     @property
     def _jobAttempts(self):
         return JobAttempt.objects.all()
+    
         
     def __init__(self,*args,**kwargs):
         super(JobManager,self).__init__(*args,**kwargs)
             
     def close_session(self):
         #TODO delete all jobtemplates
-        cosmos.drmaa_session.exit()
+        cosmos_session.drmaa_session.exit()
 
-    def terminate_all_queued_or_running_jobAttempts(self):
-        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):
-            self.terminate_jobAttempt(jobAttempt)
-        
-    def terminate_jobAttempt(self,jobAttempt):
-        cosmos.drmaa_session.control(jobAttempt.drmaa_job_id, drmaa.JobControlAction.TERMINATE)
+#    def terminate_all_queued_or_running_jobAttempts(self):
+#        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):
+#            self.terminate_jobAttempt(jobAttempt)
+#        
+#    def terminate_jobAttempt(self,jobAttempt):
+#        cosmos_session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
         
     def addJobAttempt(self, command_script_path, drmaa_output_dir, jobName = "Generic_Job_Name", drmaa_native_specification=''):
         """
@@ -226,7 +220,7 @@ class JobManager(models.Model):
         ##TODO use shell scripts to launch jobs
         job = JobAttempt(jobManager=self, command_script_path = command_script_path, jobName = jobName, drmaa_output_dir = drmaa_output_dir, drmaa_native_specification=drmaa_native_specification)
         job.command_script_text = job._get_command_shell_script_text()
-        job.createJobTemplate(base_template = cosmos.drmaa_session.createJobTemplate())
+        job.createJobTemplate(base_template = cosmos_session.drmaa_session.createJobTemplate())
         job.save()
         return job
         
@@ -240,20 +234,26 @@ class JobManager(models.Model):
         """Submits and runs a job"""
         if job.queue_status != 'not_queued':
             raise JobStatusError('JobAttempt has already been submitted')
-        job.drmaa_jobID = cosmos.drmaa_session.runJob(job.jobTemplate)
+        job.drmaa_jobID = cosmos_session.drmaa_session.runJob(job.jobTemplate)
         job.queue_status = 'queued'
         job.jobTemplate.delete() #prevents memory leak
         job.save()
         return job
         
-    def waitForJob(self,job):
+    def __waitForJob(self,job):
         """
         Waits for a job to finish
         Returns a drmaa info object
         """
         if job.queue_status != 'queued':
             raise JobStatusError('JobAttempt is not in the queue.  Make sure you submit() the job first, and make sure it hasn\'t alreay been collected.')
-        drmaa_info = cosmos.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
+        try:
+            drmaa_info = cosmos_session.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
+        except Exception as e:
+            if e == "code 24: no usage information was returned for the completed job":
+                drmaa_info = None
+            
+            
         job.hasFinished(drmaa_info)
         job.save()
         return job
@@ -267,9 +267,14 @@ class JobManager(models.Model):
         """
         if self.get_numJobsQueued() > 0:
             try:
-                drmaa_info = cosmos.drmaa_session.wait(drmaa.Session.JOB_IDS_SESSION_ANY)
+                drmaa_info = cosmos_session.drmaa_session.wait(drmaa.Session.JOB_IDS_SESSION_ANY)
             except drmaa.errors.InvalidJobException: #throws this when there are no jobs to wait on
+                self.workflow.log.error('ddrmaa_session.wait threw invalid job exception.  there are no jobs left?')
                 return None
+            except Exception as msg:
+                self.workflow.log.error(msg)
+                return None
+                
             job = JobAttempt.objects.get(drmaa_jobID = drmaa_info.jobId)
             job.hasFinished(drmaa_info)
             return job
@@ -284,6 +289,9 @@ class JobManager(models.Model):
             else:
                 break
             
+    def delete(self,*args,**kwargs):
+        self._jobAttempts.all().delete()
+        super(JobManager,self).__init__(self,*args,**kwargs)
         
     def toString(self):
         return "JobAttempt Manager, created on %s" % self.created_on

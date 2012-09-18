@@ -1,13 +1,11 @@
 import settings
-import inspect
 from django.core.exceptions import ValidationError
 
+import cosmos_session
 
-from Cosmos import cosmos
+import logging
 
-log = cosmos.log
-
-tmp_dir = '/mnt/tmp'
+logging.basicConfig(level=logging.DEBUG)
 
 def parse_command_string(txt,**kwargs):
     kwargs['settings'] = settings
@@ -19,14 +17,14 @@ def parse_command_string(txt,**kwargs):
     try:
         s = '\n'.join(x).format(**kwargs)
     except KeyError:
-        log.warning('*'*76)
-        log.warning("format() error occurred here:")
-        log.warning('txt is:'*76)
-        log.warning('\n'.join(x))
-        log.warning('-'*76)
-        log.warning('keys available are:'*76)
-        log.warning(kwargs.keys())
-        log.warning('*'*76)
+        logging.warning('*'*76)
+        logging.warning("format() error occurred here:")
+        logging.warning('txt is:'*76)
+        logging.warning('\n'.join(x))
+        logging.warning('-'*76)
+        logging.warning('keys available are:'*76)
+        logging.warning(kwargs.keys())
+        logging.warning('*'*76)
         raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
     return s
 

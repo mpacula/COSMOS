@@ -4,23 +4,26 @@ Core Requirements:
 - mysql
 - most be run on a DRMAA enabled cluster (GridEngine, LSF, Condor, etc.)
 
-#### install instructions:
+## install instructions:
 	git clone this
 	cd Cosmos
 	virtualenv venv
 	source venv/bin/activate
 	pip install -r pip_requirements.txt
+	#configure Cosmos (see below)
 
-#### configuration file:
-* edit `cosmos_settings.py`
-* set:
-
-	home_path = '/path/to/Cosmos'
-	default_root_output_dir = '/mnt/output_dir'
-
-* set any SGE or LSF specific environment variables, if necessary.  For example:
+### configuration file:
+edit `cosmos_settings.py`
+set:
+** home_path = '/path/to/Cosmos'
+** default_root_output_dir = '/mnt/output_dir'
+** mysql stuff
+set any SGE or LSF specific environment variables, if necessary.  For example:
 
 `os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge6/lib/linux-x64/libdrmaa.so'`
+
+## finally	
+	./manage.py syncdb
 
 
 # Example Workflows

@@ -151,4 +151,4 @@ node = AR_batch.add_node(name='INDEL',
 workflow.run_batch(AR_batch)
 workflow.wait_on_all_nodes()
 
-workflow.clean_up()
+workflow._clean_up()

@@ -8,3 +8,4 @@ django-pdb==0.3.2
 django-picklefield==0.2.1
 drmaa==0.5
 ipython
+gunicorn

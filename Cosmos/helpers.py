@@ -3,6 +3,23 @@ from django.core.exceptions import ValidationError
 import os
 import logging
 
+from django.db import transaction
+
+@transaction.commit_manually
+def flush_transaction():
+    """
+    Flush the current transaction so we don't read stale data
+
+    Use in long running processes to make sure fresh data is read from
+    the database.  This is a problem with MySQL and the default
+    transaction mode.  You can fix it by setting
+    "transaction-isolation = READ-COMMITTED" in my.cnf or by calling
+    this function at the appropriate moment
+    """
+    transaction.commit()
+
+
+
 def validate_name(txt,field_name=''):
     """
     Validates that txt is alphanumeric and underscores, decimals, or hyphens only
@@ -63,11 +80,11 @@ def get_logger(name,path):
     # create file handler which logs even debug messages
     fh = logging.FileHandler(path)
     fh.setLevel(logging.INFO)
-    fh.set_name('cosmos_fh')
+    #fh.set_name('cosmos_fh')
     # create console handler with a higher log level
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
-    ch.set_name('cosmos_fh')
+    #ch.set_name('cosmos_fh')
     # add the handlers to logger
     fh.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
     ch.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))

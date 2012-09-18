@@ -1,32 +1,38 @@
-#Cosmos Settings
-import cosmos_settings #the magic line to import Cosmos and Django compatibility
+#Import Cosmos
+import sys
+cosmos_path = '/home/esg21/workspace/Cosmos'
+if cosmos_path not in sys.path:
+    sys.path.append(cosmos_path)
+import cosmos_session
 
-
-import re
-import os
+#Begin Workflow
 from Workflow.models import Workflow, Batch
 
 workflow = Workflow.restart(name='Test_Workflow')
 assert isinstance(workflow, Workflow)
 
-batch_a = workflow.add_batch("Echo")
-assert isinstance(batch_a,Batch)
-batch_a.add_node(name='1', pre_command='echo "hello" > {output_dir}/{outputs[out]}', outputs = {'out':'echo.out'})
-batch_a.add_node(name='2', pre_command='echo "world" > {output_dir}/{outputs[out]}', outputs = {'out':'echo.out'})
-workflow.run_batch(batch_a)
-workflow.wait_on_all_nodes()
+
+batch_sleep = workflow.add_batch("Long_Running_Job")
+batch_sleep.add_node(name='1', pre_command='sleep 240')
+workflow.run_batch(batch_sleep)
+
+batch_echo = workflow.add_batch("Echo")
+batch_echo.add_node(name='1', pre_command='echo "hello" > {output_dir}/{outputs[out]}', outputs = {'out':'echo.out'}, reverse='yes')
+batch_echo.add_node(name='2', pre_command='echo "world" > {output_dir}/{outputs[out]}', outputs = {'out':'echo.out'}, reverse='yes')
+batch_echo.add_node(name='3', pre_command='echo "don\'t reverse me" > {output_dir}/{outputs[out]}', outputs = {'out':'echo.out'}, reverse='no')
+workflow.run_batch(batch_echo)
+workflow.wait(batch_echo)
 
 batch_reverse = workflow.add_batch("Reverse")
-assert isinstance(batch_reverse,Batch)
-for node in batch_a.nodes:
+for node in workflow.get_tagged_nodes(reverse="yes"):
     input_path = node.outputs_fullpaths['out']
     batch_reverse.add_node(name=node.name, pre_command='rev '+input_path+' > {output_dir}/{outputs[out]}', outputs = {'out':'rev.out'})
 workflow.run_batch(batch_reverse)
-workflow.wait_on_all_nodes()
+workflow.wait(batch_reverse)
 
-
-batch_check_reattempt = workflow.add_batch("Check_Reattempt")
+batch_check_reattempt = workflow.add_batch("Check_Failure")
 batch_check_reattempt.add_node(name=node.name, pre_command='i_wont_work', outputs = {})
 workflow.run_batch(batch_check_reattempt)
-workflow.wait_on_all_nodes()
+workflow.wait(batch_check_reattempt)
 
+workflow.finished()

@@ -1,6 +1,5 @@
 # Django settings for Cosmos project.
-import cosmos_settings
-home_path = cosmos_settings.home_path
+from cosmos_settings import home_path, DATABASE
 import os
 
 
@@ -14,14 +13,7 @@ ADMINS = (
 MANAGERS = ADMINS
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': 'pype',                      # Or path to database file if using sqlite3.
-        'USER': 'pype',                      # Not used with sqlite3.
-        'PASSWORD': 'YUWLXcJWZvXfxDXb',                  # Not used with sqlite3.
-        'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
-        'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
-    }
+    'default': DATABASE
 }
 
 # Local time zone for this installation. Choices can be found here:
@@ -60,7 +52,7 @@ MEDIA_URL = ''
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = os.path.join(home_path,'/static/')
+STATIC_ROOT = os.path.join(home_path,'static/')
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
@@ -73,7 +65,7 @@ ADMIN_MEDIA_PREFIX = '/static/admin/'
 
 # Additional locations of static files
 STATICFILES_DIRS = (
-    os.path.join(home_path,'/Cosmos/static/'),
+    os.path.join(home_path,'Cosmos/static/'),
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
@@ -109,7 +101,7 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'Cosmos.urls'
 
 TEMPLATE_DIRS = (
-    '/home2/erik/workspace/Cosmos/templates',
+    os.path.join(home_path,'templates'),
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
@@ -120,6 +112,7 @@ INSTALLED_APPS = (
     #'django_pdb',
     'south',
     'Workflow',
+    'gunicorn',
     'JobManager',
     'debug_toolbar',
     'django.contrib.auth',

@@ -1,5 +1,5 @@
 from argh import arg,ArghParser,command,CommandError
-cosmos_settings
+import cosmos_session
 from Workflow.models import Workflow
 import os
 
@@ -9,9 +9,9 @@ def terminate(args):
     if (args.name and args.id) or (not args.name and not args.id):
         raise CommandError('please choose a name OR an id')
     if args.name:
-        wf = Workflow.objects.get(args.name)
+        wf = Workflow.objects.get(name=args.name)
     elif args.id:
-        wf = Workflow.objects.get(args.id)
+        wf = Workflow.objects.get(pk=args.id)
     wf.terminate()
     print "Told workflow {} to terminate".format(wf)
 
