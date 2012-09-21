@@ -101,7 +101,7 @@ class JobAttempt(models.Model):
         """Returns the path to the STDOUT file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            filename = filter(lambda x:re.search('\.o%s$' % self.drmaa_jobID,x), files)[0]
+            filename = filter(lambda x:re.match('(\.o{0})|({0}\.out)'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None
@@ -110,7 +110,7 @@ class JobAttempt(models.Model):
         """Returns the path to the STDERR file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            filename = filter(lambda x:re.search('\.e%s$' % self.drmaa_jobID,x), files)[0]
+            filename = filter(lambda x:re.match('(\.e{0})|({0}\.err)'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None
@@ -173,7 +173,7 @@ class JobAttempt(models.Model):
         return ('jobAttempt_view',[str(self.id)])
     
     def __str__(self):
-        return 'JobAttempt [{}] [drmaa_jobId:{}]'.format(self.id,self.drmaa_jobID)
+        return 'JobAttempt [{0}] [drmaa_jobId:{1}]'.format(self.id,self.drmaa_jobID)
     
     def toString(self):
         attrs_to_list = ['command_script_text','successful','queue_status','STDOUT_filepath','STDERR_filepath']
@@ -191,8 +191,8 @@ class JobManager(models.Model):
     updated_on = models.DateTimeField(auto_now = True)
         
     @property
-    def _jobAttempts(self):
-        return JobAttempt.objects.all()
+    def jobAttempts(self):
+        return JobAttempt.objects.filter(jobManager=self)
     
         
     def __init__(self,*args,**kwargs):

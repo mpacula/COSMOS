@@ -18,7 +18,7 @@ def terminate(args):
 
 @arg('-p','--port',help='port to serve on',default='8080')
 def runweb(args):
-    os.system('./manage.py runserver 0.0.0.0:{}'.format(args.port))    
+    os.system('./manage.py runserver 0.0.0.0:{0}'.format(args.port))    
 
 parser = ArghParser()
 parser.add_commands([terminate,runweb])

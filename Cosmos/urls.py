@@ -19,10 +19,12 @@ urlpatterns = patterns('',
     url(r'JobManager/JobAttempt/(\d+)/$', 'JobManager.views.jobAttempt',name='jobAttempt_view'),
     url(r'JobManager/JobAttempt/(\d+)/output/(.+)$', 'JobManager.views.jobAttempt_output',name='jobAttempt_output'),
     url(r'SGE/$', 'Cosmos.views.SGE',name='sge'),
+    url(r'LSF/$', 'Cosmos.views.LSF',name='lsf'),
     url(r'Workflow/$', 'Workflow.views.index',name='workflow'),
     url(r'Workflow/(\d+)/$', 'Workflow.views.view',name='workflow_view'),
     url(r'Workflow/view_log/(\d+)/$', 'Workflow.views.view_log',name='workflow_view_log'),
     url(r'Workflow/Batch/(\d+)/$', 'Workflow.views.batch_view',name='batch_view'),
+    url(r'Workflow/Node/(\d+)/$', 'Workflow.views.node_view',name='node_view'),
     url(r'^$', 'Cosmos.views.index',name='home'),
 )
 

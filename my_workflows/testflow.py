@@ -1,8 +1,5 @@
 #Import Cosmos
 import sys
-cosmos_path = '/home/esg21/workspace/Cosmos'
-if cosmos_path not in sys.path:
-    sys.path.append(cosmos_path)
 import cosmos_session
 
 #Begin Workflow

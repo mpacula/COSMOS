@@ -10,7 +10,7 @@
 <p>
 <a href="{% url workflow_view_log workflow.id %}" class="btn btn-info">View Log</a>
 </p>
-{% for batch in batches %}
+{% for batch in batches_ordered %}
           <div class="alert alert-info">
             <a href="{{batch.url}}">
                 <h3>

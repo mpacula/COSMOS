@@ -42,6 +42,11 @@ def batch_view(request,pid):
         nodes = paginator.page(paginator.num_pages)
     return render_to_response('Workflow/Batch/view.html', { 'request':request,'batch': batch, 'page_size':page_size,'paged_nodes':nodes }, context_instance=RequestContext(request))
 
+def node_view(request,pid):
+    node = Node.objects.get(pk=pid)
+    jobAttempts_list = node._jobAttempts.all()
+    return render_to_response('Workflow/Node/view.html', { 'request':request,'node': node, 'jobAttempts_list':jobAttempts_list }, context_instance=RequestContext(request))
+
 def view_log(request,pid):
     workflow = Workflow.objects.get(pk=pid)
     return render_to_response('Workflow/view_log.html', { 'request':request,'workflow': workflow }, context_instance=RequestContext(request))

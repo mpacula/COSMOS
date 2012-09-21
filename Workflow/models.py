@@ -5,8 +5,8 @@ import os
 from Cosmos.helpers import validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField
-import shutil
-import cosmos_settings
+import sys,re
+from cosmos_session import cosmos_settings
     
 status_choices=(
                 ('successful','Executed successfully.'),
@@ -37,9 +37,9 @@ class Workflow(models.Model):
         self.save()
         ids = [ str(ja.drmaa_jobID) for ja in self.jobManager._jobAttempts.filter(queue_status='queued') ]
         jobIDs = ', '.join(ids)
-        cmd = 'qdel {}'.format(jobIDs)
+        cmd = 'qdel {0}'.format(jobIDs)
         os.system(cmd)
-        self.log.warning('Executed {}'.format(cmd))
+        self.log.warning('Executed {0}'.format(cmd))
         
     
     def _is_terminating(self):
@@ -57,7 +57,7 @@ class Workflow(models.Model):
     def __init__(self, *args, **kwargs):
         super(Workflow,self).__init__(*args, **kwargs)
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
-            raise ValidationError('Workflow with name {} already exists.  Please choose a different one or use .resume()'.format(self.name))
+            raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .resume()'.format(self.name))
         #create jobmanager
         if not hasattr(self,'jobManager') or self.jobManager is None:
             self.jobManager = JobManager.objects.create()
@@ -75,29 +75,37 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
     
     @staticmethod
-    def resume(name=None):
+    def resume(name=None,dry_run=False):
         """
         Resumes a workflow from the last failed node.  Automatically deletes any
         unsuccessful nodes and their associated files, so if you try to
         `add_node()` a node with a name that already exists but failed,
         you can change its parameters like pre_command and outputs.
+        
+        Note that as far as unique names go, spaces and underscores are equivalent since interally spaces are converted to underscores 
         """
+        name = re.sub("\s","_",name)
         if Workflow.objects.filter(name=name).count() == 0:
-            raise ValidationError('Workflow {} does not exist, cannot resume it'.format(name))
+            print >> sys.stderr,'Workflow {0} does not exist, cannot resume it'.format(name)
+            return Workflow.create(name=name)
         wf = Workflow.objects.get(name=name)
         wf._terminating=False
         wf.resume_from_last_failure=True
+        wf.dry_run=dry_run
         wf.save()
         wf.log.info('Resuming this workflow.')
         Batch.objects.filter(workflow=wf).update(order_in_workflow=None)
+        if dry_run:
+            wf.log.info('Doing a Dry Run.')
         return wf
 
     @staticmethod
-    def restart(name=None,root_output_dir=None):
+    def restart(name=None,root_output_dir=None,dry_run=False):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
         """
+        name = re.sub("\s","_",name)
         old_wf_exists = Workflow.objects.filter(name=name).count() > 0
         
         if root_output_dir is None:
@@ -110,7 +118,7 @@ class Workflow(models.Model):
         else:
             wf_id=None
         
-        new_wf = Workflow.create(_wf_id=wf_id,name=name,root_output_dir=root_output_dir)
+        new_wf = Workflow.create(_wf_id=wf_id,name=name,root_output_dir=root_output_dir,dry_run=dry_run)
         if not old_wf_exists:
             new_wf.log.warning('Tried to restart a workflow that doesn\'t exist yet'.format(name))
         new_wf.log.info('Restarting this Workflow.')
@@ -119,6 +127,7 @@ class Workflow(models.Model):
                 
     @staticmethod
     def create(name=None,dry_run=False,root_output_dir=None,_wf_id=None):
+        name = re.sub("\s","_",name)
         if name is None:
             raise ValidationError('Name of a workflow cannot be None')
         #set default output_dir?
@@ -132,7 +141,9 @@ class Workflow(models.Model):
                             output_dir=output_dir,
                             dry_run=dry_run)
         wf.save()
-        wf.log.info('Created Workflow {}.'.format(wf))
+        wf.log.info('Created Workflow {0}.'.format(wf))
+        if dry_run:
+            wf.log.info('Doing a Dry Run.')
         return wf
             
         
@@ -147,7 +158,8 @@ class Workflow(models.Model):
         :parameter name: The name of the batch, must be unique within this Workflow
         :parameter hard_reset: Delete any batch with this name including all of its nodes
         """
-        self.log.info("Adding batch {}".format(name))
+        name = re.sub("\s","_",name)
+        self.log.info("Adding batch {0}".format(name))
         #determine order
         m = Batch.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
         if m is None:
@@ -161,15 +173,15 @@ class Workflow(models.Model):
             if not batch_exists:
                 raise ValidationError("Batch does not exist.  Cannot proceed with a hard_reset.  Please set hard_reset to True in order to continue.")
             else:
-                self.log.info("Doing a hard reset on batch {}".format(name))
+                self.log.info("Doing a hard reset on batch {0}".format(name))
                 Batch.objects.get(workflow=self,name=name).delete()
                 
         if self.resume_from_last_failure:
             b, created = Batch.objects.get_or_create(workflow=self,name=name)
             if created:
-                self.log.info('Creating {} from scratch'.format(b))
+                self.log.info('Creating {0} from scratch'.format(b))
             else:
-                self.log.info('Node {} already exists, and resume is on so loading it from history.'.format(b))
+                self.log.info('Node {0} already exists, and resume is on so loading it from history.'.format(b))
         else:
             b = Batch.objects.create(workflow=self,name=name)
         b.order_in_workflow = order_in_workflow
@@ -189,16 +201,16 @@ class Workflow(models.Model):
         
         #delete_files=True will delete all output files
         if delete_files:
-            self.log.info('deleting directory {}'.format(self.output_dir))
+            self.log.info('Deleting directory {0}'.format(self.output_dir))
             if os.path.exists(self.output_dir):
-                shutil.rmtree(self.output_dir)
+                os.system('rm -rf {0}'.format(self.output_dir))
                 
         
     def __create_command_sh(self,command,file_path):
         with open(file_path,'wb') as f:
             f.write('#!/bin/sh\n')
             f.write(command)
-        os.system('chmod 700 {}'.format(file_path))
+        os.system('chmod 700 {0}'.format(file_path))
 
     def __exit(self):
         self._terminating=False
@@ -215,7 +227,7 @@ class Workflow(models.Model):
             self.log.warning("Workflow was terminated, exiting with exit code 2")
             self.__exit()
 
-    def _runNode(self,node):
+    def _run_node(self,node):
         """
         Executes a node and returns a jobAttempt
         """
@@ -229,8 +241,8 @@ class Workflow(models.Model):
         try:
             node.exec_command = node.pre_command.format(output_dir=node.output_dir,outputs = node.outputs)
         except KeyError:
-            self.log.error('Failed to format() pre_command:\n{}\nwith:\noutput_dir={} and outputs = {}'.format(node.pre_command,node.output_dir,node.outputs))
-            raise ValidationError('Command for node {} is formatted incorrectly'.format(node))
+            self.log.error('Failed to format() pre_command:\n{0}\nwith:\noutput_dir={0} and outputs = {0}'.format(node.pre_command,node.output_dir,node.outputs))
+            raise ValidationError('Command for node {0} is formatted incorrectly'.format(node))
                 
         #create command.sh that gets executed
         command_script_path = os.path.join(node.output_dir,'command.sh')
@@ -246,7 +258,7 @@ class Workflow(models.Model):
             self.log.info('Dry Run: skipping submission of job {0}'.format(jobAttempt))
         else:
             self.jobManager.submitJob(jobAttempt)
-            self.log.debug('submitted jobAttempt with jobAttempt id {0}'.format(jobAttempt.drmaa_jobID))
+            self.log.info('Submitted jobAttempt with jobAttempt id {0}'.format(jobAttempt.drmaa_jobID))
         node.save()
         self.jobManager.save()
         return jobAttempt
@@ -259,11 +271,12 @@ class Workflow(models.Model):
 
 #will have to implement with my own wait loop
 #    def synch_batch(self,batch):
-#        self.log.info('waiting on batch {}'.format(batch))
+#        self.log.info('waiting on batch {0}'.format(batch))
 #        self.jobManager.drmaa_session.
 
     def run_batch(self,batch):
-        self.log.info('Running batch {}'.format(batch))
+        self.log.info('Running batch {0}'.format(batch))
+        
         if batch.successful:
             self.log.info('{0} has already been executed successfully, skip run.'.format(batch))
             return
@@ -272,7 +285,7 @@ class Workflow(models.Model):
                 self.log.info('{0} has already been executed successfully, skip run.'.format(node))
             else:
                 self.log.debug('{0} has not been executed successfully yet.'.format(node))
-                self._runNode(node)
+                self._run_node(node)
 
 
     def _reattempt_node(self,node,failed_jobAttempt):
@@ -288,11 +301,11 @@ class Workflow(models.Model):
                 self.save()
                 return False
             elif numAttempts < self.max_reattempts:
-                self.log.warning("JobAttempt {} of node {} failed, this is attempt # {}, so retrying".format(failed_jobAttempt, node,numAttempts))
-                self._runNode(node)
+                self.log.warning("JobAttempt {0} of node {0} failed, this is attempt # {0}, so retrying".format(failed_jobAttempt, node,numAttempts))
+                self._run_node(node)
                 return True
             else:
-                self.log.warning("Node {} has reached max_reattempts of {}.  This node has failed".format(self, self.max_reattempts))
+                self.log.warning("Node {0} has reached max_reattempts of {0}.  This node has failed".format(self, self.max_reattempts))
                 self.status = 'failed'
                 self.save()
                 return False
@@ -306,7 +319,7 @@ class Workflow(models.Model):
         if batch is None:
             wait_msg = 'Waiting on all nodes...'
         else:
-            wait_msg = 'Waiting on batch {}'.format(batch)
+            wait_msg = 'Waiting on batch {0}'.format(batch)
         self.log.info(wait_msg)
         for jobAttempt in self.jobManager.yield_All_Queued_Jobs():
             node = jobAttempt.node
@@ -320,7 +333,7 @@ class Workflow(models.Model):
                     node._has_finished()
                      
             if batch is not None and Batch.objects.get(pk=batch.id).is_done():
-                self.log.info('Wait on Batch {} completed!'.format(batch))
+                self.log.info('Wait on Batch {0} completed!'.format(batch))
                 break
                     
         if batch is None:
@@ -348,6 +361,7 @@ class Workflow(models.Model):
         """
         self._check_for_leftover_nodes()
         self._clean_up()
+        self.log.info('Finished.')
         
     def _check_for_leftover_nodes(self):
         if self.nodes.filter(status='in_progress').count():
@@ -380,7 +394,7 @@ class Workflow(models.Model):
         Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
     
     def __str__(self):
-        return 'Workflow[{}] {}'.format(self.id,self.name)
+        return 'Workflow[{0}] {1}'.format(self.id,self.name)
             
     def toString(self):
         s = 'Workflow[{0.id}] {0.name} resume_from_last_failure={0.resume_from_last_failure}\n'.format(self)
@@ -439,7 +453,7 @@ class Batch(models.Model):
         validate_name(self.name,'Batch_Name')
         #validate unique name
         if Batch.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
-            raise ValidationError("Batch names must be unique within a given Workflow. The name {} already exists.".format(self.name))
+            raise ValidationError("Batch names must be unique within a given Workflow. The name {0} already exists.".format(self.name))
 
     @property
     def log(self):
@@ -496,6 +510,7 @@ class Batch(models.Model):
         :param hard_reset: Deletes this node and all associated files and start it fresh
         :param **kwargs: any other keyword arguments will add `tag`s to the node
         """
+        name = re.sub("\s","_",name)
         
         node_exists = Node.objects.filter(batch=self,name=name).count() > 0
         if node_exists:
@@ -510,15 +525,15 @@ class Batch(models.Model):
         #delete if hard_reset
         if hard_reset:
             if not node_exists:
-                raise ValidationError("Cannot hard_reset node with name {} as it doesn't exist.".format(name))
+                raise ValidationError("Cannot hard_reset node with name {0} as it doesn't exist.".format(name))
             node.delete()
         
         if node_exists and (not node.successful) and self.workflow.resume_from_last_failure:
-            self.log.info("Node was unsuccessful last time, trying again {}".format(node))
+            self.log.info("Node was unsuccessful last time, deleting old one and trying again {0}".format(node))
             node.delete()
         
         #if not self.workflow.resume_from_last_failure and node_exists:          
-        #    raise ValidationError("Node with name {} already exists and not resuming.  Either resume the workflow or hard_reset this node.")
+        #    raise ValidationError("Node with name {0} already exists and not resuming.  Either resume the workflow or hard_reset this node.")
         
         node,created = Node.objects.get_or_create(batch=self,name=name,defaults={'pre_command':pre_command,'outputs':outputs})
         
@@ -529,22 +544,31 @@ class Batch(models.Model):
             if node.outputs != outputs:
                 raise ValidationError("You can't change the outputs of an existing successful node.  Use hard_reset=True if you really want to do this")
         if created:
-            self.log.info("Created node {} from scratch".format(node))
+            self.log.info("Created node {0} from scratch".format(node))
+            #if adding to a finished batch, set that batch's status to in_progress so new nodes are executed
+            batch = node.batch
+            if batch.is_done():
+                batch.status == 'in_progress'
+                batch.successful = False
+                batch.save()
+            
         elif not created and not self.successful:
             if self.workflow.resume_from_last_failure and node.successful:
-                self.log.warning("Loaded successful node {} in unsuccessful batch {} from history".format(node,node.batch))
+                self.log.warning("Loaded successful node {0} in unsuccessful batch {0} from history".format(node,node.batch))
 
         node.save()
-        
         node.tag(**kwargs)
             
         return node
 
 
     def is_done(self):
+        """
+        Returns True if this batch is finished successfully or failed
+        """
         return self.status == 'successful' or self.status == 'failed'
 
-    def _check_if_done(self):
+    def _are_all_nodes_done(self):
         return self.nodes.filter(Q(status = 'successful') or Q(status='failed')).count() == self.nodes.count()
         
     def _has_finished(self):
@@ -558,17 +582,19 @@ class Batch(models.Model):
             self.successful = True
             self.status = 'successful'
             self.save()
-            self.log.info('Batch {} successful!'.format(self))
+            self.log.info('Batch {0} successful!'.format(self))
         elif num_nodes_failed + num_nodes_successful == num_nodes:
             self.status='failed'
             self.save()
-            self.log.warning('Batch {} failed!'.format(self))
+            self.log.warning('Batch {0} failed!'.format(self))
                 
     
           
     def delete(self, *args, **kwargs):
         self.log.debug('Deleting Batch {0}'.format(self.name))
         self.nodes.all().delete()
+        if os.path.exists(self.output_dir):
+            os.system('rm -rf {0}'.format(self.output_dir))
         super(Batch, self).delete(*args, **kwargs)
     
     @models.permalink    
@@ -596,7 +622,7 @@ class NodeTag(models.Model):
     value = models.CharField(max_length=255)
     
     def __str__(self):
-        return "Tag({}) - {}: {}".format(self.node, self.key, self.value)
+        return "Tag({0}) - {0}: {0}".format(self.node, self.key, self.value)
 
 class Node(models.Model):
     
@@ -632,8 +658,9 @@ class Node(models.Model):
     def __init__(self, *args, **kwargs):
         super(Node,self).__init__(*args, **kwargs)
         validate_name(self.name)
-        if Node.objects.filter(batch=self,name=self.name).exclude(id=self.id).count() > 0:
-            raise ValidationError("Nodes belonging to a batch with the same name detected!".format(self.name))
+        if self.id is None:
+            if Node.objects.filter(batch=self,name=kwargs['name']).count() > 0:
+                raise ValidationError("Nodes belonging to a batch with the same name detected!".format(self.name))
         if self.id is None: #creating for the first time
             check_and_create_output_dir(self.output_dir) 
         
@@ -673,15 +700,13 @@ class Node(models.Model):
         else:
             self.status = 'failed'
             self.save()
-        self.log.debug("Node {} has finished with status '{}'".format(self,self.status))
-        if self.batch._check_if_done():
-            self.batch._has_finished()
+        self.log.debug("Node {0} has finished with status '{0}'".format(self,self.status))
 
     def delete(self, *args, **kwargs):
-        self.log.info('Deleting node {} and its output directory {}'.format(self.name,self.output_dir))
+        self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
         self._jobAttempts.all().delete()
         if os.path.exists(self.output_dir):
-            shutil.rmtree(self.output_dir)
+            os.system('rm -rf {0}'.format(self.output_dir))
         super(Node, self).delete(*args, **kwargs)
     
     def __str__(self):
@@ -734,6 +759,10 @@ class Node(models.Model):
         Returns the dictionary of this node's tags
         """
         return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
+    
+    @models.permalink    
+    def url(self):
+        return ('node_view',[str(self.id)])
 
 
 

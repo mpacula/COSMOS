@@ -4,13 +4,28 @@ import os
 import subprocess
 from Workflow.models import Workflow
 
+def __exec(cmd):
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    c = p.communicate()
+    #return 'stdout:\n' +c[0]+'\nstderr:\n'+c[1]
+    return c[0]+c[1]
+
 def SGE(request):
-    p = subprocess.Popen("qhost", shell=True, stdout=subprocess.PIPE)
-    qhost = p.communicate()[0]
-    p = subprocess.Popen("qstat", shell=True, stdout=subprocess.PIPE)
-    qstat = p.communicate()[0]
+    qhost = __exec("qhost")
+    qstat = __exec("qstat")
 
     return render_to_response('Cosmos/SGE/index.html', { 'request':request,'qhost': qhost, 'qstat':qstat }, context_instance=RequestContext(request))
+
+def LSF(request):
+    bjobs = __exec("bjobs")
+    bqueues = __exec("bqueues")
+    lsload = __exec("lsload")
+    lshosts = __exec("lshosts")
+    bhosts = __exec("bhosts")
+
+    return render_to_response('Cosmos/LSF/index.html', { 'request':request,'bjobs':bjobs,'bqueues':bqueues,'lsload':lsload,'lshosts':lshosts,'bhosts':bhosts, }, context_instance=RequestContext(request))
+
+
 
 def index(request):
     workflows = Workflow.objects.all()

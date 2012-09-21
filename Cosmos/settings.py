@@ -1,5 +1,13 @@
 # Django settings for Cosmos project.
-from cosmos_settings import home_path, DATABASE
+import sys,os
+path = os.environ['COSMOS_HOME_PATH']
+if path not in sys.path:
+    sys.path.append(path)
+
+from cosmos_session  import cosmos_settings
+home_path = cosmos_settings.home_path
+DATABASE = cosmos_settings.DATABASE
+
 import os
 
 
@@ -61,7 +69,7 @@ STATIC_URL = '/static/'
 # URL prefix for admin static files -- CSS, JavaScript and images.
 # Make sure to use a trailing slash.
 # Examples: "http://foo.com/static/admin/", "/static/admin/".
-ADMIN_MEDIA_PREFIX = '/static/admin/'
+#ADMIN_MEDIA_PREFIX = '/static/admin/'
 
 # Additional locations of static files
 STATICFILES_DIRS = (

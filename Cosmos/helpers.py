@@ -24,8 +24,8 @@ def validate_name(txt,field_name=''):
     """
     Validates that txt is alphanumeric and underscores, decimals, or hyphens only
     """
-    if re.match('^[a-zA-Z0-9_\.-]+$',txt) == None:
-        raise ValidationError('Field {} must be alphanumeric and underscores, decimals, or hyphens only.  Text that failed: {}'.format(field_name,txt))
+    if re.match('^[a-zA-Z0-9_\.\s-]+$',txt) == None:
+        raise ValidationError('Field {} must be alphanumeric and underscores, periods, spaces, or hyphens only.  Text that failed: {}'.format(field_name,txt))
     
 def validate_not_null(field):
     if field == None:
@@ -71,9 +71,10 @@ def get_logger(name,path):
     Gets a logger of name `name` that prints to stderr and to path
     """
     log = logging.getLogger(name)
+    #logging.basicConfig(level=logging.DEBUG)
     
     #check if we've already configured logger
-    if len(filter(lambda x: x.name=='cosmos_fh',log.handlers)) > 0:
+    if len(log.handlers) > 0:
         return log
     
     log.setLevel(logging.INFO)
@@ -95,7 +96,6 @@ def get_logger(name,path):
 
 def get_workflow_logger(workflow):
     """
-    Gets a logger of name `name` that prints to stderr and to workflow/log/main.log
     """
     log_dir = os.path.join(workflow.output_dir,'log')
     path = os.path.join(log_dir,'main.log')

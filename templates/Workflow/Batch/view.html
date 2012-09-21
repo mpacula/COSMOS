@@ -8,7 +8,7 @@
   <li class="active">{{batch}}</li>
 </ul>
    
-<div class="well">
+<div class="alert alert-info">
     <h1>
         {{batch}}
         {%if batch.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
@@ -51,13 +51,14 @@
         </ul>
     </span>
 </div>
+<br class="clear">
 {% endif %}
 <table class="table table-hover table-striped">
 {% for node in paged_nodes %}
     <tr><td>
         {%if node.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
         {%if node.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
-        <strong>{{node}}</strong> (status: {{node.status}}, file_size: {{node.file_size}}, time_to_run: {{node.time_to_run|format_time}}, successful: {{node.successful}})
+        <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong> (status: {{node.status}}, file_size: {{node.file_size}}, time_to_run: {{node.time_to_run|format_time}}, successful: {{node.successful}})
         <ul>
         {% for j in node.jobAttempts %}
             <li style="list-style-type:none">
