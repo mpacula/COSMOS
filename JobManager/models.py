@@ -78,7 +78,7 @@ class JobAttempt(models.Model):
         self.jobTemplate.workingDirectory = os.getcwd()
         self.jobTemplate.remoteCommand = self.command_script_path #TODO create a bash script that this this command_script_text
         #self.jobTemplate.args = self.command_script_text.split(' ')[1:]
-        self.jobTemplate.jobName = 'JobAttempt_'+self.jobName
+        self.jobTemplate.jobName = 'ja-'+self.jobName
         self.jobTemplate.outputPath = ':'+self.drmaa_output_dir
         self.jobTemplate.errorPath = ':'+self.drmaa_output_dir
         self.jobTemplate.blockEmail = True
@@ -290,7 +290,7 @@ class JobManager(models.Model):
                 break
             
     def delete(self,*args,**kwargs):
-        self._jobAttempts.all().delete()
+        #self.jobAttempts.delete()
         super(JobManager,self).__init__(self,*args,**kwargs)
         
     def toString(self):

@@ -32,7 +32,11 @@
 
 <h3>Nodes</h3>
 {% if paged_nodes.paginator.num_pages > 1 %}
+{% if paged_nodes.paginator.page_range|length <= 10 %}
 <div class="pagination">
+{%else%}
+<div class="pagination_big">
+{%endif%}
     <span class="step-links">
         <ul>
         {% if paged_nodes.has_previous %}
@@ -42,7 +46,7 @@
             <li {%if pagenum == paged_nodes.number%}class="active"{%endif%}><a href="?page={{pagenum}}">{{pagenum|add:"-1"|mult:page_size|add:"1"}} -
 			{%if forloop.last %} {{paged_nodes.paginator.count}}
 			{%else%}
-			 {{pagenum|mult:page_size}}{%endif%}</a></li>
+			 {{pagenum|mult:page_size}}{%endif%}</a>{% if paged_nodes.paginator.page_range|length > 10 %}, {%endif%}</li>
         	{%endfor %}
 
         {% if paged_nodes.has_next %}
@@ -51,7 +55,6 @@
         </ul>
     </span>
 </div>
-<br class="clear">
 {% endif %}
 <table class="table table-hover table-striped">
 {% for node in paged_nodes %}
@@ -62,11 +65,13 @@
         <ul>
         {% for j in node.jobAttempts %}
             <li style="list-style-type:none">
-                {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
-                {%if j.queue_status == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
-                {%if j.queue_status == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>{%endif%}
-                {%if j.get_drmaa_status == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
-                {%if j.get_drmaa_status == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
+                {% with qs=j.queue_status ds=j.get_drmaa_status %}
+                    {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
+	                {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
+	                {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>{%endif%}
+	                {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
+                    {%if ds == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
+                {% endwith%}
                 
                 <a href="{{j.url}}">{{ j }}</a>
             </li>

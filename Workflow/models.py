@@ -159,7 +159,7 @@ class Workflow(models.Model):
         :parameter hard_reset: Delete any batch with this name including all of its nodes
         """
         name = re.sub("\s","_",name)
-        self.log.info("Adding batch {0}".format(name))
+        self.log.info("Adding batch {0}.".format(name))
         #determine order
         m = Batch.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
         if m is None:
@@ -179,7 +179,7 @@ class Workflow(models.Model):
         if self.resume_from_last_failure:
             b, created = Batch.objects.get_or_create(workflow=self,name=name)
             if created:
-                self.log.info('Creating {0} from scratch'.format(b))
+                self.log.info('Creating {0} from scratch.'.format(b))
             else:
                 self.log.info('Node {0} already exists, and resume is on so loading it from history.'.format(b))
         else:
@@ -275,7 +275,7 @@ class Workflow(models.Model):
 #        self.jobManager.drmaa_session.
 
     def run_batch(self,batch):
-        self.log.info('Running batch {0}'.format(batch))
+        self.log.info('Running batch {0}.'.format(batch))
         
         if batch.successful:
             self.log.info('{0} has already been executed successfully, skip run.'.format(batch))
@@ -319,7 +319,7 @@ class Workflow(models.Model):
         if batch is None:
             wait_msg = 'Waiting on all nodes...'
         else:
-            wait_msg = 'Waiting on batch {0}'.format(batch)
+            wait_msg = 'Waiting on batch {0}...'.format(batch)
         self.log.info(wait_msg)
         for jobAttempt in self.jobManager.yield_All_Queued_Jobs():
             node = jobAttempt.node
@@ -394,7 +394,7 @@ class Workflow(models.Model):
         Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
     
     def __str__(self):
-        return 'Workflow[{0}] {1}'.format(self.id,self.name)
+        return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
             
     def toString(self):
         s = 'Workflow[{0.id}] {0.name} resume_from_last_failure={0.resume_from_last_failure}\n'.format(self)
@@ -602,7 +602,7 @@ class Batch(models.Model):
         return ('batch_view',[str(self.id)])
         
     def __str__(self):
-        return 'Batch[{1}] {0}'.format(self.name,self.id,)
+        return 'Batch[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
     
     def toString(self,tabs=0):
         # s = ['-'*72]
@@ -710,7 +710,7 @@ class Node(models.Model):
         super(Node, self).delete(*args, **kwargs)
     
     def __str__(self):
-        return 'Node[{1}] {0}'.format(self.name,self.id)
+        return 'Node[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
         
     def toString(self):
         drmaa_stdout = '' #default if job is unsuccessful

@@ -3,21 +3,25 @@ from django.core.exceptions import ValidationError
 import os
 import logging
 
-from django.db import transaction
-
-@transaction.commit_manually
-def flush_transaction():
-    """
-    Flush the current transaction so we don't read stale data
-
-    Use in long running processes to make sure fresh data is read from
-    the database.  This is a problem with MySQL and the default
-    transaction mode.  You can fix it by setting
-    "transaction-isolation = READ-COMMITTED" in my.cnf or by calling
-    this function at the appropriate moment
-    """
-    transaction.commit()
-
+def parse_command_string(txt,**kwargs):
+    """removes empty lines and white space.
+    also .format()s with the **kwargs dictioanry"""
+    x = txt.split('\n')
+    x = map(lambda x: x.strip(),x)
+    x = filter(lambda x: not x == '',x)
+    try:
+        s = '\n'.join(x).format(**kwargs)
+    except KeyError:
+        logging.warning('*'*76)
+        logging.warning("format() error occurred here:")
+        logging.warning('txt is:')
+        logging.warning('\n'.join(x))
+        logging.warning('-'*76)
+        logging.warning('keys available are:')
+        logging.warning(kwargs.keys())
+        logging.warning('*'*76)
+        raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
+    return s
 
 
 def validate_name(txt,field_name=''):

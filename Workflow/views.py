@@ -32,6 +32,7 @@ def batch_view(request,pid):
     page_size = 10
     paginator = Paginator(nodes_list, page_size) # Show 25 contacts per page
     page = request.GET.get('page')
+    if page is None: page = 1
     try:
         nodes = paginator.page(page)
     except PageNotAnInteger:
@@ -40,7 +41,8 @@ def batch_view(request,pid):
     except EmptyPage:
         # If page is out of range (e.g. 9999), deliver last page of results.
         nodes = paginator.page(paginator.num_pages)
-    return render_to_response('Workflow/Batch/view.html', { 'request':request,'batch': batch, 'page_size':page_size,'paged_nodes':nodes }, context_instance=RequestContext(request))
+    page_slice = "{0}:{1}".format(page,int(page)+9)
+    return render_to_response('Workflow/Batch/view.html', { 'request':request,'batch': batch,'page_size':page_size,'paged_nodes':nodes, 'page_slice':page_slice }, context_instance=RequestContext(request))
 
 def node_view(request,pid):
     node = Node.objects.get(pk=pid)

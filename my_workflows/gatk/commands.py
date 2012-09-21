@@ -1,41 +1,19 @@
-import settings
 from django.core.exceptions import ValidationError
 
 import cosmos_session
-
+from Cosmos.helpers import parse_command_string
 import logging
+import settings
+from settings import get_Gatk_cmd,get_Picard_cmd
 
-logging.basicConfig(level=logging.DEBUG)
+def _parse_cmd_str(s,**kwargs):
+    return parse_command_string(s,settings=settings,**kwargs)
 
-def parse_command_string(txt,**kwargs):
-    kwargs['settings'] = settings
-    """removes empty lines and white space.
-    also .format()s with settings and extra_config"""
-    x = txt.split('\n')
-    x = map(lambda x: x.strip(),x)
-    x = filter(lambda x: not x == '',x)
-    try:
-        s = '\n'.join(x).format(**kwargs)
-    except KeyError:
-        logging.warning('*'*76)
-        logging.warning("format() error occurred here:")
-        logging.warning('txt is:'*76)
-        logging.warning('\n'.join(x))
-        logging.warning('-'*76)
-        logging.warning('keys available are:'*76)
-        logging.warning(kwargs.keys())
-        logging.warning('*'*76)
-        raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
-    return s
-
-def list_annotations():
+def bwa_aln(fq,output_sai):
     s = r"""
-    {settings.GATK_cmd} \
-    -R {settings.reference_fasta_path} \
-    -T VariantAnnotator \
-    --list 
+    {settings.bwa_path} aln {fq} {settings.reference_fasta_path} > {output_sai}
     """
-    return parse_command_string(s)
+    return _parse_cmd_str(s,fq=fq,output_sai=output_sai)
 
 
 def ReduceBam(input_bam,output_bam,interval):
@@ -47,7 +25,7 @@ def ReduceBam(input_bam,output_bam,interval):
     -o {output_bam} \
     -L {interval}
     """
-    return parse_command_string(s,input_bam=input_bam,output_bam=output_bam,interval=interval)
+    return _parse_cmd_str(s,input_bam=input_bam,output_bam=output_bam,interval=interval)
 
 #i want input_bams to be a list so its not a command line argument right now
 def MergeSamFiles(input_bams,output_bam):
@@ -60,7 +38,7 @@ def MergeSamFiles(input_bams,output_bam):
     MERGE_SEQUENCE_DICTIONARIES=True \
     ASSUME_SORTED=True
     """
-    return parse_command_string(s,INPUTs=INPUTs,output_bam=output_bam,Picard_MergeSamFiles=settings.get_Picard_cmd('MergeSamFiles.jar'))
+    return _parse_cmd_str(s,INPUTs=INPUTs,output_bam=output_bam,Picard_MergeSamFiles=get_Picard_cmd('MergeSamFiles.jar'))
 
 def HaplotypeCaller(input_bam,output_bam,interval,glm):
     pass
@@ -83,7 +61,7 @@ def _UnifiedGenotyper(input_bam,output_bam,interval,glm):
     -baq CALCULATE_AS_NECESSARY \
     -L {interval}
     """ 
-    return parse_command_string(s,input_bam=input_bam,output_bam=output_bam,interval=interval,glm=glm)
+    return _parse_cmd_str(s,input_bam=input_bam,output_bam=output_bam,interval=interval,glm=glm)
 
 def UnifiedGenotyper_SNP(input_bam,output_bam,interval):
     return _UnifiedGenotyper(input_bam=input_bam, output_bam=output_bam, interval=interval, glm='SNP')
@@ -109,7 +87,7 @@ def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
     -o {output_vcf} \
     -genotypeMergeOptions {genotypeMergeOptions}
     """ 
-    return parse_command_string(s,INPUTs=INPUTs,output_vcf=output_vcf,genotypeMergeOptions=genotypeMergeOptions)
+    return _parse_cmd_str(s,INPUTs=INPUTs,output_vcf=output_vcf,genotypeMergeOptions=genotypeMergeOptions)
 
 def VariantQualityRecalibration(input_vcf,output_recal,output_tranches,output_rscript,mode,exome_or_wgs,haplotypeCaller_or_unifiedGenotyper,inbreedingcoeff=True):
     """
@@ -178,7 +156,7 @@ def VariantQualityRecalibration(input_vcf,output_recal,output_tranches,output_rs
     elif mode == 'wgs':
         raise NotImplementedError()
             
-    return parse_command_string(s,input_vcf=input_vcf,output_recal=output_recal,InbreedingCoeff=InbreedingCoeff,output_tranches=output_tranches,output_rscript=output_rscript)
+    return _parse_cmd_str(s,input_vcf=input_vcf,output_recal=output_recal,InbreedingCoeff=InbreedingCoeff,output_tranches=output_tranches,output_rscript=output_rscript)
 
 def ApplyRecalibration(input_vcf,input_recal,input_tranches,output_recalibrated_vcf,mode,haplotypeCaller_or_unifiedGenotyper):
     """
@@ -228,4 +206,4 @@ def ApplyRecalibration(input_vcf,input_recal,input_tranches,output_recalibrated_
             -mode BOTH
             """
             
-    return parse_command_string(s,input_vcf=input_vcf,output_recalibrated_vcf=output_recalibrated_vcf,input_recal=input_recal,input_tranches=input_tranches)
+    return _parse_cmd_str(s,input_vcf=input_vcf,output_recalibrated_vcf=output_recalibrated_vcf,input_recal=input_recal,input_tranches=input_tranches)

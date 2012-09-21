@@ -11,8 +11,6 @@ tmp_dir='/mnt/tmp'
 
 ### auto generated
 GATK_cmd = 'java -Xmx5g -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(gatk_jar = os.path.join(GATK_path,'GenomeAnalysisTK.jar'),tmp_dir=tmp_dir)
-def get_Picard_cmd(jar,memory="5g"):
-    return 'java -Xmx5g -jar {picard_jar}'.format(picard_jar = os.path.join(Picard_path,jar))
 reference_fasta_path = os.path.join(resource_bundle_path,'human_g1k_v37.fasta')
 dbsnp_path = os.path.join(resource_bundle_path,'dbsnp_135.b37.vcf')
 hapmap_path = os.path.join(resource_bundle_path,'hapmap_3.3.b37.sites.vcf')

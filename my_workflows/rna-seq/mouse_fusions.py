@@ -9,7 +9,7 @@ import os
 
 input_files_path = '/home2/himanshu/rna-seq-fusion/input'
 
-workflow = Workflow.restart(name='Mouse_RNA_Seq_fusion_2', root_output_dir='/mnt/himanshu')
+workflow = Workflow.restart(name='Mouse_RNA_Seq_fusion_3', root_output_dir='/mnt/himanshu')
 
 
 def parse_command_string(txt,**kwargs):
@@ -33,7 +33,7 @@ sequences = [
           ]
 
 
-fusion_b1_batch = workflow.add_batch("fusions_bowtie1")
+fusion_b1_batch = workflow.add_batch("tophat_fusion_bowtie1")
 #fusion_b2_batch = workflow.add_batch("fusions_bowtie2")
 #for bowtie_version in ['bowtie1','bowtie2']:
 for i, seqs in enumerate(sequences):
@@ -54,7 +54,7 @@ for i, seqs in enumerate(sequences):
     {seq1} {seq2}
     """
     cmd = parse_command_string(cmd,seq1=seq1,seq2=seq2,output_dir='{output_dir}')
-    fusion_b1_batch.add_node(name="seq1_{0}".format(i+1),pre_command = cmd, outputs = {})
+    fusion_b1_batch.add_node(name="seq{0}".format(i+1),pre_command = cmd, outputs = {})
         
         
         

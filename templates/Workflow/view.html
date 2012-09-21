@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load url from future %}
 {% load extras %}
 {%block content%}
 
@@ -8,7 +9,7 @@
   <li class="active">{{workflow}}</li>
 </ul>
 <p>
-<a href="{% url workflow_view_log workflow.id %}" class="btn btn-info">View Log</a>
+<a href="{% url 'workflow_view_log' workflow.id %}" class="btn btn-info">View Log</a>
 </p>
 {% for batch in batches_ordered %}
           <div class="alert alert-info">

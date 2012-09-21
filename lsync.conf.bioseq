@@ -1,0 +1,19 @@
+settings = {
+   delay=0,
+   logfile = "/home/erik/log/lsyncd.log",
+   statusFile = "/home/erik/log/lsyncd-status.log",
+   statusInterval = 100 }
+sync{
+   default.rsyncssh,
+   source="/home/erik/workspace/Cosmos/",
+   targetdir="workspace/Cosmos/",
+   host="esg21@orchestra",
+   host="ch158749@gpp",
+   host="erik@bioseq.info",
+   rsyncOps={
+	"--exclude-from=/home/erik/workspace/Cosmos/.gitignore",
+	"--no-perms",
+	"-vz",
+	"-l"
+   }
+}
