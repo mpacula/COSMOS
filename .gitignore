@@ -1,5 +1,7 @@
 .pydevproject
 *.*~
+quickCommit.bash
+lsync.conf*
 .Rhistory
 .project
 .git/
