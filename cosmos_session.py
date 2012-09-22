@@ -25,10 +25,3 @@ import drmaa
 drmaa_session = drmaa.Session()
 drmaa_session.initialize()
 
-#import signal
-#def signal_handler(signal, frame):
-#        print 'You pressed Ctrl+C!'
-#        sys.exit(0)
-#signal.signal(signal.SIGINT, signal_handler)
-#print 'Press Ctrl+C'
-#signal.pause()

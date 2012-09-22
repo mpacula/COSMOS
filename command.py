@@ -13,15 +13,20 @@ def terminate(args):
     elif args.id:
         wf = Workflow.objects.get(pk=args.id)
     wf.terminate()
-    print "Told workflow {} to terminate".format(wf)
+    print "Told workflow {0} to terminate".format(wf)
 
 
 @arg('-p','--port',help='port to serve on',default='8080')
 def runweb(args):
-    os.system('./manage.py runserver 0.0.0.0:{0}'.format(args.port))    
+    os.system('./manage.py runserver 0.0.0.0:{0}'.format(args.port))   
+     
+def workflows(args):
+    for workflow in Workflow.objects.all():
+        print workflow
+        
 
 parser = ArghParser()
-parser.add_commands([terminate,runweb])
+parser.add_commands([terminate,runweb,workflows])
 
 if __name__=='__main__':
     parser.dispatch()

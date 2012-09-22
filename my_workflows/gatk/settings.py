@@ -7,7 +7,7 @@ GATK_path = '/home/ch158749/tools/GenomeAnalysisTKLite-2.1-8-gbb7f038'
 Picard_path = '/home2/ch158749/picard-tools-1.74'
 bwa_path = '/home/ch158749/tools/bwa-0.6.2/bwa'
 #resource_bundle_path = '/home2/erik/gatk/bundle/b37'
-resource_bundle_path = '/nas/gatk_bundle1.5'
+resource_bundle_path = '/nas/erik/gatk_bundle1.5'
 queue_output_dir = '/vol3/cai_testgluster'
 tmp_dir='/mnt/tmp'
 

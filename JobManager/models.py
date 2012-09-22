@@ -88,20 +88,23 @@ class JobAttempt(models.Model):
         
     def update_from_drmaa_info(self):
         """takes _drmaa_info objects and updates a JobAttempt's attributes like utime and exitStatus"""
-        if self._drmaa_info is None:
+        dInfo = self._drmaa_info
+        if dInfo is None:
             self.successful = False
         else:
-            if 'ru_utime' in self._drmaa_info['resourceUsage']:
-                self.drmaa_utime = math.ceil(float(self._drmaa_info['resourceUsage']['ru_utime']))
-            self.drmaa_exitStatus = self._drmaa_info['exitStatus']
-            self.successful = self.drmaa_exitStatus == 0 and self._drmaa_info['wasAborted'] == False
+            if 'ru_utime' in dInfo['resourceUsage']:
+                self.drmaa_utime = math.ceil(float(dInfo['resourceUsage']['ru_utime'])) #is SGE
+            elif 'start_time' in dInfo['resourceUsage']: #is LSF
+                self.drmaa_utime = int(dInfo['resourceUsage']['end_time']) - int(dInfo['resourceUsage']['start_time'])
+            self.drmaa_exitStatus = dInfo['exitStatus']
+            self.successful = self.drmaa_exitStatus == 0 and dInfo['wasAborted'] == False
         self.save()
     
     def get_drmaa_STDOUT_filepath(self):
         """Returns the path to the STDOUT file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            filename = filter(lambda x:re.match('(\.o{0})|({0}\.out)'.format(self.drmaa_jobID),x), files)[0]
+            filename = filter(lambda x:re.search('(\.o{0}|{0}\.out)'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None
@@ -110,7 +113,7 @@ class JobAttempt(models.Model):
         """Returns the path to the STDERR file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            filename = filter(lambda x:re.match('(\.e{0})|({0}\.err)'.format(self.drmaa_jobID),x), files)[0]
+            filename = filter(lambda x:re.search('(\.e{0})|({0}\.err)'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None
@@ -240,23 +243,22 @@ class JobManager(models.Model):
         job.save()
         return job
         
-    def __waitForJob(self,job):
-        """
-        Waits for a job to finish
-        Returns a drmaa info object
-        """
-        if job.queue_status != 'queued':
-            raise JobStatusError('JobAttempt is not in the queue.  Make sure you submit() the job first, and make sure it hasn\'t alreay been collected.')
-        try:
-            drmaa_info = cosmos_session.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-        except Exception as e:
-            if e == "code 24: no usage information was returned for the completed job":
-                drmaa_info = None
-            
-            
-        job.hasFinished(drmaa_info)
-        job.save()
-        return job
+#    def __waitForJob(self,job):
+#        """
+#        Waits for a job to finish
+#        Returns a drmaa info object
+#        """
+#        if job.queue_status != 'queued':
+#            raise JobStatusError('JobAttempt is not in the queue.  Make sure you submit() the job first, and make sure it hasn\'t alreay been collected.')
+#        try:
+#            drmaa_info = cosmos_session.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
+#        except Exception as e:
+#            if e == "code 24: no usage information was returned for the completed job":
+#                drmaa_info = None
+#               
+#        job.hasFinished(drmaa_info)
+#        job.save()
+#        return job
     
     def get_numJobsQueued(self):
         return self.getJobs().filter(queue_status = 'queued').count()

@@ -11,7 +11,7 @@ def _parse_cmd_str(s,**kwargs):
 
 def bwa_aln(fq,output_sai):
     s = r"""
-    {settings.bwa_path} aln {fq} {settings.reference_fasta_path} > {output_sai}
+    {settings.bwa_path} aln {settings.reference_fasta_path} {fq} > {output_sai}
     """
     return _parse_cmd_str(s,fq=fq,output_sai=output_sai)
 
