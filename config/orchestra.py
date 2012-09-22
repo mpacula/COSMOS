@@ -1,12 +1,9 @@
 import os
 
 #Cosmos Settings
-home_path = '/home2/erik/workspace/Cosmos' #bioseq
-#home_path = '/home/esg21/workspace/Cosmos' #orchestra
-#home_path = '/home/ch158749/workspace/Cosmos' #gpp
-default_root_output_dir = '/mnt'
-#default_root_output_dir = '/scratch/esg21' #orchestra
-#default_root_output_dir = '/nas/erik' #gpp
+home_path = '/home/esg21/workspace/Cosmos' #orchestra
+default_root_output_dir = '/scratch/esg21' #orchestra
+DRM = 'LSF'
 
 
 DATABASE = {

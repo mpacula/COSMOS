@@ -3,8 +3,8 @@ import os
 #Cosmos Settings
 home_path = '/home/ch158749/workspace/Cosmos' #gpp
 default_root_output_dir = '/nas/erik/cosmos_out' #gpp
+DRM = 'LSF' #LSF, or GE
 
-#starcluster
 DATABASE = {
     'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
     'NAME': 'Cosmos',                      # Or path to database file if using sqlite3.

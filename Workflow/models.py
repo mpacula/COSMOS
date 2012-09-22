@@ -31,31 +31,6 @@ class Workflow(models.Model):
     max_reattempts = models.SmallIntegerField(default=3)
     _terminating = models.BooleanField(default=False,help_text='this workflow is terminating')
     
-    def terminate(self):
-        """
-        terminates this workflow
-        """
-        self.log.warning("Terminating this workflow...")
-        self._terminating = True
-        self.save()
-        ids = [ str(ja.drmaa_jobID) for ja in self.jobManager.jobAttempts.filter(queue_status='queued') ]
-        jobIDs = ', '.join(ids)
-        cmd = 'qdel {0}'.format(jobIDs)
-        os.system(cmd)
-        self.log.warning('Executed {0}'.format(cmd))
-    
-    def _is_terminating(self):
-        wf = Workflow.objects.get(pk=self.id) #database can be out of sync
-        return wf._terminating
-        
-    @property
-    def nodes(self):
-        return Node.objects.filter(batch__in=self.batch_set.all())
-    
-    @property
-    def file_size(self):
-        return folder_size(self.output_dir)
-    
     def __init__(self, *args, **kwargs):
         super(Workflow,self).__init__(*args, **kwargs)
         validate_name(self.name)
@@ -70,9 +45,42 @@ class Workflow(models.Model):
         check_and_create_output_dir(self.output_dir)
         
         self.log, self.log_path = get_workflow_logger(self)
+    
+    def terminate(self):
+        """
+        Terminates this workflow.  Generally executing via the command.py terminate
+        command line interface.  qdels all jobs and tells the workflow to terminate
+        """
+        self.log.warning("Terminating this workflow...")
+        self._terminating = True
+        self.save()
+        ids = [ str(ja.drmaa_jobID) for ja in self.jobManager.jobAttempts.filter(queue_status='queued') ]
+        jobIDs = ', '.join(ids)
+        cmd = 'qdel {0}'.format(jobIDs)
+        os.system(cmd)
+        self.log.warning('Executed {0}'.format(cmd))
+    
+    def _is_terminating(self):
+        """
+        Helper function to check if this workflow is terminating.  Accessing the Workflow._terminating
+        variable will probably hit a cache, so this function forces a database query.
+        """
+        wf = Workflow.objects.get(pk=self.id) #database can be out of sync
+        return wf._terminating
+        
+    @property
+    def nodes(self):
+        """Nodes in thsi batch"""
+        return Node.objects.filter(batch__in=self.batch_set.all())
+    
+    @property
+    def file_size(self):
+        """Size of the output directory"""
+        return folder_size(self.output_dir)
         
     @property
     def log_txt(self):
+        """Path to the logfile"""
         return file(self.log_path,'rb').read()
     
     @staticmethod
@@ -83,7 +91,9 @@ class Workflow(models.Model):
         `add_node()` a node with a name that already exists but failed,
         you can change its parameters like pre_command and outputs.
         
-        Note that as far as unique names go, spaces and underscores are equivalent since interally spaces are converted to underscores 
+        :param name: A unique name for this workflow
+        :param dry_run: This workflow is a dry run.  No jobs will actually be executed
+        :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
         """
         name = re.sub("\s","_",name)
         if Workflow.objects.filter(name=name).count() == 0:
@@ -105,6 +115,9 @@ class Workflow(models.Model):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
+        :param name: A unique name for this workflow
+        :param dry_run: This workflow is a dry run.  No jobs will actually be executed
+        :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
         """
         name = re.sub("\s","_",name)
         old_wf_exists = Workflow.objects.filter(name=name).count() > 0
@@ -128,6 +141,12 @@ class Workflow(models.Model):
                 
     @staticmethod
     def create(name=None,dry_run=False,root_output_dir=None,_wf_id=None):
+        """
+        Creates a new workflow
+        :param name: A unique name for this workflow
+        :param dry_run: This workflow is a dry run.  No jobs will actually be executed
+        :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
+        """
         name = re.sub("\s","_",name)
         if name is None:
             raise ValidationError('Name of a workflow cannot be None')
@@ -186,11 +205,15 @@ class Workflow(models.Model):
         
         
     def _close_session(self):
-        if hasattr(self.jobManager,'session'):
-            self.log.info('Ending session')
-            self.jobManager._close_session()
+        """Shuts down this workflow's jobmanager"""
+        self.log.info('Ending session')
+        self.jobManager._close_session()
             
     def delete(self, *args, **kwargs):
+        """
+        Deletes this workflow.
+        :param delete_files: Deletes all files associated with this workflow
+        """
         self._close_session()
         self.jobManager.delete()
         self.save()
@@ -211,12 +234,17 @@ class Workflow(models.Model):
                 
         
     def __create_command_sh(self,command,file_path):
+        """Create a sh script that will execute command"""
         with open(file_path,'wb') as f:
             f.write('#!/bin/sh\n')
             f.write(command)
         os.system('chmod 700 {0}'.format(file_path))
 
     def _check_termination(self,check_for_leftovers = True):
+        """
+        Checks if the current workflow is terminating.  If it is terminating, it will
+        initiate the termination sequence.
+        """
         if self._is_terminating():
             #make sure all jobs get returned
             self.log.warning("Termination sequence initiated.  Jobs queued must be killed manually so program can exit gracefully.")
@@ -264,11 +292,6 @@ class Workflow(models.Model):
         node.save()
         self.jobManager.save()
         return jobAttempt
-
-#will have to implement with my own wait loop
-#    def synch_batch(self,batch):
-#        self.log.info('waiting on batch {0}'.format(batch))
-#        self.jobManager.drmaa_session.
 
     def run_batch(self,batch):
         self.log.info('Running batch {0}.'.format(batch))
@@ -370,21 +393,22 @@ class Workflow(models.Model):
         self.log.info('Finished.')
         
     def _check_and_wait_for_leftover_nodes(self):
+        """Checks and waits for any leftover nodes"""
         if self.nodes.filter(status='in_progress').count()>0:
             self.log.warning("There are left over nodes in the queue, waiting for them to finish")
             self.__wait()
         
     def _clean_up(self):
         """
-        executed ONLY at the end of a workflow.  right now just removes old batches that weren't used in last resume
+        Should be executed at the end of a workflow.
         """
         self.log.debug("Cleaning up workflow")
         Batch.objects.filter(workflow=self,order_in_workflow=None).delete() #these batches weren't used again after a restart
                
-        if self._is_terminating():
-            for batch in self.batch_set.filter(status='in_progress').all():
-                batch.status = 'failed'
-                batch.save()
+#        if self._is_terminating():
+#            for batch in self.batch_set.filter(status='in_progress').all():
+#                batch.status = 'failed'
+#                batch.save()
     
     def restart_from_here(self):
         """
@@ -502,12 +526,13 @@ class Batch(models.Model):
     def numNodes(self):
         return Node.objects.filter(batch=self).count()
     
-    def add_node(self, name, pcmd, outputs={}, hard_reset=False, **kwargs):
+    def add_node(self, name, pcmd, outputs={}, hard_reset=False, memory_required = '', **kwargs):
         """
         Adds a node to the batch.
         :param pre_cmd: The preformatted command to execute
         :param outputs: a dictionary of outputs and their names
         :param hard_reset: Deletes this node and all associated files and start it fresh
+        :param memory_required: Optional setting to tell the DRM how much memory to reserve
         :param **kwargs: any other keyword arguments will add `tag`s to the node
         """
         #some user convenience stuff
@@ -569,6 +594,9 @@ class Batch(models.Model):
         return self.status == 'successful' or self.status == 'failed'
 
     def _are_all_nodes_done(self):
+        """
+        Returns True if all nodes have succeeded or failed in this batch
+        """
         return self.nodes.filter(Q(status = 'successful') | Q(status='failed')).count() == self.nodes.count()
         
     def _has_finished(self):
@@ -590,8 +618,10 @@ class Batch(models.Model):
             self.log.warning('Batch {0} failed!'.format(self))
                 
     
-          
     def delete(self, *args, **kwargs):
+        """
+        Deletes this batch and all files associated with it
+        """
         self.log.debug('Deleting Batch {0}'.format(self.name))
         self.nodes.all().delete()
         if os.path.exists(self.output_dir):
@@ -681,6 +711,10 @@ class Node(models.Model):
         return self._jobAttempts.count()
     
     def get_successful_jobAttempt(self):
+        """
+        Return this node's successful job attempt.  If there were no successful job attempts
+        return None
+        """
         jobs = self._jobAttempts.filter(successful=True)
         if len(jobs) == 1:
             return jobs[0]
@@ -731,6 +765,9 @@ class Node(models.Model):
 
 
     def delete(self, *args, **kwargs):
+        """
+        Deletes this node and all files associated with it
+        """
         self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
         self._jobAttempts.all().delete()
         if os.path.exists(self.output_dir):

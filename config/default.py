@@ -3,6 +3,7 @@ import os
 #Cosmos Settings
 home_path = '/home2/erik/workspace/Cosmos' #bioseq
 default_root_output_dir = '/mnt'
+DRM = 'GE'
 
 #starcluster
 DATABASE = {
