@@ -12,14 +12,12 @@
 	<div class="progress progress-{% status2csstype batch.status %} progress-striped" rel="tooltip" title="{{batch.percent_done}}% Completed" data-placement="right">
 		<div class="bar" style="opacity:.75;width:{{batch.percent_done}}%"%></div>
 	</div>
-	{% if details == True %}
 	Nodes: {{batch.numNodes}},
-	successful: {{batch.successful}},
 	status: {{batch.status}},
-	{{batch.percent_done}}% done,
-	file_size: {{batch.file_size}},
 	max job time: {{batch.max_job_time|format_time}},
-	total job time: {{batch.total_job_time|format_time}}
+	total job time: {{batch.total_job_time|format_time}}{% if details %},
+	successful: {{batch.successful}},
+	file_size: {{batch.file_size}}
 	{% endif %}
 </p>
 </div>

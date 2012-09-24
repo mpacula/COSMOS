@@ -29,6 +29,45 @@ def bwa_sampe(output_sam,r1_sai,r2_sai,r1_fq,r2_fq,ID,LIBRARY,SAMPLE_NAME,PLATFO
     """
     return _parse_cmd_str(s,output_sam=output_sam,r1_sai=r1_sai,r2_sai=r2_sai,r1_fq=r1_fq,r2_fq=r2_fq,ID=ID,LIBRARY=LIBRARY,SAMPLE_NAME=SAMPLE_NAME,PLATFORM=PLATFORM)
 
+def create_bam_list():
+    """bam.list input to queue"""
+    s= r"""
+    java \
+    """
+    return _parse_cmd_str(s,)
+
+def queue(input_bam_list):
+    s= r"""
+    java \
+    -classpath $CLASSPATH \
+    -Xmx4g \
+    -Djava.io.tmpdir=/nas/erik/tmp \
+    -jar $QUEUE_DIR/QueueLite.jar \
+    -S ~/workspace/Cosmos/my_workflows/gatk/DataProcessingPipeline.scala \
+    -i $INPUT_FILE \
+    -R $BUNDLE_DIR/human_g1k_v37.fasta \
+    -D $BUNDLE_DIR/dbsnp_135.b37.vcf \
+    -outputDir $OUTPUT_DIR/ \
+    -p MGH_BC \
+    -gv $OUTPUT_DIR/graphviz.dot \
+    -gvsg $OUTPUT_DIR/graphviz_scatter_gather.dot \
+    -log $OUTPUT_DIR/queue_output.log \
+    -jobReport $OUTPUT_DIR/job_report.pdf \
+    -retry 5 \
+    -resMemReq 3 \
+    -run
+    """
+    return _parse_cmd_str(s,)
+
+def CleanSam(input,output):
+     # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
+    s = r"""
+    {Picard_CleanSam} \
+    I={input} \
+    O={output}
+    """
+    return _parse_cmd_str(s,input=input,output=output,Picard_CleanSam=get_Picard_cmd('CleanSam.jar'))
+    
 
 def ReduceBam(input_bam,output_bam,interval):
     s = r"""
@@ -42,17 +81,17 @@ def ReduceBam(input_bam,output_bam,interval):
     return _parse_cmd_str(s,input_bam=input_bam,output_bam=output_bam,interval=interval)
 
 #i want input_bams to be a list so its not a command line argument right now
-def MergeSamFiles(input_bams,output_bam):
-    INPUTs = " \\\n".join(["INPUT={}".format(b) for b in input_bams])
+def MergeSamFiles(input_bams,output_bam,assume_sorted=True):
+    INPUTs = " \\\n".join(["INPUT={0}".format(b) for b in input_bams])
     s = r"""
     {Picard_MergeSamFiles} \
     {INPUTs} \
     OUTPUT={output_bam} \
     SORT_ORDER=coordinate \
     MERGE_SEQUENCE_DICTIONARIES=True \
-    ASSUME_SORTED=True
+    ASSUME_SORTED={assume_sorted}
     """
-    return _parse_cmd_str(s,INPUTs=INPUTs,output_bam=output_bam,Picard_MergeSamFiles=get_Picard_cmd('MergeSamFiles.jar'))
+    return _parse_cmd_str(s,INPUTs=INPUTs,output_bam=output_bam,assume_sorted=assume_sorted,Picard_MergeSamFiles=get_Picard_cmd('MergeSamFiles.jar'))
 
 def HaplotypeCaller(input_bam,output_bam,interval,glm):
     pass
@@ -92,7 +131,7 @@ def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
         UNSORTED - Take the genotypes in any order.
         REQUIRE_UNIQUE - Require that all samples/genotypes be unique between all inputs.
     """
-    INPUTs = " \\\n".join(["--variant:{},VCF {}".format(vcf[0],vcf[1]) for vcf in input_vcfs])
+    INPUTs = " \\\n".join(["--variant:{0},VCF {1}".format(vcf[0],vcf[1]) for vcf in input_vcfs])
     s = r"""
     {settings.GATK_cmd} \
     -T CombineVariants \

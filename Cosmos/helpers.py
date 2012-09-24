@@ -3,6 +3,23 @@ from django.core.exceptions import ValidationError
 import os
 import logging
 import subprocess
+import itertools
+
+def formatError(txt,dict):
+    logging.warning('*'*76)
+    logging.warning("format() error occurred here:")
+    logging.warning('txt is:')
+    logging.warning(txt)
+    logging.warning('-'*76)
+    logging.warning('keys available are:')
+    logging.warning(dict.keys())
+    logging.warning('*'*76)
+    raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
+    
+
+def groupby(iterable,fxn):
+    """aggregates an iterable using a function"""
+    return itertools.groupby(sorted(iterable,key=fxn),fxn)
 
 def parse_command_string(txt,**kwargs):
     """removes empty lines and white space.
@@ -10,18 +27,11 @@ def parse_command_string(txt,**kwargs):
     x = txt.split('\n')
     x = map(lambda x: x.strip(),x)
     x = filter(lambda x: not x == '',x)
+    txt = '\n'.join(x)
     try:
-        s = '\n'.join(x).format(**kwargs)
+        s = txt.format(**kwargs)
     except KeyError:
-        logging.warning('*'*76)
-        logging.warning("format() error occurred here:")
-        logging.warning('txt is:')
-        logging.warning('\n'.join(x))
-        logging.warning('-'*76)
-        logging.warning('keys available are:')
-        logging.warning(kwargs.keys())
-        logging.warning('*'*76)
-        raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
+        formatError(txt,kwargs)
     return s
 
 

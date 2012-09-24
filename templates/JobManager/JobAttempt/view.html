@@ -14,7 +14,7 @@
 <dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.command_script_text}}</pre></dd>
 <dt>Output Directory</dt><dd><code>{{jobAttempt.node.job_output_dir}}</code></dd>
 <dt>Outputs<strong></strong></dt>
-{% for key,val in jobAttempt.node.outputs_fullpaths.items %}
+{% for key,val in jobAttempt.node.output_paths.items %}
 <dd><em>{{key}}</em>: <a href="{% url jobAttempt_output jobAttempt.id key%}"><code>{{val}}</code></a></dd>
 {% empty %}
 <dd>None</dd>

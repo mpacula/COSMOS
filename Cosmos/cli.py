@@ -4,7 +4,7 @@ from Workflow.models import Workflow
 import os
 
 @arg('id',type=str, help='id for workflow to terminate')
-def terminate(args):
+def stop(args):
     if args.id is None:
         raise CommandError('please choose a name OR an id')
     wf = Workflow.objects.get(pk=args.id)
@@ -25,7 +25,7 @@ def shell(args):
     os.system('manage shell_plus')
 
 parser = ArghParser()
-parser.add_commands([terminate,runweb,workflows,shell])
+parser.add_commands([stop,runweb,workflows,shell])
 
 if __name__=='__main__':
     parser.dispatch()

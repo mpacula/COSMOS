@@ -4,12 +4,12 @@ import os
 #This pipeline's settings
 #GATK_path = '/home2/erik/2gatk/GenomeAnalysisTK-2.1-8-g5efb575'
 GATK_path = '/home/ch158749/tools/GenomeAnalysisTKLite-2.1-8-gbb7f038'
-Picard_path = '/home2/ch158749/picard-tools-1.74'
+Picard_path = '/home/ch158749/tools/picard-tools-1.77'
 bwa_path = '/home/ch158749/tools/bwa-0.6.2/bwa'
 #resource_bundle_path = '/home2/erik/gatk/bundle/b37'
 resource_bundle_path = '/nas/erik/gatk_bundle1.5'
 queue_output_dir = '/vol3/cai_testgluster'
-tmp_dir='/mnt/tmp'
+tmp_dir='/dev/shm'
 
 
 ### auto generated
@@ -21,6 +21,6 @@ mills_path = os.path.join(resource_bundle_path,'Mills_and_1000G_gold_standard.in
 #Setup Cosmos
 
 def get_Picard_cmd(jar,memory="5g"):
-    return 'java -Xmx5g -jar {picard_jar}'.format(picard_jar = os.path.join(Picard_path,jar))
-def get_Gatk_cmd(jar,memory="5g"):
-    return 'java -Xmx5g -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(gatk_jar = os.path.join(GATK_path,'GenomeAnalysisTK.jar'),tmp_dir=tmp_dir)
+    return 'java -Xmx{memory} -Djava.io.tmpdir={tmp_dir} -jar {picard_jar}'.format(memory=memory,picard_jar = os.path.join(Picard_path,jar),tmp_dir=tmp_dir)
+def get_Gatk_cmd(memory="5g"):
+    return 'java -Xmx{memory} -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(memory=memory,gatk_jar = os.path.join(GATK_path,'GenomeAnalysisTK.jar'),tmp_dir=tmp_dir)

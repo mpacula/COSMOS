@@ -1,13 +1,12 @@
 from django.db import models
 from django.db.models import Q
 from JobManager.models import JobAttempt,JobManager
-import os
+import os,sys,re,logging
 from Cosmos.helpers import get_rusage,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
+from Cosmos import helpers
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField
-import sys,re
 from cosmos_session import cosmos_settings
-import logging
 
 waiting_on_workflow = None #set to whichever workflow has a wait().  used by ctrl_c to terminate it
 
@@ -45,6 +44,7 @@ class Workflow(models.Model):
         check_and_create_output_dir(self.output_dir)
         
         self.log, self.log_path = get_workflow_logger(self)
+        
     
     def terminate(self):
         """
@@ -185,7 +185,7 @@ class Workflow(models.Model):
         """
         name = re.sub("\s","_",name)
         self.log.info("Adding batch {0}.".format(name))
-        #determine order
+        #determine order in workflow
         m = Batch.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
         if m is None:
             order_in_workflow = 1
@@ -201,14 +201,12 @@ class Workflow(models.Model):
                 self.log.info("Doing a hard reset on batch {0}.".format(name))
                 Batch.objects.get(workflow=self,name=name).delete()
                 
-        if self.resume_from_last_failure:
-            b, created = Batch.objects.get_or_create(workflow=self,name=name)
-            if created:
-                self.log.info('Creating {0} from scratch.'.format(b))
-            else:
-                self.log.info('{0} already exists, and resume is on so loading it from history.'.format(b))
+        b, created = Batch.objects.get_or_create(workflow=self,name=name)
+        if created:
+            self.log.info('Creating {0} from scratch.'.format(b))
         else:
-            b = Batch.objects.create(workflow=self,name=name)
+            self.log.info('{0} already exists, and resume is on so loading it from history...'.format(b))
+            
         b.order_in_workflow = order_in_workflow
         b.save()
         return b
@@ -280,8 +278,7 @@ class Workflow(models.Model):
         try:
             node.exec_command = node.pre_command.format(output_dir=node.job_output_dir,outputs = node.outputs)
         except KeyError:
-            self.log.error('Failed to format() pre_command:\n{0}\nwith:\njob_output_dir={0} and outputs = {0}'.format(node.pre_command,node.job_output_dir,node.outputs))
-            raise ValidationError('pre_command for node {0} cannot be formatted.  Please make sure your outputs are set correctly.'.format(node))
+            helpers.formatError(node.pre_command,{'output_dir':node.job_output_dir,'outputs': node.outputs})
                 
         #create command.sh that gets executed
         command_script_path = os.path.join(node.output_dir,'command.sh')
@@ -338,7 +335,7 @@ class Workflow(models.Model):
                 self.save()
                 return False
     
-    def __wait(self,batch=None):
+    def __wait(self,batch=None,stop_on_fail=False):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         if batch is omitted or set to None, all running nodes will be waited on
@@ -360,6 +357,8 @@ class Workflow(models.Model):
                 submitted_another_job = self._reattempt_node(node,jobAttempt)
                 if not submitted_another_job:
                     node._has_finished(jobAttempt) #job has failed and out of reattempts
+                    if self._is_terminating() and stop_on_fail:
+                        self.terminate()
             
             if node.batch._are_all_nodes_done():
                 node.batch._has_finished()
@@ -374,12 +373,12 @@ class Workflow(models.Model):
         return nodes 
 
 
-    def wait(self, batch=None):
+    def wait(self, batch=None, stop_on_fail=True):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         if batch is omitted or set to None, all running nodes will be waited on
         """
-        nodes = self.__wait(batch=batch)
+        nodes = self.__wait(batch=batch,stop_on_fail=stop_on_fail)
         self._check_termination(check_for_leftovers=True)
         return nodes
 
@@ -535,7 +534,7 @@ class Batch(models.Model):
     def numNodes(self):
         return Node.objects.filter(batch=self).count()
     
-    def add_node(self, name, pcmd, outputs={}, hard_reset=False, mem_req = 0, **kwargs):
+    def add_node(self, name, pcmd, outputs={}, hard_reset=False, mem_req = 0, tags = {}):
         """
         Adds a node to the batch.
         :param pre_cmd: (str) The preformatted command to execute
@@ -571,11 +570,11 @@ class Batch(models.Model):
         node,created = Node.objects.get_or_create(batch=self,name=name,defaults={'pre_command':pcmd,'outputs':outputs,'memory_requirement':mem_req})
         
         #validation
-        if (not created) and node.successful and (not node_exists):  
+        if (not created) and node.successful:  
             if node.pre_command != pcmd:
-                raise ValidationError("You can't change the pcmd of a existing successful node.  Use hard_reset=True if you really want to do this")
+                self.log.error("You can't change the pcmd of a existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
             if node.outputs != outputs:
-                raise ValidationError("You can't change the outputs of an existing successful node.  Use hard_reset=True if you really want to do this")
+                self.log.error("You can't change the outputs of an existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this")
         
         if created:
             self.log.info("Created node {0} from scratch".format(node))
@@ -586,13 +585,13 @@ class Batch(models.Model):
                 batch.successful = False
                 batch.save()
         
-        #possible error?    
+        #this error should never occur    
         elif not created and not self.successful:
             if self.workflow.resume_from_last_failure and node.successful:
-                self.log.warning("Loaded successful node {0} in unsuccessful batch {0} from history".format(node,node.batch))
+                self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history".format(node,node.batch))
 
         node.save()
-        node.tag(**kwargs)
+        node.tag(**tags)
             
         return node
 
@@ -627,6 +626,25 @@ class Batch(models.Model):
             self.save()
             self.log.warning('Batch {0} failed!'.format(self))
                 
+    def nodes_by(self,*args):
+        """
+        Yields nodes, grouped by tags in *args.
+        :returns: a tuple of (tags used,nodes in group)
+        note: nodes without a single tag in *args will be ignored
+        usage: nodes_by('color','shape') will yield a tuple of the tags used, and the groups of nodes with different colors and shapes,
+               for example ({'color':'red','shape':'circle'},[node1,node2,node3])
+        """
+        node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=args).values() #get this batch's tags
+        
+        itr = helpers.groupby(node_tag_values,lambda x: x['node_id'])
+        node_ids2kvps = dict( [ (node_id,set([ (ntv['key'],ntv['value']) for ntv in ntvs ])) for node_id,ntvs in itr ] ) #ntvs = node_tag_values, #kvp = key_value_pair
+        # node_ids2kvps is a dict who's keys are node_ids and values are a set of (key,val) tags)
+        node_ids = node_ids2kvps.keys()    
+            
+        for kvps,node_ids in helpers.groupby(node_ids,lambda x: node_ids2kvps[x]): #this works because the key value pairs are unique sets
+            node_ids = [ x for x in node_ids ]
+            if len(kvps) == len(args): #make sure all kvps were used.  this could be more efficient, but oh well
+                yield dict(kvps),Node.objects.filter(pk__in=node_ids)
     
     def delete(self, *args, **kwargs):
         """
@@ -655,7 +673,6 @@ class Batch(models.Model):
             s.append(node_str)
         return '\n'.join(s)
             
-
 
 class NodeTag(models.Model):
     node = models.ForeignKey('Node')
@@ -763,13 +780,9 @@ class Node(models.Model):
         tag this node with keys and values.  keys must be unique
         usage: node.tag(color="blue",shape="circle")
         """
-        for key,val in kwargs.items():
-            val = str(val)
-            if NodeTag.objects.filter(node=self,key=key).count() > 0:
-                nodetag = NodeTag.objects.get(node=self,key=key)
-                nodetag.value=val
-            else:
-                nodetag = NodeTag.objects.create(node=self,key=key,value=val)
+        for key,value in kwargs.items():
+            value = str(value)
+            nodetag, created = NodeTag.objects.get_or_create(node=self,key=key,defaults= {'value':value})
             nodetag.save()
 
     @property            
