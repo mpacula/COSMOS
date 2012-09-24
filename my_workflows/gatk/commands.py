@@ -9,11 +9,25 @@ from settings import get_Gatk_cmd,get_Picard_cmd
 def _parse_cmd_str(s,**kwargs):
     return parse_command_string(s,settings=settings,**kwargs)
 
-def bwa_aln(fq,output_sai):
+def bwa_aln(fastq,output_sai):
     s = r"""
-    {settings.bwa_path} aln {settings.reference_fasta_path} {fq} > {output_sai}
+    {settings.bwa_path} aln {settings.reference_fasta_path} {fastq} > {output_sai}
     """
-    return _parse_cmd_str(s,fq=fq,output_sai=output_sai)
+    return _parse_cmd_str(s,fastq=fastq,output_sai=output_sai)
+
+
+def bwa_sampe(output_sam,r1_sai,r2_sai,r1_fq,r2_fq,ID,LIBRARY,SAMPLE_NAME,PLATFORM='ILLUMINA'):
+    s = r"""
+    {settings.bwa_path} sampe \
+    -f {output_sam} \
+    -r "@RG\tID:{ID}\tLB:{LIBRARY}\tSM:{SAMPLE_NAME}\tPL:{PLATFORM}" \
+    {settings.reference_fasta_path} \
+    {r1_sai} \
+    {r2_sai} \
+    {r1_fq} \
+    {r2_fq}
+    """
+    return _parse_cmd_str(s,output_sam=output_sam,r1_sai=r1_sai,r2_sai=r2_sai,r1_fq=r1_fq,r2_fq=r2_fq,ID=ID,LIBRARY=LIBRARY,SAMPLE_NAME=SAMPLE_NAME,PLATFORM=PLATFORM)
 
 
 def ReduceBam(input_bam,output_bam,interval):

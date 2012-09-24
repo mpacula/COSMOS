@@ -95,6 +95,7 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     # Uncomment the next line for simple clickjacking protection:
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
@@ -114,9 +115,9 @@ TEMPLATE_DIRS = (
 INSTALLED_APPS = (
     'django_extensions',
     #'django_pdb',
-#    'south',
+    'south',
     'Workflow',
-#    'gunicorn',
+    'gunicorn',
     'JobManager',
     'debug_toolbar',
     'django.contrib.auth',
@@ -170,3 +171,7 @@ DEBUG_TOOLBAR_CONFIG = {
     'TAG': 'div',
     'ENABLE_STACKTRACES' : True,
 }
+import django.conf.global_settings as DEFAULT_SETTINGS
+TEMPLATE_CONTEXT_PROCESSORS = DEFAULT_SETTINGS.TEMPLATE_CONTEXT_PROCESSORS + (
+ 'Workflow.context_processor.contproc',
+)

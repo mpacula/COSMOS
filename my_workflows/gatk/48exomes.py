@@ -1,8 +1,7 @@
 #Import Cosmos
-import sys,os,re
-import itertools
-import csv
+import sys,os,re,pickle,itertools,csv
 import cosmos_session
+
 from Workflow.models import Workflow, Batch
 from Cosmos.helpers import parse_command_string
 import commands
@@ -41,12 +40,23 @@ class Sample:
         filename = os.path.basename(path)
         with open(os.path.join(path,'SampleSheet.csv'), 'rb') as csvfile:
             reader = csv.DictReader(csvfile, delimiter=',')
-            flowcell = reader.next()['FCID']
+            rows = [ r for r in reader ]
+            flowcell = rows[0]['FCID']
+            flowcell2 = rows[1]['FCID']
+            if flowcell != flowcell2 or len(rows) > 2:
+                raise Exception('flowcell not as expected')
+                
             return Sample(name=re.sub('Sample_','',filename),input_path=path,flowcell=flowcell)
-         
+    
+    @property
+    def fastq_pairs(self):
+        if not hasattr(self, '_fastq_pairs'):
+            print 'Getting Sample Fastq Info'
+            self._fastq_pairs = [ fqps for fqps in self.yield_fastq_pairs() ]
+        return self._fastq_pairs
+            
         
     def yield_fastq_pairs(self):
-        fastq_pairs = []
         all_fastqs = filter(lambda x:re.search('\.fastq|\.fq$',x),os.listdir(self.input_path))
         for lane,fastqs_in_lane in aggregate(all_fastqs,fastq2lane):
             for readGroupNumber,fastqs_in_readgroup in aggregate(fastqs_in_lane,fastq2readGroupNumber):
@@ -84,6 +94,15 @@ for pool_dir in os.listdir(input_dir):
         if re.match('Sample',sample_dir):
             samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
 
+#pickle samples so we don't have to keep recalculating initial fastq pair data with each script run
+if not os.path.exists('samples.p'):
+    for sample in samples:
+        sample.fastq_pairs
+    pickle.dump(samples, open("samples.p", "wb"))
+else:
+    print 'Loading pickled sample data from samples.p'
+    samples = pickle.load(open("samples.p","rb"))
+
 #Gunzip fastqs
 B_gunzip = WF.add_batch("gunzip")
 cmd = 'find {0} -name *.gz'.format(input_dir)
@@ -92,27 +111,40 @@ gzs = p.communicate()[0]
 for gz in gzs.split("\n"):
     if gz != '':
         name = os.path.basename(gz)
-        B_gunzip.add_node(name=name,pcmd='gunzip -v {0}'.format(gz))   
-WF.run_batch(B_gunzip)
-WF.wait(B_gunzip)
+        B_gunzip.add_node(name=name,pcmd='gunzip -v {0}'.format(gz)) 
+WF.run_wait(B_gunzip)
 
 
 
-B_bwa_aln = WF.add_batch("BWA Align",hard_reset=True)
+B_bwa_aln = WF.add_batch("BWA Align")
 for sample in samples:
-    print sample
-    for fqp in sample.yield_fastq_pairs():
-        node = B_bwa_aln.add_node(name = fqp.r1,
-                           pcmd = commands.bwa_aln(fq=fqp.r1_path,output_sai='{output_dir}/{outputs[sai]}'),
-                           outputs = {'sai':'{0}.sai'.format(fqp.r1)})
-        fqp.r1_sai_node = node
-        node = B_bwa_aln.add_node(name = fqp.r2,
-                           pcmd = commands.bwa_aln(fq=fqp.r2_path,output_sai='{output_dir}/{outputs[sai]}'),
-                           outputs = {'sai':'{0}.sai'.format(fqp.r1)})
-        fqp.r2_sai_node = node
-        
-        
-WF.run_batch(B_bwa_aln)
-WF.wait(B_bwa_aln)
-    
+    for fqp in sample.fastq_pairs:
+        fqp.r1_sai_node = B_bwa_aln.add_node(name = fqp.r1,
+                           pcmd = commands.bwa_aln(fastq=fqp.r1_path,output_sai='{output_dir}/{outputs[sai]}'),
+                           outputs = {'sai':'{0}.sai'.format(fqp.r1)},
+                           mem_req=5000)
+        fqp.r2_sai_node = B_bwa_aln.add_node(name = fqp.r2,
+                           pcmd = commands.bwa_aln(fastq=fqp.r2_path,output_sai='{output_dir}/{outputs[sai]}'),
+                           outputs = {'sai':'{0}.sai'.format(fqp.r1)},
+                           mem_req=5000)
+WF.run_wait(B_bwa_aln)
+
+B_bwa_sampe = WF.add_batch("BWA Sampe",hard_reset=True)
+for sample in samples:
+    for fqp in sample.fastq_pairs:
+        sample.align_node = B_bwa_sampe.add_node(name = re.sub('_R1','',fqp.r1),
+                           pcmd = commands.bwa_sampe(r1_sai=fqp.r1_sai_node.output_paths['sai'],
+                                                     r2_sai=fqp.r2_sai_node.output_paths['sai'],
+                                                     r1_fq=fqp.r1_path,
+                                                     r2_fq=fqp.r2_path,
+                                                     ID='%s.L%s' % (sample.flowcell,fqp.lane),
+                                                     LIBRARY='LIB-%s' % sample.name,
+                                                     SAMPLE_NAME=sample.name,
+                                                     PLATFORM='ILLUMINA',
+                                                     output_sam='{output_dir}/{outputs[sam]}'),
+                           outputs = {'sam':'{0}.sai'.format(fqp.r1)},
+                           mem_req=5000)
+WF.run_wait(B_bwa_sampe)
+
+
 WF.finished()

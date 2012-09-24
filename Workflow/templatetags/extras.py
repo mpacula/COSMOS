@@ -28,11 +28,13 @@ def mult(value, arg):
 
 @register.filter
 def format_time(seconds):
-    if seconds == 0:
-        return '00:00:00'
-    if seconds is None or seconds == 'None' or seconds == '':
-        return 'None'
-    try:
-        return time.strftime('%H:%M:%S', time.gmtime(seconds))
-    except TypeError:
-        raise ValidationError('Expected a float, got'.format(seconds))
+    if not seconds:
+        seconds =0
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
+    if d:
+        return "%dd:%02d:%02d:%02d" % (d, h, m, s)
+    else:
+        return "%d:%02d:%02d" % (h, m, s)
+        

@@ -20,7 +20,7 @@ workflow.run_wait(batch_echo)
 
 batch_reverse = workflow.add_batch("Reverse")
 for node in workflow.get_tagged_nodes(reverse="yes"):
-    input_path = node.outputs_fullpaths['out']
+    input_path = node.output_paths['out']
     batch_reverse.add_node(name=node.name, pcmd='rev '+input_path+' > {output_dir}/{outputs[out]}', outputs = {'out':'rev.out'})
 workflow.run_wait(batch_reverse)
 

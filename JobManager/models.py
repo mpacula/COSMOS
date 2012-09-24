@@ -82,7 +82,7 @@ class JobAttempt(models.Model):
         self.jobTemplate.outputPath = ':'+self.drmaa_output_dir
         self.jobTemplate.errorPath = ':'+self.drmaa_output_dir
         self.jobTemplate.blockEmail = True
-        self.jobTemplate.native_specification = self.drmaa_native_specification
+        self.jobTemplate.nativeSpecification = self.drmaa_native_specification
         #create dir if doesn't exist
         check_and_create_output_dir(self.drmaa_output_dir)
         
@@ -200,10 +200,11 @@ class JobManager(models.Model):
         
     def __init__(self,*args,**kwargs):
         super(JobManager,self).__init__(*args,**kwargs)
+    
             
-    def close_session(self):
-        #TODO delete all jobtemplates
-        cosmos_session.drmaa_session.exit()
+#    def close_session(self):
+#        #TODO delete all jobtemplates
+#        cosmos_session.drmaa_session.exit()
 
 #    def terminate_all_queued_or_running_jobAttempts(self):
 #        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):

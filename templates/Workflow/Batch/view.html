@@ -7,29 +7,10 @@
   <li><a href="{{batch.workflow.url }}">{{batch.workflow}}</a> <span class="divider">/</span></li>
   <li class="active">{{batch}}</li>
 </ul>
-   
-<div class="alert alert-info">
-    <h1>
-        {{batch}}
-        {%if batch.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
-        {%if batch.status == "completed"%}
-        <i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>
-        {%endif%}
-     </h1>
-   <div class="progress progress-{% status2csstype batch.status %} progress-striped" rel="tooltip" title="{{batch.percent_done}}% Completed" data-placement="right">
-   <div class="bar" style="opacity:.75;width:{{batch.percent_done}}%"></div>
-   </div>
-<p>
-   Nodes: {{batch.numNodes}},
-   successful: {{batch.successful}},
-   status: {{batch.status}},
-   {{batch.percent_done}}% done,
-   file_size: {{batch.file_size}},
-   max_time_to_run: {{batch.max_time_to_run|format_time}},
-   total_time_to_run: {{batch.total_time_to_run|format_time}}
-</p>
-</div>
-
+ 
+{% with details=True %}
+{%include "Workflow/Batch/batch.html"%}
+{% endif %}
 <h3>Nodes</h3>
 {% if paged_nodes.paginator.num_pages > 1 %}
 {% if paged_nodes.paginator.page_range|length <= 10 %}

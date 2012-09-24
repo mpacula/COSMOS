@@ -12,7 +12,7 @@
 <h1>{{jobAttempt}}</h1>
 <dl class="dl-horizontal">
 <dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.command_script_text}}</pre></dd>
-<dt>Output Directory</dt><dd><code>{{jobAttempt.node.output_dir}}</code></dd>
+<dt>Output Directory</dt><dd><code>{{jobAttempt.node.job_output_dir}}</code></dd>
 <dt>Outputs<strong></strong></dt>
 {% for key,val in jobAttempt.node.outputs_fullpaths.items %}
 <dd><em>{{key}}</em>: <a href="{% url jobAttempt_output jobAttempt.id key%}"><code>{{val}}</code></a></dd>
@@ -20,10 +20,11 @@
 <dd>None</dd>
 {%endfor%}
 
-<dt>Successful</dt>      <dd>{{jobAttempt.successful}}</dd>
-<dt>Queue_status</dt>   <dd>{{jobAttempt.queue_status}}</dd>
-<dt>Drmaa_status</dt>   <dd>{{jobAttempt.get_drmaa_status}}</dd>
+<dt>Successful</dt>    <dd>{{jobAttempt.successful}}</dd>
+<dt>Queue_status</dt>  <dd>{{jobAttempt.queue_status}}</dd>
+<dt>Drmaa_status</dt>  <dd>{{jobAttempt.get_drmaa_status}}</dd>
 <dt>Drmaa_utime</dt>   <dd>{{jobAttempt.drmaa_utime}} </dd>
+<dt>Drmaa_native_specification</dt>  <dd>{{jobAttempt.drmaa_native_specification}}</dd>
 {% for key,val in jobAttempt.get_drmaa_info.items %}
   <dt>drmaa_{{key}}</dt>
   <dd>{{val}}</dd>

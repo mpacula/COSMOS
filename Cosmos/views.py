@@ -19,11 +19,12 @@ def SGE(request):
 def LSF(request):
     bjobs = __exec("bjobs")
     bqueues = __exec("bqueues")
-    lsload = __exec("lsload")
+    lsload = __exec("lsload -l")
     lshosts = __exec("lshosts")
     bhosts = __exec("bhosts")
+    bhosts_l = __exec("bhosts -l")
 
-    return render_to_response('Cosmos/LSF/index.html', { 'request':request,'bjobs':bjobs,'bqueues':bqueues,'lsload':lsload,'lshosts':lshosts,'bhosts':bhosts, }, context_instance=RequestContext(request))
+    return render_to_response('Cosmos/LSF/index.html', { 'request':request,'bjobs':bjobs,'bqueues':bqueues,'lsload':lsload,'lshosts':lshosts,'bhosts':bhosts,'bhosts_l':bhosts_l, }, context_instance=RequestContext(request))
 
 
 
