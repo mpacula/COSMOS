@@ -5,6 +5,11 @@ from django.core.validators import ValidationError
 
 register = template.Library()
 
+
+@register.filter
+def key2val(d, key_name):
+    return d[key_name]
+
 @register.simple_tag
 def navactive(request, name):
     if name=='home' and request.path=='/':

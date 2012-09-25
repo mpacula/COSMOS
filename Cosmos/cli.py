@@ -3,13 +3,8 @@ import cosmos_session
 from Workflow.models import Workflow
 import os
 
-
-def run(cmd):
-    print 'executing %s'%cmd
-    os.system(cmd)
-
 @arg('id',type=str, help='id for workflow to terminate')
-def stop(args):
+def terminate(args):
     if args.id is None:
         raise CommandError('please choose a name OR an id')
     wf = Workflow.objects.get(pk=args.id)
@@ -21,31 +16,34 @@ def stop(args):
 @arg('-p','--port',help='port to serve on',default='8080')
 def runweb(args):
     os.system('manage runserver 0.0.0.0:{0}'.format(args.port))   
-    
-@arg('-p','--port',help='port to serve on',default='8080')
-def runweb(args):
-    os.system('manage runserver 0.0.0.0:{0}'.format(args.port))   
      
-     
-def workflows(args):
-    for workflow in Workflow.objects.all():
-        print workflow
         
 def shell(args):
     os.system('manage shell_plus')
 
-@arg('-y',action='store_true',default=False,help="WARNING: Resets the Workflow sql database.  Does not delete output files.")
-def resetdb(args):
-    if args.y:
-        dbs = ['Workflow','JobManager']
-        for db in dbs:
-            run('manage sqlclear %s | manage dbshell' % db)
-        run('manage syncdb')
-    else:
-        print 'You must use -y so I know you\'re sure'
-
+@arg('id',help='workflow id')
+@arg('-q',action="store_true",help='Queued Jobs only')  
+@arg('-jid',action="store_true",help='Job id only')    
+def jobs(args):
+    jobs = Workflow.objects.get(pk=args.id).jobManager.jobAttempts.all()
+    if args.q:
+        jobs = jobs.filter(queue_status='queued')
+    for ja in jobs:
+        if args.jid:
+            print ja.drmaa_jobID
+        else:
+            print ja
+    
+            
+    
+@arg('id',type=int,help='workflow id')    
+def list(args):
+    for workflow in Workflow.objects.all():
+        print workflow
+    
 parser = ArghParser()
-parser.add_commands([stop,runweb,workflows,shell,resetdb])
+parser.add_commands([runweb,shell],namespace='adm',title='Admin')
+parser.add_commands([terminate,list,jobs],namespace='wf',title='Workflow')
 
 if __name__=='__main__':
     parser.dispatch()

@@ -11,10 +11,10 @@ from cosmos_session import cosmos_settings
 waiting_on_workflow = None #set to whichever workflow has a wait().  used by ctrl_c to terminate it
 
 status_choices=(
-                ('successful','Executed successfully.'),
-                ('no_attempt','No attempt has been made to execute this node.'),
-                ('in_progress','Node execution in progress. It\'s either waiting in the Queue or being Executed'),
-                ('failed','Execution has been attempted, but failed.')
+                ('successful','Successful'),
+                ('no_attempt','No Attempt'),
+                ('in_progress','In Progress'),
+                ('failed','Failed')
                 )
 
 
@@ -472,21 +472,25 @@ class Workflow(models.Model):
         :param _op: choose to either "and" or "or" the key/values together when searching for nodes
         usage: workflow.get_tagged_nodes(batch=my_batch,shape="circle",color="orange")
         """
-        Q_list = []
-        for key,val in kwargs.items():
-            Q_list.append(Q(key=key,value=val))
-        if _op == 'and':
-            Qs = reduce(lambda x,y: x & y,Q_list)
-        else:
-            Qs = reduce(lambda x,y: x | y,Q_list)
             
-        
         if batch is None:
-            nodeTag_matches = NodeTag.objects.filter(node__batch__workflow=self).filter(Qs)
+            nodeTag_matches = NodeTag.objects.filter(node__batch__workflow=self)
         else:
-            nodeTag_matches = NodeTag.objects.filter(node__batch=batch).filter(Qs)
+            nodeTag_matches = NodeTag.objects.filter(node__batch=batch)
             
-        return Node.objects.filter(nodetag__in=nodeTag_matches)
+
+        if len(kwargs):
+            Q_list = []
+            for key,val in kwargs.items():
+                Q_list.append(Q(key=key,value=val))
+            if _op == 'and':
+                Qs = reduce(lambda x,y: x & y,Q_list)
+            else:
+                Qs = reduce(lambda x,y: x | y,Q_list)
+                 
+            return Node.objects.filter(nodetag__in=nodeTag_matches.filter(Qs))
+        else:
+            return Node.objects.filter(nodetag__in=nodeTag_matches)
 
 
     
@@ -651,7 +655,7 @@ class Batch(models.Model):
             self.save()
             self.log.warning('Batch {0} failed!'.format(self))
     
-    def get_nodes(self,_op='and',**kwargs):
+    def get_tagged_nodes(self,_op='and',**kwargs):
         """
         Get nodes by keyword
         """
@@ -812,6 +816,7 @@ class Node(models.Model):
         tag this node with keys and values.  keys must be unique
         usage: node.tag(color="blue",shape="circle")
         """
+        #TODO don't allow tags called things like 'status' or other node attributes
         for key,value in kwargs.items():
             value = str(value)
             nodetag, created = NodeTag.objects.get_or_create(node=self,key=key,defaults= {'value':value})
@@ -822,7 +827,7 @@ class Node(models.Model):
         """
         Returns the dictionary of this node's tags
         """
-        return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
+        return dict([(x['`key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
     
     @models.permalink    
     def url(self):

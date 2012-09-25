@@ -1,10 +1,12 @@
-assert isinstance(WF, Workflow)
 import cosmos_session
+from Workflow.models import Workflow, Batch
+import subprocess
 import commands
 from Cosmos.helpers import parse_command_string
-from exomes48 import samples
+from exomes48 import samples,input_dir
 
 WF = Workflow.resume(name='GPP_48Exomes_GATK',dry_run=False)
+assert isinstance(WF, Workflow)
 
 #Gunzip fastqs
 B_gunzip = WF.add_batch("gunzip")
