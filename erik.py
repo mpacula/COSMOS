@@ -3,9 +3,6 @@ import os
 
 all_dbs = ['Workflow','JobManager']
 
-def run(cmd):
-    print 'executing %s'%cmd
-    os.system(cmd)
 
 @arg('dbname',help='db name')
 def cleardb(args):

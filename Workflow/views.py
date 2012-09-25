@@ -3,16 +3,6 @@ from django.template import RequestContext
 from models import Workflow, Batch, Node
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-#
-#
-#   Nodes: {{batch.numNodes}},
-#   successful: {{batch.successful}},
-#   status: {{batch.status}},
-#   {{batch.percent_done}}% done,
-#   file_size: {{batch.file_size}},
-#   max_time_to_run: {{batch.max_time_to_run|format_time}}
-#   total_time_to_run: {{batch.total_time_to_run|format_time}}
-
 def _get_batches_dict(workflow):
     #batches_dict = Batch.objects.get(workflow=workflow).values('successful',')
     pass

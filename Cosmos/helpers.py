@@ -86,8 +86,11 @@ def execute(cmd):
     c = p.communicate()
     return c[0],c[1]
 
-def folder_size(folder):
-    return re.match('(.+?)\s',execute('du -hs {0}'.format(folder))[0]).group(1)
+def folder_size(folder,human_readable=True):
+    if human_readable:
+        return re.match('(.+?)\s',execute('du -hs {0}'.format(folder))[0]).group(1)
+    else:
+        return re.match('(.+?)\s',execute('du -s {0}'.format(folder))[0]).group(1)
 #    folder_size = 0
 #    for (path, dirs, files) in os.walk(folder):
 #        for f in files:

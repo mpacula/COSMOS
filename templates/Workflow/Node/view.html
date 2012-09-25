@@ -28,6 +28,9 @@
 <dt>Successful</dt><dd>{{node.successful}}</dd>
 <dt>Pre Command</dt><dd><pre class="pre-scrollable">{{node.pre_command}}</pre></dd>
 <dt>Output Directory</dt><dd><code>{{node.output_dir}}</code></dd>
+{% for k,v in node.tags.items %}
+<dt>Tag: {{k}}</dt><dd>{{v}}</dd>
+{% endfor %}
 </dl>
 
 <h3>JobAttempts</h3>

@@ -183,6 +183,7 @@ class Workflow(models.Model):
         :parameter name: The name of the batch, must be unique within this Workflow
         :parameter hard_reset: Delete any batch with this name including all of its nodes
         """
+        #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
         self.log.info("Adding batch {0}.".format(name))
         #determine order in workflow
@@ -211,7 +212,31 @@ class Workflow(models.Model):
         b.save()
         return b
         
-        
+ 
+    def get_resource_usage(self):
+        yield 'Batch,failures,file_size,memory,time'
+        for batch in self.batches:
+            for node in batch.nodes:
+                sja = node.get_successful_jobAttempt()
+                memory = '0'
+                utime = 0
+                if sja and sja._drmaa_info: #TODO missing this  stuff is caused by errors.  fix those errors and delete this
+                        if sja.drmaa_utime: utime = sja.drmaa_utime 
+                        try:
+                            memory = sja._drmaa_info['resourceUsage']['mem']
+                        except KeyError:
+                            pass
+                fs = helpers.folder_size(node.output_dir,human_readable=False) #TODO make obj.file_size a fxn not a property
+                yield '{batch.name},-1,{fs},{memory},{utime}'.format(batch=batch,node=node,fs=fs,memory=memory,sja=sja,utime=utime)
+                
+     
+    def save_resource_usage(self):
+        d = os.path.join(self.output_dir,'_plots')
+        with file(d,'wb') as f:
+            for line in self.get_resource_usage():
+                f.write(line+"\n")
+             
+                
 #    def _close_session(self):
 #        """Shuts down this workflow's jobmanager"""
 #        self.log.info('Ending session')
@@ -440,17 +465,17 @@ class Workflow(models.Model):
         return ('workflow_view',[str(self.id)])
     
     
-    def get_tagged_nodes(self,batch=None,op="and",**kwargs):
+    def get_tagged_nodes(self,batch=None,_op="and",**kwargs):
         """
         returns nodes that are tagged with any set of key/vaue pairs
         :param batch: optionally pass a batch in to search only that batch
-        :param op: choose to either "and" or "or" the key/values together when searching for nodes
+        :param _op: choose to either "and" or "or" the key/values together when searching for nodes
         usage: workflow.get_tagged_nodes(batch=my_batch,shape="circle",color="orange")
         """
         Q_list = []
         for key,val in kwargs.items():
             Q_list.append(Q(key=key,value=val))
-        if op == 'and':
+        if _op == 'and':
             Qs = reduce(lambda x,y: x & y,Q_list)
         else:
             Qs = reduce(lambda x,y: x | y,Q_list)
@@ -459,7 +484,7 @@ class Workflow(models.Model):
         if batch is None:
             nodeTag_matches = NodeTag.objects.filter(node__batch__workflow=self).filter(Qs)
         else:
-            nodeTag_matches = NodeTag.objects.filter(node__batch__workflow=self,batch=batch).filter(Qs)
+            nodeTag_matches = NodeTag.objects.filter(node__batch=batch).filter(Qs)
             
         return Node.objects.filter(nodetag__in=nodeTag_matches)
 
@@ -625,13 +650,19 @@ class Batch(models.Model):
             self.status='failed'
             self.save()
             self.log.warning('Batch {0} failed!'.format(self))
+    
+    def get_nodes(self,_op='and',**kwargs):
+        """
+        Get nodes by keyword
+        """
+        return self.workflow.get_tagged_nodes(batch=self, _op=_op, **kwargs)
                 
-    def nodes_by(self,*args):
+    def group_nodes(self,*args):
         """
         Yields nodes, grouped by tags in *args.
         :returns: a tuple of (tags used,nodes in group)
         note: nodes without a single tag in *args will be ignored
-        usage: nodes_by('color','shape') will yield a tuple of the tags used, and the groups of nodes with different colors and shapes,
+        usage: group_nodes('color','shape') will yield a tuple of the tags used, and the groups of nodes with different colors and shapes,
                for example ({'color':'red','shape':'circle'},[node1,node2,node3])
         """
         node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=args).values() #get this batch's tags
@@ -715,8 +746,9 @@ class Node(models.Model):
         return self.workflow.log
 
     @property
-    def file_size(self):
-        return folder_size(self.output_dir)
+    def file_size(self,human_readable=True):
+        """Node filesize"""
+        return folder_size(self.output_dir,human_readable=human_readable)
     
     @property
     def output_dir(self):
