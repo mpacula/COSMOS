@@ -14,10 +14,10 @@ DATABASE = {
     'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
     'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
 }
-
-
-###SGE
-os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge6/lib/linux-x64/libdrmaa.so'
-os.environ['SGE_ROOT'] = '/opt/sge6'
-os.environ['SGE_EXECD_PORT'] = '63232'
-os.environ['SGE_QMASTER_PORT'] = '63231'
+#
+#
+####SGE
+#os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge6/lib/linux-x64/libdrmaa.so'
+#os.environ['SGE_ROOT'] = '/opt/sge6'
+#os.environ['SGE_EXECD_PORT'] = '63232'
+#os.environ['SGE_QMASTER_PORT'] = '63231'

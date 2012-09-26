@@ -1,5 +1,4 @@
 from django.db import models
-import drmaa
 import os
 from picklefield.fields import PickledObjectField
 import math
@@ -8,6 +7,8 @@ from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
 from Cosmos.helpers import check_and_create_output_dir
 import cosmos_session
+from cosmos_session import drmaa
+from django.utils import timezone
 
 import django.dispatch
 jobAttempt_done = django.dispatch.Signal(providing_args=["jobAttempt"])
@@ -38,6 +39,7 @@ class JobAttempt(models.Model):
     
     created_on = models.DateTimeField(auto_now_add = True)
     updated_on = models.DateTimeField(auto_now = True)
+    finished_on = models.DateTimeField(null=True,default=None)
     
     jobManager = models.ForeignKey('JobManager',related_name='+')
     
@@ -66,6 +68,7 @@ class JobAttempt(models.Model):
         
     @property
     def node(self):
+        "This job's node"
         return self.node_set.get()
     
             
@@ -79,8 +82,8 @@ class JobAttempt(models.Model):
         self.jobTemplate.remoteCommand = self.command_script_path #TODO create a bash script that this this command_script_text
         #self.jobTemplate.args = self.command_script_text.split(' ')[1:]
         self.jobTemplate.jobName = 'ja-'+self.jobName
-        self.jobTemplate.outputPath = ':'+self.drmaa_output_dir
-        self.jobTemplate.errorPath = ':'+self.drmaa_output_dir
+        self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,drmaa.JobTemplate.PARAMETRIC_INDEX+'.out')
+        self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,drmaa.JobTemplate.PARAMETRIC_INDEX+'.err')
         self.jobTemplate.blockEmail = True
         self.jobTemplate.nativeSpecification = self.drmaa_native_specification
         #create dir if doesn't exist
@@ -104,7 +107,8 @@ class JobAttempt(models.Model):
         """Returns the path to the STDOUT file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            filename = filter(lambda x:re.search('(\.o{0}|{0}\.out)'.format(self.drmaa_jobID),x), files)[0]
+            #filename = filter(lambda x:re.search('(\.o{0}|{0}\.out)'.format(self.drmaa_jobID),x), files)[0]
+            filename = filter(lambda x:re.search('(\d+.out)'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None
@@ -113,13 +117,17 @@ class JobAttempt(models.Model):
         """Returns the path to the STDERR file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            filename = filter(lambda x:re.search('(\.e{0})|({0}\.err)'.format(self.drmaa_jobID),x), files)[0]
+            #filename = filter(lambda x:re.search('(\.e{0})|({0}\.err)'.format(self.drmaa_jobID),x), files)[0]
+            filename = filter(lambda x:re.search('(\d.err)'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None
         
     @property
     def get_drmaa_status(self):
+        """
+        Queries the DRM for the status of the job
+        """
         try:
             s = decode_drmaa_state[cosmos_session.drmaa_session.jobStatus(str(self.drmaa_jobID))]
         except drmaa.InvalidJobException:
@@ -133,16 +141,20 @@ class JobAttempt(models.Model):
         return s
     
     def get_drmaa_info(self):
+        ":returns: the drmaa_info object created by python_drmaa"
         return self._drmaa_info
                 
     @property
     def STDOUT_filepath(self):
+        "Path to STDOUT"
         return self.get_drmaa_STDOUT_filepath()
     @property
     def STDERR_filepath(self):
+        "Path to STDERR"
         return self.get_drmaa_STDERR_filepath()
     @property
     def STDOUT_txt(self):
+        "Read the STDOUT file"
         path = self.STDOUT_filepath
         if path is None:
             return 'File does not exist.'
@@ -151,6 +163,7 @@ class JobAttempt(models.Model):
                 return f.read()
     @property
     def STDERR_txt(self):
+        "Read the STDERR file"
         path = self.STDERR_filepath
         if path is None:
             return 'File does not exist.'
@@ -159,6 +172,7 @@ class JobAttempt(models.Model):
                 return f.read()
     
     def _get_command_shell_script_text(self):
+        "Read the command.sh file"
         with open(self.command_script_path,'rb') as f:
             return f.read()
     
@@ -169,6 +183,7 @@ class JobAttempt(models.Model):
             self._drmaa_info = drmaa_info._asdict()
         self.update_from_drmaa_info()
         
+        self.finished_on = timezone.now()
         self.save()
     
     @models.permalink    
@@ -195,6 +210,7 @@ class JobManager(models.Model):
         
     @property
     def jobAttempts(self):
+        "This JobManager's jobAttempts"
         return JobAttempt.objects.filter(jobManager=self)
     
         
@@ -216,9 +232,10 @@ class JobManager(models.Model):
     def addJobAttempt(self, command_script_path, drmaa_output_dir, jobName = "Generic_Job_Name", drmaa_native_specification=''):
         """
         Adds a new JobAttempt
-        command_script_path is the system command_script_path to run.  this is generally an sh script that executes the binary or script you actually want to run.
-        jobName is an optional name for the job 
-        drmaa_output_dir is the directory to story the stdout and stderr files
+        :param command_script_path: The system command_script_path to run.  this is generally an sh script that executes the binary or script you actually want to run.
+        :param jobName: an optional name for the job 
+        :param drmaa_output_dir: the directory to story the stdout and stderr files
+        :param drmaa_native_specification: the drmaa_native_specifications tring
         """
         ##TODO - check that jobName is unique? or maybe append the job primarykey to the jobname to avoid conflicts.  maybe add primary key as a subdirectory of drmaa_output_dir
         ##TODO use shell scripts to launch jobs
@@ -262,11 +279,12 @@ class JobManager(models.Model):
 #        return job
     
     def get_numJobsQueued(self):
+        "The number of queued jobs."
         return self.getJobs().filter(queue_status = 'queued').count()
     
     def _waitForAnyJob(self):
         """
-        Waits for any job to finish, and returns that JobAttempt.  If there are no jobs left, returns None
+        Waits for any job to finish, and returns that JobAttempt.  If there are no jobs left, returns None.
         """
         if self.get_numJobsQueued() > 0:
             try:
@@ -285,6 +303,7 @@ class JobManager(models.Model):
             return None
         
     def yield_All_Queued_Jobs(self):
+        "Yield all queued jobs."
         while True:
             j = self._waitForAnyJob()
             if j != None:
@@ -293,6 +312,7 @@ class JobManager(models.Model):
                 break
             
     def delete(self,*args,**kwargs):
+        "Deletes this job manager"
         #self.jobAttempts.delete()
         super(JobManager,self).__init__(self,*args,**kwargs)
         

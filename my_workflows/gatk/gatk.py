@@ -2,7 +2,9 @@ import cosmos_session
 from Workflow.models import Workflow, Batch
 import subprocess
 import commands
+import os
 from Cosmos.helpers import parse_command_string
+from datetime import time
 #from exomes48 import samples,input_dir
 
 WF = Workflow.resume(name='GPP_48Exomes_GATK',dry_run=False)
@@ -27,11 +29,13 @@ if not B_bwa_aln.successful:
             fqp.r1_sai_node = B_bwa_aln.add_node(name = fqp.r1,
                                pcmd = commands.bwa_aln(fastq=fqp.r1_path,output_sai='{output_dir}/{outputs[sai]}'),
                                outputs = {'sai':'{0}.sai'.format(fqp.r1)},
-                               mem_req=3000)
+                               mem_req=3000,
+                               time_limit=time(1))
             fqp.r2_sai_node = B_bwa_aln.add_node(name = fqp.r2,
                                pcmd = commands.bwa_aln(fastq=fqp.r2_path,output_sai='{output_dir}/{outputs[sai]}'),
                                outputs = {'sai':'{0}.sai'.format(fqp.r1)},
-                               mem_req=3000) #TODO add tags
+                               mem_req=3000,
+                               time_limit=time(1)) #TODO add tags
     WF.run_wait(B_bwa_aln)
 
 B_bwa_sampe = WF.add_batch("BWA Sampe",hard_reset=False)
@@ -55,7 +59,8 @@ if not B_bwa_aln.successful:
                                    'lane': fqp.lane,
                                    'readGroupNumber': fqp.readGroupNumber
                                },
-                               mem_req=3000)
+                               mem_req=3000,
+                               time_limit=time(2,45))
     WF.run_wait(B_bwa_sampe)
 
 B_clean_sam = WF.add_batch("Clean Bams",hard_reset=False)
@@ -67,22 +72,24 @@ if not B_clean_sam.successful:
                                                    output='{output_dir}/{outputs[bam]}'),
                           outputs = {'bam':'cleaned.bam'},
                           tags = n.tags,
-                          mem_req=500)
+                          mem_req=500,
+                          time_limit=time(1))
 WF.run_wait(B_clean_sam)
 
 B_merge1 = WF.add_batch("Merge Bams by Sample",hard_reset=True)
-for tags,input_nodes in B_bwa_sampe.group_nodes('sample'):
-    sample_name = tags['sample']
-    sample_sams = [ n.output_paths['sam'] for n in input_nodes ]
-    B_merge1.add_node(name=sample_name,
-                      pcmd = commands.MergeSamFiles(input_bams=sample_sams,
-                                                    output_bam='{output_dir}/{outputs[bam]}',
-                                                    assume_sorted=False),
-                      outputs = {'bam':'{0}.bam'.format(sample_name)},
-                      tags = {'sample':sample_name},
-                      mem_req=1000)
-    break
-WF.run_wait(B_merge1)
+if not B_merge1.successful:
+    for tags,input_nodes in B_bwa_sampe.group_nodes_by('sample'):
+        sample_name = tags['sample']
+        sample_sams = [ n.output_paths['sam'] for n in input_nodes ]
+        B_merge1.add_node(name=sample_name,
+                          pcmd = commands.MergeSamFiles(input_bams=sample_sams,
+                                                        output_bam='{output_dir}/{outputs[bam]}',
+                                                        assume_sorted=False),
+                          outputs = {'bam':'{0}.bam'.format(sample_name)},
+                          tags = {'sample':sample_name},
+                          mem_req=1000,
+                          time_limit=time(1))
+    WF.run_wait(B_merge1)
                                             
         
 WF.finished()

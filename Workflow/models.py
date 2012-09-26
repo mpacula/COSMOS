@@ -2,11 +2,12 @@ from django.db import models
 from django.db.models import Q
 from JobManager.models import JobAttempt,JobManager
 import os,sys,re,logging
-from Cosmos.helpers import get_rusage,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
+from Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from Cosmos import helpers
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField
 from cosmos_session import cosmos_settings
+from django.utils import timezone
 
 waiting_on_workflow = None #set to whichever workflow has a wait().  used by ctrl_c to terminate it
 
@@ -20,7 +21,8 @@ status_choices=(
 
 class Workflow(models.Model):
     """
-    A collection of Batches of Jobs
+    A collection of Batches of Jobs with various
+    methods for running and waiting on the batches
     """
     name = models.CharField(max_length=250,unique=True)
     output_dir = models.CharField(max_length=250)
@@ -29,6 +31,11 @@ class Workflow(models.Model):
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     _terminating = models.BooleanField(default=False,help_text='this workflow is terminating')
+    
+    created_on = models.DateTimeField(auto_now_add = True)
+    updated_on = models.DateTimeField(auto_now = True)
+    finished_on = models.DateTimeField(null=True)
+    
     
     def __init__(self, *args, **kwargs):
         super(Workflow,self).__init__(*args, **kwargs)
@@ -65,7 +72,8 @@ class Workflow(models.Model):
     def _is_terminating(self):
         """
         Helper function to check if this workflow is terminating.  Accessing the Workflow._terminating
-        variable will probably hit a cache, so this function forces a database query.
+        variable will probably hit a cache and not report the correct value;
+        this function forces a database query.
         """
         if Workflow.objects.filter(pk=self.id,_terminating=True).count() > 0: #database can be out of sync
             self._terminating = True
@@ -102,8 +110,11 @@ class Workflow(models.Model):
         you can change its parameters like pre_command and outputs.
         
         :param name: A unique name for this workflow
+        :type name: str
         :param dry_run: This workflow is a dry run.  No jobs will actually be executed
+        :type dry_run: bool
         :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
+        :type root_output_dir: str
         """
         name = re.sub("\s","_",name)
         if Workflow.objects.filter(name=name).count() == 0:
@@ -125,9 +136,13 @@ class Workflow(models.Model):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
+        
         :param name: A unique name for this workflow
+        :type name: str
         :param dry_run: This workflow is a dry run.  No jobs will actually be executed
+        :type dry_run: bool
         :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
+        :type root_output_dir: str
         """
         name = re.sub("\s","_",name)
         old_wf_exists = Workflow.objects.filter(name=name).count() > 0
@@ -153,9 +168,13 @@ class Workflow(models.Model):
     def create(name=None,dry_run=False,root_output_dir=None,_wf_id=None):
         """
         Creates a new workflow
+        
         :param name: A unique name for this workflow
+        :type name: str
         :param dry_run: This workflow is a dry run.  No jobs will actually be executed
+        :type dry_run: bool
         :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
+        :type root_output_dir: str
         """
         name = re.sub("\s","_",name)
         if name is None:
@@ -213,7 +232,8 @@ class Workflow(models.Model):
         return b
         
  
-    def get_resource_usage(self):
+    def yield_resource_usage(self):
+        "Yield's each node in the Workflow's resource usage"
         yield 'Batch,failures,file_size,memory,time'
         for batch in self.batches:
             for node in batch.nodes:
@@ -231,9 +251,10 @@ class Workflow(models.Model):
                 
      
     def save_resource_usage(self):
+        "Saves this workflow's resource usage to disk"
         d = os.path.join(self.output_dir,'_plots')
         with file(d,'wb') as f:
-            for line in self.get_resource_usage():
+            for line in self.yield_resource_usage():
                 f.write(line+"\n")
              
                 
@@ -309,10 +330,12 @@ class Workflow(models.Model):
         command_script_path = os.path.join(node.output_dir,'command.sh')
         self.__create_command_sh(node.exec_command,command_script_path)
         
+        print get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement, node.time_limit)
         jobAttempt = self.jobManager.addJobAttempt(command_script_path=command_script_path,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
-                                     drmaa_native_specification=get_rusage(cosmos_settings.DRM,node.memory_requirement))
+                                     drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement, node.time_limit))
+        
         node._jobAttempts.add(jobAttempt)
         if self.dry_run:
             self.log.info('Dry Run: skipping submission of job {0}'.format(jobAttempt))
@@ -423,6 +446,8 @@ class Workflow(models.Model):
         """
         self._check_and_wait_for_leftover_nodes()
         self._clean_up()
+        self.finished_on = timezone.now()
+        self.save()
         self.log.info('Finished.')
         
     def _check_and_wait_for_leftover_nodes(self):
@@ -465,12 +490,16 @@ class Workflow(models.Model):
         return ('workflow_view',[str(self.id)])
     
     
-    def get_tagged_nodes(self,batch=None,_op="and",**kwargs):
+    def get_nodes_by(self,batch=None,_op="and",**kwargs):
         """
-        returns nodes that are tagged with any set of key/vaue pairs
-        :param batch: optionally pass a batch in to search only that batch
-        :param _op: choose to either "and" or "or" the key/values together when searching for nodes
-        usage: workflow.get_tagged_nodes(batch=my_batch,shape="circle",color="orange")
+        Searches for nodes by their tags
+        
+        :param _op: Choose either 'and' or 'or' as the logic to filter tags with
+        :param **kwargs: Any keywords you'd like to search for
+        :returns: a query result of the filtered nodes
+        
+        >>> node.get_nodes_by(_op='or',color='grey',color='orange')
+        >>> node.get_nodes_by(_op='and',color='grey',shape='square')
         """
         
         if len(kwargs) == 0: #no tags
@@ -505,6 +534,10 @@ class Batch(models.Model):
     order_in_workflow = models.IntegerField(null=True)
     status = models.CharField(max_length=200,choices=status_choices,default='no_attempt') 
     successful = models.BooleanField(default=False)
+    created_on = models.DateTimeField(auto_now_add = True)
+    updated_on = models.DateTimeField(auto_now = True)
+    finished_on = models.DateTimeField(null=True,default=None)
+    
     
     def __init__(self,*args,**kwargs):
         super(Batch,self).__init__(*args,**kwargs)
@@ -537,6 +570,7 @@ class Batch(models.Model):
     
     @property
     def max_job_time(self):
+        "Max job time of all jobs in this batch"
         m = JobAttempt.objects.filter(node_set__in = Node.objects.filter(batch=self)).aggregate(models.Max('drmaa_utime'))['drmaa_utime__max']
         if m is None:
             return None
@@ -544,6 +578,7 @@ class Batch(models.Model):
     
     @property
     def total_job_time(self):
+        "Total job time of all jobs in this batch"
         t = JobAttempt.objects.filter(node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('drmaa_utime'))['drmaa_utime__sum']
         if t is None:
             return None
@@ -551,27 +586,34 @@ class Batch(models.Model):
     
     @property
     def file_size(self):
+        "Size of the batch's output_dir"
         return folder_size(self.output_dir)
     
     @property
     def output_dir(self):
+        "Absolute path to this batch's output_dir"
         return os.path.join(self.workflow.output_dir,self.name)
     
     @property
     def nodes(self):
+        "Queryset of this batch's nodes"
         return Node.objects.filter(batch=self)
     
     def numNodes(self):
+        "The number of nodes in this batch"
         return Node.objects.filter(batch=self).count()
     
-    def add_node(self, name, pcmd, outputs={}, hard_reset=False, mem_req = 0, tags = {}):
+    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, mem_req=0, time_limit=None):
         """
         Adds a node to the batch.
-        :param pre_cmd: (str) The preformatted command to execute
-        :param outputs: (dict) a dictionary of outputs and their names
-        :param hard_reset: (bool) Deletes this node and all associated files and start it fresh
-        :param mem_req: (int) Optional setting to tell the DRM how much memory to reserve in MB
-        :param **kwargs: any other keyword arguments will add `tag`s to the node
+        
+        :param name: (str) The preformatted command to execute. Required.
+        :param pcmd: (str) The preformatted command to execute. Required.
+        :param outputs: (dict) a dictionary of outputs and their names. Optional.
+        :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
+        :param tags: (dict) any other keyword arguments will add a :class:`NodeTag` to the node. Optional.
+        :param mem_req: (int) Optional setting to tell the DRM how much memory to reserve in MB. Optional.
+        :param time_limit: (datetime.time) any other keyword arguments will add `tag`s to the node. Optional.
         """
         
         #validation
@@ -581,7 +623,6 @@ class Batch(models.Model):
             raise ValidationError('pre_command cannot be blank')
         
         name = re.sub("\s","_",name) #user convenience
-        pre_command = pcmd  #user convenience
         
         node_exists = Node.objects.filter(batch=self,name=name).count() > 0
         if node_exists:
@@ -597,7 +638,7 @@ class Batch(models.Model):
             self.log.info("Node was unsuccessful last time, deleting old one and trying again {0}".format(node))
             node.delete()
                
-        node,created = Node.objects.get_or_create(batch=self,name=name,defaults={'pre_command':pcmd,'outputs':outputs,'memory_requirement':mem_req})
+        node,created = Node.objects.get_or_create(batch=self,name=name,defaults={'pre_command':pcmd,'outputs':outputs,'memory_requirement':mem_req,'time_limit':time_limit})
         
         #validation
         if (not created) and node.successful:  
@@ -649,26 +690,33 @@ class Batch(models.Model):
         if num_nodes_successful == num_nodes:
             self.successful = True
             self.status = 'successful'
-            self.save()
             self.log.info('Batch {0} successful!'.format(self))
         elif num_nodes_failed + num_nodes_successful == num_nodes:
             self.status='failed'
-            self.save()
             self.log.warning('Batch {0} failed!'.format(self))
+        
+        self.finished_on = timezone.now()
+        self.save()
     
-    def get_tagged_nodes(self,_op='and',**kwargs):
+    def get_nodes_by(self,_op='and',**kwargs):
         """
-        Get nodes by keyword
+        An alias for :func:`Workflow.get_nodes_by` with batch=self
+        
+        :returns: a queryset of filtered nodes
         """
-        return self.workflow.get_tagged_nodes(batch=self, _op=_op, **kwargs)
+        return self.workflow.get_nodes_by(batch=self, _op=_op, **kwargs)
                 
-    def group_nodes(self,*args):
+    def group_nodes_by(self,*args):
         """
-        Yields nodes, grouped by tags in *args.
+        Yields nodes, grouped by tags in *args.  Groups will be every unique set of possible values of tags
+        For example, if you had nodes tagged by color, and shape, and you ran func:`batch.group_nodes_by`('color','shape'),
+        this function would yield all the nodes that were blue and a circle, then all the nodes that were red and a circle,
+        then all the nodes that were blue and a square, etc.
+        
+        :param *args: Keywords of the tags you want to group by
         :returns: a tuple of (tags used,nodes in group)
-        note: nodes without a single tag in *args will be ignored
-        usage: group_nodes('color','shape') will yield a tuple of the tags used, and the groups of nodes with different colors and shapes,
-               for example ({'color':'red','shape':'circle'},[node1,node2,node3])
+        
+        .. note:: nodes missing one of the tags in *args will be automatically filtered out
         """
         node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=args).values() #get this batch's tags
         
@@ -694,6 +742,7 @@ class Batch(models.Model):
     
     @models.permalink    
     def url(self):
+        "The URL of this batch"
         return ('batch_view',[str(self.id)])
         
     def __str__(self):
@@ -711,27 +760,33 @@ class Batch(models.Model):
             
 
 class NodeTag(models.Model):
+    "A keyword/value object used to describe a node"
     node = models.ForeignKey('Node')
     key = models.CharField(max_length=63)
     value = models.CharField(max_length=255)
+    
     
     def __str__(self):
         return "Tag({0}) - {0}: {0}".format(self.node, self.key, self.value)
 
 class Node(models.Model):
-    
     _jobAttempts = models.ManyToManyField(JobAttempt,related_name='node_set')
     pre_command = models.TextField(help_text='preformatted command.  almost always will contain the special string {output} which will later be replaced by the proper output path')
     exec_command = models.TextField(help_text='the actual command that was executed',null=True)
     name = models.CharField(max_length=255,null=True)
-    memory_requirement = models.IntegerField(help_text="Minimum Memory Requirement in MB",default=None,null=True)
+    memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=None,null=True)
+    time_limit = models.TimeField(help_text="Maximum time for a job to run",default=None,null=True)
     batch = models.ForeignKey(Batch,null=True)
     successful = models.BooleanField(null=False)
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     outputs = PickledObjectField(null=True) #dictionary of outputs
     
+    created_on = models.DateTimeField(auto_now_add = True)
+    updated_on = models.DateTimeField(auto_now = True)
+    finished_on = models.DateTimeField(null=True,default=None)
+    
+    
     def __init__(self, *args, **kwargs):
-        """Init Node"""
         super(Node,self).__init__(*args, **kwargs)
         validate_name(self.name)
         if self.id is None:
@@ -743,25 +798,27 @@ class Node(models.Model):
     
     @property
     def workflow(self):
+        "This node's workflow"
         return self.batch.workflow
     
     @property
-    def node_tags(self):
-        return NodeTags.objects.filter(node=self)
+    def nodetags(self):
+        "Queryset of NodeTag Objects"
+        return NodeTag.objects.filter(node=self)
 
     @property
     def log(self):
-        """This node's workflow's log"""
+        "This node's workflow's log"
         return self.workflow.log
 
     @property
     def file_size(self,human_readable=True):
-        """Node filesize"""
+        "Node filesize"
         return folder_size(self.output_dir,human_readable=human_readable)
     
     @property
     def output_dir(self):
-        """Node output dir"""
+        "Node output dir"
         return os.path.join(self.batch.output_dir,self.name)
     
     @property
@@ -771,7 +828,7 @@ class Node(models.Model):
     
     @property
     def output_paths(self):
-        """Dictionary of outputs and their full absolute paths"""
+        "Dictionary of outputs and their full absolute paths"
         r = {}
         for key,val in self.outputs.items():
             r[key] = os.path.join(self.job_output_dir,val)
@@ -779,19 +836,23 @@ class Node(models.Model):
     
     @property
     def jobAttempts(self):
+        "This node's jobAttempts"
         return self._jobAttempts.all().order_by('id')
     
     @property
     def time_to_run(self):
+        "Time it took this node to run"
         return self.get_successful_jobAttempt().drmaa_utime if self.successful else None
     
-    def get_numAttempts(self):
+    def numAttempts(self):
+        "This node's number of job attempts"
         return self._jobAttempts.count()
     
     def get_successful_jobAttempt(self):
         """
-        Return this node's successful job attempt.  If there were no successful job attempts
-        return None
+        Get this node's successful job attempt.
+        
+        :return: this node's successful job attempt.  If there were no successful job attempts, returns None
         """
         jobs = self._jobAttempts.filter(successful=True)
         if len(jobs) == 1:
@@ -809,17 +870,19 @@ class Node(models.Model):
         if self._jobAttempts.filter(successful=True).count():
             self.status = 'successful'
             self.successful = True
-            self.log.info("{0} Successful!".format(self,jobAttempt))
-            self.save()
+            self.log.info("{0} Successful!".format(self,jobAttempt))        
         else:
             self.status = 'failed'
             self.log.info("{0} Failed!".format(self,jobAttempt))
-            self.save()
+            
+        self.finished_on = timezone.now()
+        self.save()
         
     def tag(self,**kwargs):
         """
         tag this node with keys and values.  keys must be unique
-        usage: node.tag(color="blue",shape="circle")
+        
+        >>> node.tag(color="blue",shape="circle")
         """
         #TODO don't allow tags called things like 'status' or other node attributes
         for key,value in kwargs.items():
@@ -830,12 +893,13 @@ class Node(models.Model):
     @property            
     def tags(self):
         """
-        Returns the dictionary of this node's tags
+        The dictionary of this node's tags
         """
         return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
     
     @models.permalink    
     def url(self):
+        "This node's url"
         return ('node_view',[str(self.id)])
 
 
@@ -845,7 +909,7 @@ class Node(models.Model):
         """
         self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
         self._jobAttempts.all().delete()
-        self.node_tags.delete()
+        self.nodetags.delete()
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         super(Node, self).delete(*args, **kwargs)
@@ -871,7 +935,7 @@ class Node(models.Model):
         "drmaa_stderr:").format(self=self,
                                 batch=self.batch,
                                 status=self.status(),
-                                attempts=self.get_numAttempts(),
+                                attempts=self.numAttempts(),
                                 successful=self.successful,
                                 drmaa_stdout=drmaa_stdout,
                                 drmaa_stderr=drmaa_stderr)

@@ -5,6 +5,7 @@ lsync.conf*
 .Rhistory
 .project
 .git/
+doc/build/
 build/
 .metadata/
 migrations/

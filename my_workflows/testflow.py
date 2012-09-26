@@ -4,12 +4,14 @@ import cosmos_session
 
 #Begin Workflow
 from Workflow.models import Workflow, Batch
+from datetime import time
 
 workflow = Workflow.restart(name='Test_Workflow')
 assert isinstance(workflow, Workflow)
 
-batch_sleep = workflow.add_batch("Long_Running_Job")
-batch_sleep.add_node(name='1', pcmd='sleep 30')
+batch_sleep = workflow.add_batch("Job That Runs Too Long")
+n = batch_sleep.add_node(name='1', pcmd='sleep 75', mem_req=10,time_limit=time(0,1))
+
 workflow.run_batch(batch_sleep)
 
 batch_echo = workflow.add_batch("Echo")
@@ -19,7 +21,7 @@ batch_echo.add_node(name='3', pcmd='echo "don\'t reverse me" > {output_dir}/{out
 workflow.run_wait(batch_echo)
 
 batch_reverse = workflow.add_batch("Reverse")
-for node in batch_echo.get_nodes(reverse="yes"):
+for node in batch_echo.get_nodes_by(reverse="yes"):
     input_path = node.output_paths['out']
     batch_reverse.add_node(name=node.name, pcmd='rev %s > {output_dir}/{outputs[out]}'%input_path, outputs = {'out':'rev.out'})
 workflow.run_wait(batch_reverse)

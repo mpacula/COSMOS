@@ -22,6 +22,13 @@ from django.conf import settings as django_settings
 
 #DRMAA
 import drmaa
-drmaa_session = drmaa.Session()
-drmaa_session.initialize()
+drmaa_enabled = True
+try:
+    drmaa_session = drmaa.Session()
+    drmaa_session.initialize()
+except Exception as e:
+    #print "WARNING! WARNING! Could not enable drmaa.  Proceeding without drmaa enabled."
+    #print e
+    pass
+    
 

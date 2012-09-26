@@ -2,8 +2,8 @@ import os
 
 #Cosmos Settings
 home_path = '/home2/erik/workspace/Cosmos' #bioseq
-default_root_output_dir = '/mnt'
-DRM = 'GE'
+default_root_output_dir = '/mnt' #The root directory to output workflows to
+DRM = 'GE' # 'LSF' or 'GE'
 
 #starcluster
 DATABASE = {
@@ -17,10 +17,10 @@ DATABASE = {
 
 
 ###SGE
-os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge6/lib/linux-x64/libdrmaa.so'
-os.environ['SGE_ROOT'] = '/opt/sge6'
-os.environ['SGE_EXECD_PORT'] = '63232'
-os.environ['SGE_QMASTER_PORT'] = '63231'
+#os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge6/lib/linux-x64/libdrmaa.so'
+#os.environ['SGE_ROOT'] = '/opt/sge6'
+#os.environ['SGE_EXECD_PORT'] = '63232'
+#os.environ['SGE_QMASTER_PORT'] = '63231'
 
 ###LSF
 #os.environ['LSF_DRMAA_CONF']='/opt/lsf/conf/lsf_drmaa.conf'

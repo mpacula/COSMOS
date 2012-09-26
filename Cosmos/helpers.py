@@ -35,14 +35,23 @@ def parse_command_string(txt,**kwargs):
     return s
 
 
-def get_rusage(DRM,mem):
-    """Returns the DRM specific resource usage flags for the drmaa_native_specification"""
-    if mem == '' or not mem:
+def get_drmaa_ns(DRM,mem_req,time_limit):
+    """Returns the DRM specific resource usage flags for the drmaa_native_specification
+    :param time_limit: as datetime.time object
+    :param mem_req: memory required in MB
+    """
+    if mem_req == '' or not mem_req:
         return ''
     if DRM == 'LSF':
-        return '-R "rusage[mem={0}]"'.format(mem)
+        if time_limit:
+            min_limit = time_limit.hour * 60 + time_limit.minute
+            if min_limit >0:
+                duration = ':duration={0}'.format(min_limit)
+        else:
+            duration = ''
+        return '-R "rusage[mem={0}{1}]"'.format(mem_req,duration)
     elif DRM == 'GE':
-        return '-l h_vmem={0},virtual_free={0}'.format(mem)
+        return '-l h_vmem={0},virtual_free={0}'.format(mem_req)
 
 def validate_name(txt,field_name=''):
     """

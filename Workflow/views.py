@@ -26,9 +26,9 @@ def batch_view(request,pid):
 
     #filtering
     #generate possible filter choices
-    node_tags = NodeTag.objects.filter(node__batch=batch).values('key','value')
+    nodetags = NodeTag.objects.filter(node__batch=batch).values('key','value')
     filter_choices = SortedDict({ 'f_status': [ x[0] for x in status_choices ] }) #init with status filter
-    for key,nts in groupby(node_tags,lambda x: x['key']):
+    for key,nts in groupby(nodetags,lambda x: x['key']):
         filter_choices[key] = set ([ nt['value'] for nt in nts ]) #add each node_tag.key and all the unique node_tag.values
         
     #filter!
@@ -39,7 +39,7 @@ def batch_view(request,pid):
         tag_filters = all_filters.copy()
         for k,v in tag_filters.items():
             if v=='' or v==None or k =='f_status': del tag_filters[k] #filter tag_filters
-        nodes_list = batch.get_tagged_nodes(**tag_filters) 
+        nodes_list = batch.get_nodes_by(**tag_filters) 
         fs = request.GET.get('f_status')
         if fs != None and fs != '': #might be none or ''
             nodes_list = nodes_list.filter(status=request.GET['f_status'])

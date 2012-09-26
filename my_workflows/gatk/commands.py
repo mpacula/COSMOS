@@ -7,6 +7,7 @@ import settings
 from settings import get_Gatk_cmd,get_Picard_cmd
 
 def _parse_cmd_str(s,**kwargs):
+    """Runs parse_command_string but adds settings to the keyword args"""
     return parse_command_string(s,settings=settings,**kwargs)
 
 def bwa_aln(fastq,output_sai):
