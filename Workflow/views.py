@@ -34,16 +34,18 @@ def batch_view(request,pid):
     #filter!
     all_filters = {}
     filter_url=''
-    if 'f_status' in request.GET: #user wanted a filter
+    if 'filter' in request.GET: #user wanted a filter
         all_filters = dict([ (k,request.GET[k]) for k in filter_choices.keys()])
         tag_filters = all_filters.copy()
         for k,v in tag_filters.items():
             if v=='' or v==None or k =='f_status': del tag_filters[k] #filter tag_filters
         nodes_list = batch.get_tagged_nodes(**tag_filters) 
-        if request.GET['f_status']: #might be none or ''
+        fs = request.GET.get('f_status')
+        if fs != None and fs != '': #might be none or ''
             nodes_list = nodes_list.filter(status=request.GET['f_status'])
+            pass
         
-        filter_url = '&'+'&'.join([ '{0}={1}'.format(k,v) for k,v in tag_filters.items() ]) #url to retain this filter
+        filter_url = '&filter=True&'+'&'.join([ '{0}={1}'.format(k,v) for k,v in all_filters.items() ]) #url to retain this filter
     else:
         nodes_list = Node.objects.filter(batch=batch)
 
@@ -62,7 +64,6 @@ def batch_view(request,pid):
         # If page is out of range (e.g. 9999), deliver last page of results.
         nodes = paginator.page(paginator.num_pages)
     page_slice = "{0}:{1}".format(page,int(page)+9)
-    
         
     return render_to_response('Workflow/Batch/view.html', { 'request':request, 'current_filters':all_filters,'filter_url':filter_url ,'filter_choices':filter_choices, 'batch': batch,'page_size':page_size,'paged_nodes':nodes, 'page_slice':page_slice }, context_instance=RequestContext(request))
 

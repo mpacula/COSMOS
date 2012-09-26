@@ -3,7 +3,7 @@ from Workflow.models import Workflow, Batch
 import subprocess
 import commands
 from Cosmos.helpers import parse_command_string
-from exomes48 import samples,input_dir
+#from exomes48 import samples,input_dir
 
 WF = Workflow.resume(name='GPP_48Exomes_GATK',dry_run=False)
 assert isinstance(WF, Workflow)
@@ -31,7 +31,7 @@ if not B_bwa_aln.successful:
             fqp.r2_sai_node = B_bwa_aln.add_node(name = fqp.r2,
                                pcmd = commands.bwa_aln(fastq=fqp.r2_path,output_sai='{output_dir}/{outputs[sai]}'),
                                outputs = {'sai':'{0}.sai'.format(fqp.r1)},
-                               mem_req=5000)
+                               mem_req=5000) #TODO add tags
     WF.run_wait(B_bwa_aln)
 
 B_bwa_sampe = WF.add_batch("BWA Sampe",hard_reset=False)
@@ -58,7 +58,7 @@ if not B_bwa_aln.successful:
                                mem_req=5000)
     WF.run_wait(B_bwa_sampe)
 
-B_clean_sam = WF.add_batch("Clean Bams",hard_reset=True)
+B_clean_sam = WF.add_batch("Clean Bams",hard_reset=False)
 if not B_clean_sam.successful:
     for n in B_bwa_sampe.nodes:
         name = '{tags[sample]} L{tags[lane]} RGN{tags[readGroupNumber]}'.format(tags=n.tags)
@@ -70,7 +70,7 @@ if not B_clean_sam.successful:
                           mem_req=5000)
 WF.run_wait(B_clean_sam)
 
-B_merge1 = WF.add_batch("Merge Bams by Sample",hard_reset=False)
+B_merge1 = WF.add_batch("Merge Bams by Sample",hard_reset=True)
 for tags,input_nodes in B_bwa_sampe.group_nodes('sample'):
     sample_name = tags['sample']
     sample_sams = [ n.output_paths['sam'] for n in input_nodes ]
@@ -84,7 +84,5 @@ for tags,input_nodes in B_bwa_sampe.group_nodes('sample'):
     break
 WF.run_wait(B_merge1)
                                             
-
-
         
 WF.finished()

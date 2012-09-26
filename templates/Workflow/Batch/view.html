@@ -7,7 +7,6 @@
   <li><a href="{{batch.workflow.url }}">{{batch.workflow}}</a> <span class="divider">/</span></li>
   <li class="active">{{batch}}</li>
 </ul>
- 
 {% with details=1 %}
 {%include "Workflow/Batch/batch.html"%}
 {% endwith %}
@@ -16,13 +15,13 @@
 	<div class="accordion-group">
 		<div class="accordion-heading">
 			<a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#collapseOne">
-			Filter
+			<button class="bt btn-inverse btn-large">Filter</button>
 			</a>
 		</div>
 		<div id="collapseOne" class="accordion-body collapse">
 			<div class="accordion-inner">
 				<form method="GET" action="{{ request.url }}" class="form-horizontal">
-					<legend></legend>
+					<input type="hidden" name="filter" value="True"/>
 					{% csrf_token %}
 					{% for key,values in filter_choices.items %}
 				 	<div class="control-group">
@@ -78,7 +77,11 @@
     <tr><td>
         {%if node.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
         {%if node.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
-        <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong> (status: {{node.status}}, file_size: {{node.file_size}}, time_to_run: {{node.time_to_run|format_time}}, successful: {{node.successful}})
+        <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong>
+        (status: {{node.status}}, 
+        file_size: feature_off{{node.file_sizeX}}, 
+        time_to_run: {{node.time_to_run|format_time}}, 
+        successful: {{node.successful}})
         <ul>
         {% for j in node.jobAttempts %}
             <li style="list-style-type:none">
@@ -100,7 +103,7 @@
         </ul>
     </td></tr>
 {% empty %}
-  No nodes in this batch.
+  No nodes.
 {% endfor %}
 </table>
 

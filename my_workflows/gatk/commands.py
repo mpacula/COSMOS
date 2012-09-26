@@ -5,7 +5,6 @@ from Cosmos.helpers import parse_command_string
 import logging
 import settings
 from settings import get_Gatk_cmd,get_Picard_cmd
-from exomes48 import Sample, Fastq_Pair
 
 def _parse_cmd_str(s,**kwargs):
     return parse_command_string(s,settings=settings,**kwargs)

@@ -472,6 +472,10 @@ class Workflow(models.Model):
         :param _op: choose to either "and" or "or" the key/values together when searching for nodes
         usage: workflow.get_tagged_nodes(batch=my_batch,shape="circle",color="orange")
         """
+        
+        if len(kwargs) == 0: #no tags
+            if batch: return batch.nodes
+            return self.nodes
             
         if batch is None:
             nodeTag_matches = NodeTag.objects.filter(node__batch__workflow=self)
@@ -479,18 +483,15 @@ class Workflow(models.Model):
             nodeTag_matches = NodeTag.objects.filter(node__batch=batch)
             
 
-        if len(kwargs):
-            Q_list = []
-            for key,val in kwargs.items():
-                Q_list.append(Q(key=key,value=val))
-            if _op == 'and':
-                Qs = reduce(lambda x,y: x & y,Q_list)
-            else:
-                Qs = reduce(lambda x,y: x | y,Q_list)
-                 
-            return Node.objects.filter(nodetag__in=nodeTag_matches.filter(Qs))
+        Q_list = []
+        for key,val in kwargs.items():
+            Q_list.append(Q(key=key,value=val))
+        if _op == 'and':
+            Qs = reduce(lambda x,y: x & y,Q_list)
         else:
-            return Node.objects.filter(nodetag__in=nodeTag_matches)
+            Qs = reduce(lambda x,y: x | y,Q_list)
+             
+        return Node.objects.filter(nodetag__in=nodeTag_matches.filter(Qs))
 
 
     
@@ -743,6 +744,10 @@ class Node(models.Model):
     @property
     def workflow(self):
         return self.batch.workflow
+    
+    @property
+    def node_tags(self):
+        return NodeTags.objects.filter(node=self)
 
     @property
     def log(self):
@@ -827,7 +832,7 @@ class Node(models.Model):
         """
         Returns the dictionary of this node's tags
         """
-        return dict([(x['`key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
+        return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
     
     @models.permalink    
     def url(self):
@@ -840,6 +845,7 @@ class Node(models.Model):
         """
         self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
         self._jobAttempts.all().delete()
+        self.node_tags.delete()
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         super(Node, self).delete(*args, **kwargs)
