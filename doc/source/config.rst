@@ -32,7 +32,6 @@ Feel free to use our included lsf_drmaa.conf lsf_drmaa1.04:
    export LSF_DRMAA_CONF=$COSMOS_HOME_PATH/config/lsf_drmaa.conf
    
 
-   
 2. Edit Configuration File
 __________________________
 
@@ -45,10 +44,8 @@ on a network shared drive
 3. Create SQL Tables
 ____________________
 
-Once you've configured Cosmos, run:
+Once you've configured Cosmos, setting up the SQL database tables is easy.
 
 .. code-block:: bash
 
    $ cosmos adm syncdb
-  
-To setup the mysql database

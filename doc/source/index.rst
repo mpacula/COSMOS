@@ -6,15 +6,16 @@ Welcome to Cosmos's documentation!
 
 
 .. toctree::
-   :maxdepth: 2
+   :numbered:
+   :maxdepth: 3
    
    intro
    install
    config
-   tutorial
+   getting_started.rst
+   first_workflow.rst
    cli
-   API/Workflow.rst
-   API/JobManager.rst
+   API/api.rst
 
 
 Indices and tables

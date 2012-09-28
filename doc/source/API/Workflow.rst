@@ -1,5 +1,5 @@
-Workflow API
-============
+Workflow
+========
 
-.. automodule:: Workflow.models
+.. autoclass:: Workflow.models.Workflow
    :members:

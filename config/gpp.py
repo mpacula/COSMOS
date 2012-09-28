@@ -1,9 +1,13 @@
 import os
 
-#Cosmos Settings
+# Cosmos Settings
 home_path = '/home/ch158749/workspace/Cosmos' #gpp
 default_root_output_dir = '/nas/erik/cosmos_out' #gpp
 DRM = 'LSF' #LSF, or GE
+tmp_dir = '/nas/erik/tmp'
+
+# Web interface settings
+show_batch_file_sizes = False # on some systems, file i/o slows down a lot when running a lot of jobs making this feature very slow
 
 DATABASE = {
     'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.

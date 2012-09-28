@@ -19,7 +19,6 @@ class Sample:
     name = None
     input_path = None
     flowcell = None
-    fastq_pairs = []
     
     def __init__(self,name,input_path,flowcell):
         self.name = name
@@ -55,27 +54,23 @@ class Sample:
         for lane,fastqs_in_lane in groupby(all_fastqs,fastq2lane):
             for readGroupNumber,fastqs_in_readgroup in groupby(fastqs_in_lane,fastq2readGroupNumber):
                 fqs = [f for f in fastqs_in_readgroup]
-                yield Fastq_Pair(r1=fqs[0],r2=fqs[1],lane=lane,rgn=readGroupNumber,input_dir=self.input_path)
+                yield (Fastq(filename=fqs[0],lane=lane,rgn=readGroupNumber,input_dir=self.input_path),
+                       Fastq(filename=fqs[1],lane=lane,rgn=readGroupNumber,input_dir=self.input_path))
         
-class Fastq_Pair:
-    r1 = None #filename of the first set of reads
-    r2 = None
+class Fastq:
+    filename = None #filename of the first set of reads
     lane = None
     readGroupNumber = None
 
-    def __init__(self,r1,r2,lane,rgn,input_dir):
-        self.r1=r1
-        self.r2=r2
+    def __init__(self,filename,lane,rgn,input_dir):
+        self.filename=filename
         self.lane=lane
         self.readGroupNumber = rgn
         self.input_dir= input_dir
         
     @property
-    def r1_path(self):
-        return os.path.join(self.input_dir,self.r1)
-    @property
-    def r2_path(self):
-        return os.path.join(self.input_dir,self.r2)
+    def path(self):
+        return os.path.join(self.input_dir,self.filename)
         
     def __str__(self):
         return "FastQ_Pair| r1: {0.r1}, r2: {0.r2}, lane: {0.lane}, readGroupNumber: {0.readGroupNumber}".format(self)   

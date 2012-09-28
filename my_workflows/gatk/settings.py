@@ -1,5 +1,5 @@
 import os
-
+from cosmos_session import cosmos_settings
 ###User Defined Settings
 #This pipeline's settings
 #GATK_path = '/home2/erik/2gatk/GenomeAnalysisTK-2.1-8-g5efb575'
@@ -9,7 +9,7 @@ bwa_path = '/home/ch158749/tools/bwa-0.6.2/bwa'
 #resource_bundle_path = '/home2/erik/gatk/bundle/b37'
 resource_bundle_path = '/nas/erik/gatk_bundle1.5'
 queue_output_dir = '/vol3/cai_testgluster'
-tmp_dir='/dev/shm'
+tmp_dir=cosmos_settings.tmp_dir
 
 
 ### auto generated
@@ -17,7 +17,8 @@ reference_fasta_path = os.path.join(resource_bundle_path,'human_g1k_v37.fasta')
 dbsnp_path = os.path.join(resource_bundle_path,'dbsnp_135.b37.vcf')
 hapmap_path = os.path.join(resource_bundle_path,'hapmap_3.3.b37.sites.vcf')
 omni_path = os.path.join(resource_bundle_path,'1000G_omni2.5.b37.sites.vcf')
-mills_path = os.path.join(resource_bundle_path,'Mills_and_1000G_gold_standard.indels.b37.sites.vcf')
+mills_path = os.path.join(resource_bundle_path,'Mills_and_1000G_gold_standard.indels.b37.vcf')
+indels_1000g_phase1_path = os.path.join(resource_bundle_path,'1000G_phase1.indels.b37.vcf')
 #Setup Cosmos
 
 def get_Picard_cmd(jar,memory="5g"):

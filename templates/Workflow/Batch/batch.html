@@ -17,7 +17,11 @@
 	max job time: {{batch.max_job_time|format_time}},
 	total job time: {{batch.total_job_time|format_time}}{% if details %},
 	successful: {{batch.successful}},
-	file_size: feature_off{{batch.file_sizeX}}
+	successful: {{batch.successful}},
+	file_size: {%if settings.show_batch_file_sizes%}{{batch.file_size}}{%else%}OFF{%endif%}, 
+    Created On: {{batch.created_on}},
+	Finished On: {{batch.finished_on}},
+	Updated On: {{batch.updated_on}}
 	{% endif %}
 </p>
 </div>

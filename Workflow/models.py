@@ -20,9 +20,9 @@ status_choices=(
 
 
 class Workflow(models.Model):
-    """
-    A collection of Batches of Jobs with various
-    methods for running and waiting on the batches
+    """   
+    This is the master object.  It contains a list of **Batches** which represent a pool of jobs that have no dependencies on each other
+    and can be executed at the same time. 
     """
     name = models.CharField(max_length=250,unique=True)
     output_dir = models.CharField(max_length=250)
@@ -334,7 +334,7 @@ class Workflow(models.Model):
         jobAttempt = self.jobManager.addJobAttempt(command_script_path=command_script_path,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
-                                     drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement, node.time_limit))
+                                     drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement))
         
         node._jobAttempts.add(jobAttempt)
         if self.dry_run:
@@ -405,7 +405,7 @@ class Workflow(models.Model):
                 submitted_another_job = self._reattempt_node(node,jobAttempt)
                 if not submitted_another_job:
                     node._has_finished(jobAttempt) #job has failed and out of reattempts
-                    if self._is_terminating() and stop_on_fail:
+                    if not self._is_terminating() and stop_on_fail: 
                         self.terminate()
             
             if node.batch._are_all_nodes_done():
@@ -527,7 +527,9 @@ class Workflow(models.Model):
 class Batch(models.Model):
     """
     Executes a list of commands via drmaa.
-    Should not be directly created.  Use workflow.addBatch() to create a new batch.
+    
+    .. note:: A Batch should not be directly created.  Use ``workflow.add_batch()`` to create a new batch.
+    A Batch is `Embarrassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_.
     """
     name = models.CharField(max_length=200)
     workflow = models.ForeignKey(Workflow)
@@ -708,27 +710,30 @@ class Batch(models.Model):
                 
     def group_nodes_by(self,*args):
         """
-        Yields nodes, grouped by tags in *args.  Groups will be every unique set of possible values of tags
+        Yields nodes, grouped by tags in *args.  Groups will be every unique set of possible values of tags.
         For example, if you had nodes tagged by color, and shape, and you ran func:`batch.group_nodes_by`('color','shape'),
-        this function would yield all the nodes that were blue and a circle, then all the nodes that were red and a circle,
-        then all the nodes that were blue and a square, etc.
+        this function would yield the group of nodes that exist in the various combinations of ``color``s and ``shape``s.
+        So one of the yields may be (({'color':'orange'n'shape':'circle'}), [ orange_circular_nodes ])
         
         :param *args: Keywords of the tags you want to group by
-        :returns: a tuple of (tags used,nodes in group)
+        :yields: a tuple of (tags_in_this_group,nodes in group)
         
-        .. note:: nodes missing one of the tags in *args will be automatically filtered out
+        .. note:: a missing tag is considered as None and thus its own grouped with other similar nodes.  You should generally
+        try to avoid this scenario and have all nodes tagged by the keywords you're grouping by.
+        
+        .. note:: any nodes without a single one of the tags in *args are not included
         """
         node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=args).values() #get this batch's tags
+        #filter out any nodes without all args
         
-        itr = helpers.groupby(node_tag_values,lambda x: x['node_id'])
-        node_ids2kvps = dict( [ (node_id,set([ (ntv['key'],ntv['value']) for ntv in ntvs ])) for node_id,ntvs in itr ] ) #ntvs = node_tag_values, #kvp = key_value_pair
-        # node_ids2kvps is a dict who's keys are node_ids and values are a set of (key,val) tags)
-        node_ids = node_ids2kvps.keys()    
-            
-        for kvps,node_ids in helpers.groupby(node_ids,lambda x: node_ids2kvps[x]): #this works because the key value pairs are unique sets
-            node_ids = [ x for x in node_ids ]
-            if len(kvps) == len(args): #make sure all kvps were used.  this could be more efficient, but oh well
-                yield dict(kvps),Node.objects.filter(pk__in=node_ids)
+        node_id2tags = {}
+        for node_id, ntv in helpers.groupby(node_tag_values,lambda x: x['node_id']):
+            node_tags = dict([ (n['key'],n['value']) for n in ntv ])
+            node_id2tags[node_id] = node_tags
+        
+        for tags,node_id_and_tags_tuple in helpers.groupby(node_id2tags.items(),lambda x: x[1]):
+            node_ids = [ x[0] for x in node_id_and_tags_tuple ]
+            yield tags, Node.objects.filter(pk__in=node_ids)
     
     def delete(self, *args, **kwargs):
         """
@@ -760,7 +765,7 @@ class Batch(models.Model):
             
 
 class NodeTag(models.Model):
-    "A keyword/value object used to describe a node"
+    "A keyword/value object used to describe a node."
     node = models.ForeignKey('Node')
     key = models.CharField(max_length=63)
     value = models.CharField(max_length=255)
@@ -770,6 +775,9 @@ class NodeTag(models.Model):
         return "Tag({0}) - {0}: {0}".format(self.node, self.key, self.value)
 
 class Node(models.Model):
+    """
+    The object that represents the command line that gets executed.
+    """
     _jobAttempts = models.ManyToManyField(JobAttempt,related_name='node_set')
     pre_command = models.TextField(help_text='preformatted command.  almost always will contain the special string {output} which will later be replaced by the proper output path')
     exec_command = models.TextField(help_text='the actual command that was executed',null=True)

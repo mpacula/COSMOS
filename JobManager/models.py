@@ -30,6 +30,9 @@ class JobStatusError(Exception):
     pass
        
 class JobAttempt(models.Model):
+    """
+    An attempt at running a node.
+    """
     queue_status_choices = (
         ('not_queued','JobAttempt has not been submitted to the JobAttempt Queue yet'),
         ('queued','JobAttempt is in the JobAttempt Queue and is waiting to run, is running, or has finished'),
@@ -70,7 +73,6 @@ class JobAttempt(models.Model):
     def node(self):
         "This job's node"
         return self.node_set.get()
-    
             
     def createJobTemplate(self,base_template):
         """

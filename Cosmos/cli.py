@@ -8,7 +8,7 @@ def terminate(args):
     if args.id is None:
         raise CommandError('please choose a name OR an id')
     wf = Workflow.objects.get(pk=args.id)
-    print "Telling workflow {0} to terminate".format(wf)
+    print "Telling {0} to terminate".format(wf)
     wf.terminate()
 
     #lsf qdel all: bjobs|cut -d " " -f 1 -|sed 1d|xargs -t -L 1 qdel

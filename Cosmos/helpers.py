@@ -21,7 +21,7 @@ def groupby(iterable,fxn):
     """aggregates an iterable using a function"""
     return itertools.groupby(sorted(iterable,key=fxn),fxn)
 
-def parse_command_string(txt,**kwargs):
+def parse_cmd(txt,**kwargs):
     """removes empty lines and white space.
     also .format()s with the **kwargs dictioanry"""
     x = txt.split('\n')
@@ -35,21 +35,24 @@ def parse_command_string(txt,**kwargs):
     return s
 
 
-def get_drmaa_ns(DRM,mem_req,time_limit):
+def get_drmaa_ns(DRM,mem_req,time_limit=None):
     """Returns the DRM specific resource usage flags for the drmaa_native_specification
     :param time_limit: as datetime.time object
     :param mem_req: memory required in MB
     """
-    if mem_req == '' or not mem_req:
-        return ''
     if DRM == 'LSF':
-        if time_limit:
-            min_limit = time_limit.hour * 60 + time_limit.minute
-            if min_limit >0:
-                duration = ':duration={0}'.format(min_limit)
+        if mem_req == '' or not mem_req:
+            rusage_mem_req = ''
         else:
-            duration = ''
-        return '-R "rusage[mem={0}{1}]"'.format(mem_req,duration)
+            rusage_mem_req = 'mem={0}'.format(mem_req)  
+#        if time_limit:
+#            min_limit = time_limit.hour * 60 + time_limit.minute
+#            if min_limit >0:
+#                duration = ':duration={0}'.format(min_limit)
+#        else:
+#            duration = ''
+#        return '-R "rusage[{0}{1}]"'.format(rusage_mem_req,duration)
+        return '-R "rusage[{0}]"'.format(rusage_mem_req)
     elif DRM == 'GE':
         return '-l h_vmem={0},virtual_free={0}'.format(mem_req)
 

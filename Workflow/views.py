@@ -29,7 +29,7 @@ def batch_view(request,pid):
     nodetags = NodeTag.objects.filter(node__batch=batch).values('key','value')
     filter_choices = SortedDict({ 'f_status': [ x[0] for x in status_choices ] }) #init with status filter
     for key,nts in groupby(nodetags,lambda x: x['key']):
-        filter_choices[key] = set ([ nt['value'] for nt in nts ]) #add each node_tag.key and all the unique node_tag.values
+        filter_choices[key] = sorted(set([ nt['value'] for nt in nts ])) #add each node_tag.key and all the unique node_tag.values
         
     #filter!
     all_filters = {}

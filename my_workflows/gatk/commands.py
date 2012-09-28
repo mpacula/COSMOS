@@ -1,20 +1,18 @@
 from django.core.exceptions import ValidationError
-
 import cosmos_session
-from Cosmos.helpers import parse_command_string
-import logging
+from Cosmos.helpers import parse_cmd
 import settings
-from settings import get_Gatk_cmd,get_Picard_cmd
+from settings import get_Picard_cmd
 
-def _parse_cmd_str(s,**kwargs):
-    """Runs parse_command_string but adds settings to the keyword args"""
-    return parse_command_string(s,settings=settings,**kwargs)
+def _parse_cmd(s,**kwargs):
+    """Runs parse_cmd but adds settings to the keyword args"""
+    return parse_cmd(s,settings=settings,**kwargs)
 
 def bwa_aln(fastq,output_sai):
     s = r"""
     {settings.bwa_path} aln {settings.reference_fasta_path} {fastq} > {output_sai}
     """
-    return _parse_cmd_str(s,fastq=fastq,output_sai=output_sai)
+    return _parse_cmd(s,fastq=fastq,output_sai=output_sai)
 
 
 def bwa_sampe(output_sam,r1_sai,r2_sai,r1_fq,r2_fq,ID,LIBRARY,SAMPLE_NAME,PLATFORM='ILLUMINA'):
@@ -28,14 +26,14 @@ def bwa_sampe(output_sam,r1_sai,r2_sai,r1_fq,r2_fq,ID,LIBRARY,SAMPLE_NAME,PLATFO
     {r1_fq} \
     {r2_fq}
     """
-    return _parse_cmd_str(s,output_sam=output_sam,r1_sai=r1_sai,r2_sai=r2_sai,r1_fq=r1_fq,r2_fq=r2_fq,ID=ID,LIBRARY=LIBRARY,SAMPLE_NAME=SAMPLE_NAME,PLATFORM=PLATFORM)
+    return _parse_cmd(s,output_sam=output_sam,r1_sai=r1_sai,r2_sai=r2_sai,r1_fq=r1_fq,r2_fq=r2_fq,ID=ID,LIBRARY=LIBRARY,SAMPLE_NAME=SAMPLE_NAME,PLATFORM=PLATFORM)
 
 def create_bam_list():
     """bam.list input to queue"""
     s= r"""
     java \
     """
-    return _parse_cmd_str(s,)
+    return _parse_cmd(s,)
 
 def queue(input_bam_list):
     s= r"""
@@ -58,16 +56,16 @@ def queue(input_bam_list):
     -resMemReq 3 \
     -run
     """
-    return _parse_cmd_str(s,)
+    return _parse_cmd(s,)
 
 def CleanSam(input,output):
-     # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
+    # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
     s = r"""
     {Picard_CleanSam} \
     I={input} \
     O={output}
     """
-    return _parse_cmd_str(s,input=input,output=output,Picard_CleanSam=get_Picard_cmd('CleanSam.jar'))
+    return _parse_cmd(s,input=input,output=output,Picard_CleanSam=get_Picard_cmd('CleanSam.jar'))
     
 
 def ReduceBam(input_bam,output_bam,interval):
@@ -79,7 +77,7 @@ def ReduceBam(input_bam,output_bam,interval):
     -o {output_bam} \
     -L {interval}
     """
-    return _parse_cmd_str(s,input_bam=input_bam,output_bam=output_bam,interval=interval)
+    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,interval=interval)
 
 #i want input_bams to be a list so its not a command line argument right now
 def MergeSamFiles(input_bams,output_bam,assume_sorted=True):
@@ -92,12 +90,67 @@ def MergeSamFiles(input_bams,output_bam,assume_sorted=True):
     MERGE_SEQUENCE_DICTIONARIES=True \
     ASSUME_SORTED={assume_sorted}
     """
-    return _parse_cmd_str(s,INPUTs=INPUTs,output_bam=output_bam,assume_sorted=assume_sorted,Picard_MergeSamFiles=get_Picard_cmd('MergeSamFiles.jar'))
+    return _parse_cmd(s,INPUTs=INPUTs,output_bam=output_bam,assume_sorted=assume_sorted,Picard_MergeSamFiles=get_Picard_cmd('MergeSamFiles.jar'))
+
+def RealignerTargetCreator(input_bam,output_recal_intervals):
+    s = r"""
+    {settings.GATK_cmd} \
+    -T RealignerTargetCreator \
+    -R {settings.reference_fasta_path} \
+    -I {input_bam} \
+    -o {output_recal_intervals} \
+    --known {settings.indels_1000g_phase1_path} \
+    --known {settings.mills_path}
+    """
+    return _parse_cmd(s,input_bam=input_bam,output_recal_intervals=output_recal_intervals)
+
+def IndelRealigner(input_bam,targetIntervals,output_bam):
+    #TODO use SW?
+    s = r"""
+    {settings.GATK_cmd} \
+    -T IndelRealigner \
+    -R {settings.reference_fasta_path} \
+    -I {input_bam} \
+    -targetIntervals {target_intervals} \
+    -o {output_bam} \
+    --known {settings.indels_1000g_phase1_path} \
+    --known {settings.mills_path}
+    """
+    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,targetIntervals=targetIntervals)
+
+def BaseQualityScoreRecalibration(input_bam,output_recal_report):
+    #TODO use SW?
+    s = r"""
+    {settings.GATK_cmd} \
+    -T BaseRecalibrator \
+    -R {settings.reference_fasta_path} \
+    -I {input_bam} \
+    -o {output_report} \
+    --known {settings.indels_1000g_phase1_path} \
+    --known {settings.mills_path} \
+    -cov ReadGroupCovariate \
+    -cov QualityScoreCovariate \
+    -cov CycleCovariate \
+    -cov DinucCovariate
+    """
+    return _parse_cmd(s,input_bam=input_bam,output_recal_report=output_recal_report)
+
+def PrintReads(input_bam,output_bam,input_recal_report):
+    #TODO use SW?
+    s = r"""
+    {settings.GATK_cmd} \
+    -T PrintReads \
+    -R {settings.reference_fasta_path} \
+    -I {input_bam} \
+    -o {output_bam} \
+    -BQSR {input_recal_report}
+    """
+    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,input_recal_report=input_recal_report)
 
 def HaplotypeCaller(input_bam,output_bam,interval,glm):
     pass
 
-def _UnifiedGenotyper(input_bam,output_bam,interval,glm):
+def UnifiedGenotyper(input_bam,output_bam,interval,glm):
     """
     need to make variant annotation a separate step since some annotations use multi-sample info
     """
@@ -115,13 +168,8 @@ def _UnifiedGenotyper(input_bam,output_bam,interval,glm):
     -baq CALCULATE_AS_NECESSARY \
     -L {interval}
     """ 
-    return _parse_cmd_str(s,input_bam=input_bam,output_bam=output_bam,interval=interval,glm=glm)
+    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,interval=interval,glm=glm)
 
-def UnifiedGenotyper_SNP(input_bam,output_bam,interval):
-    return _UnifiedGenotyper(input_bam=input_bam, output_bam=output_bam, interval=interval, glm='SNP')
-
-def UnifiedGenotyper_INDEL(input_bam,output_bam,interval):
-    return _UnifiedGenotyper(input_bam=input_bam, output_bam=output_bam, interval=interval, glm='INDEL')
 
 def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
     """
@@ -141,7 +189,7 @@ def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
     -o {output_vcf} \
     -genotypeMergeOptions {genotypeMergeOptions}
     """ 
-    return _parse_cmd_str(s,INPUTs=INPUTs,output_vcf=output_vcf,genotypeMergeOptions=genotypeMergeOptions)
+    return _parse_cmd(s,INPUTs=INPUTs,output_vcf=output_vcf,genotypeMergeOptions=genotypeMergeOptions)
 
 def VariantQualityRecalibration(input_vcf,output_recal,output_tranches,output_rscript,mode,exome_or_wgs,haplotypeCaller_or_unifiedGenotyper,inbreedingcoeff=True):
     """
@@ -191,26 +239,26 @@ def VariantQualityRecalibration(input_vcf,output_recal,output_tranches,output_rs
                 -tranchesFile {output_tranches} \
                 -rscriptFile {output_rscript}
                 """
-        elif haplotypeCaller_or_unifiedGenotyper == 'HaplotypeCaller':
-            raise NotImplementedError()
-            if mode == 'SNP' or mode == 'INDEL': 
-                s = r"""
-                {settings.GATK_cmd} \
-                -T VariantRecalibrator \
-                -R {settings.reference_fasta_path} \
-                -input {input_vcf} \
-                --maxGaussians 6 \
-                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.b37.sites.vcf \
-                -resource:omni,known=false,training=true,truth=false,prior=12.0 1000G_omni2.5.b37.sites.vcf \
-                -resource:mills,known=true,training=true,truth=true,prior=12.0 Mills_and_1000G_gold_standard.indels.b37.sites.vcf \
-                -resource:dbsnp,known=true,training=false,truth=false,prior=6.0 dbsnp_135.b37.vcf \
-                -an QD -an MQRankSum -an ReadPosRankSum -an FS -an MQ -an InbreedingCoeff -an ClippingRankSum \
-                -mode BOTH \
-                """
+#        elif haplotypeCaller_or_unifiedGenotyper == 'HaplotypeCaller':
+#            raise NotImplementedError()
+#            if mode == 'SNP' or mode == 'INDEL': 
+#                s = r"""
+#                {settings.GATK_cmd} \
+#                -T VariantRecalibrator \
+#                -R {settings.reference_fasta_path} \
+#                -input {input_vcf} \
+#                --maxGaussians 6 \
+#                -resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.b37.sites.vcf \
+#                -resource:omni,known=false,training=true,truth=false,prior=12.0 1000G_omni2.5.b37.sites.vcf \
+#                -resource:mills,known=true,training=true,truth=true,prior=12.0 Mills_and_1000G_gold_standard.indels.b37.sites.vcf \
+#                -resource:dbsnp,known=true,training=false,truth=false,prior=6.0 dbsnp_135.b37.vcf \
+#                -an QD -an MQRankSum -an ReadPosRankSum -an FS -an MQ -an InbreedingCoeff -an ClippingRankSum \
+#                -mode BOTH \
+#                """
     elif mode == 'wgs':
         raise NotImplementedError()
             
-    return _parse_cmd_str(s,input_vcf=input_vcf,output_recal=output_recal,InbreedingCoeff=InbreedingCoeff,output_tranches=output_tranches,output_rscript=output_rscript)
+    return _parse_cmd(s,input_vcf=input_vcf,output_recal=output_recal,InbreedingCoeff=InbreedingCoeff,output_tranches=output_tranches,output_rscript=output_rscript)
 
 def ApplyRecalibration(input_vcf,input_recal,input_tranches,output_recalibrated_vcf,mode,haplotypeCaller_or_unifiedGenotyper):
     """
@@ -260,4 +308,4 @@ def ApplyRecalibration(input_vcf,input_recal,input_tranches,output_recalibrated_
             -mode BOTH
             """
             
-    return _parse_cmd_str(s,input_vcf=input_vcf,output_recalibrated_vcf=output_recalibrated_vcf,input_recal=input_recal,input_tranches=input_tranches)
+    return _parse_cmd(s,input_vcf=input_vcf,output_recalibrated_vcf=output_recalibrated_vcf,input_recal=input_recal,input_tranches=input_tranches)
