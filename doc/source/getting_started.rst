@@ -2,7 +2,7 @@ Getting Started
 ===============
 
 We'll start by running a simple test workflow, exploring it via the web interface, and terminating.  Then
-you'll be ready to start your own
+you'll be ready to start your own.
 
 Command Line Interface
 ______________________
@@ -44,7 +44,7 @@ features of Cosmos.  Again, the number beside each object inside brackets, `[#]`
    INFO: 2012-09-27 16:47:31: Creating Batch[352] Job That Runs Too Long from scratch.
    INFO: 2012-09-27 16:47:31: Created node Node[7145] 1 from scratch
    INFO: 2012-09-27 16:47:31: Running batch Batch[352] Job That Runs Too Long.
-   INFO: 2012-09-27 16:47:31: Running Node[7145] 1 from Batch[352] Job That Runs Too Long -R "rusage[mem=10]"
+   INFO: 2012-09-27 16:47:31: Running Node[7145] 1 from Batch[352] Job That Runs Too Long
    INFO: 2012-09-27 16:47:32: Submitted jobAttempt with drmaa jobid 14173
    INFO: 2012-09-27 16:47:32: Adding batch Echo.
    INFO: 2012-09-27 16:47:35: Creating Batch[353] Echo from scratch.
@@ -52,11 +52,11 @@ features of Cosmos.  Again, the number beside each object inside brackets, `[#]`
    INFO: 2012-09-27 16:47:35: Created node Node[7147] 2 from scratch
    INFO: 2012-09-27 16:47:35: Created node Node[7148] 3 from scratch
    INFO: 2012-09-27 16:47:35: Running batch Batch[353] Echo.
-   INFO: 2012-09-27 16:47:35: Running Node[7146] 1 from Batch[353] Echo -R "rusage[]"
+   INFO: 2012-09-27 16:47:35: Running Node[7146] 1 from Batch[353] Echo
    INFO: 2012-09-27 16:47:36: Submitted jobAttempt with drmaa jobid 14174
-   INFO: 2012-09-27 16:47:36: Running Node[7147] 2 from Batch[353] Echo -R "rusage[]"
+   INFO: 2012-09-27 16:47:36: Running Node[7147] 2 from Batch[353] Echo
    INFO: 2012-09-27 16:47:40: Submitted jobAttempt with drmaa jobid 14175
-   INFO: 2012-09-27 16:47:40: Running Node[7148] 3 from Batch[353] Echo -R "rusage[]"
+   INFO: 2012-09-27 16:47:40: Running Node[7148] 3 from Batch[353] Echo
    INFO: 2012-09-27 16:47:41: Submitted jobAttempt with drmaa jobid 14176
    INFO: 2012-09-27 16:47:41: Waiting on batch Batch[353] Echo...
 
@@ -86,7 +86,7 @@ Currently, we do not support pressing ctrl+c (coming soon!) to terminate a workf
 If you do, Cosmos will not be able to properly update the database.  It will be fine when you restart things, but for example, your latest batch
 will still have the status of "in_progress" instead of "failed".
 
-To terminate a workflow properly, first find it's id:
+To terminate a workflow properly, first find it's ID:
 
 .. code-block:: bash
 

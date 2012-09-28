@@ -330,7 +330,6 @@ class Workflow(models.Model):
         command_script_path = os.path.join(node.output_dir,'command.sh')
         self.__create_command_sh(node.exec_command,command_script_path)
         
-        print get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement, node.time_limit)
         jobAttempt = self.jobManager.addJobAttempt(command_script_path=command_script_path,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
@@ -338,10 +337,10 @@ class Workflow(models.Model):
         
         node._jobAttempts.add(jobAttempt)
         if self.dry_run:
-            self.log.info('Dry Run: skipping submission of job {0}'.format(jobAttempt))
+            self.log.info('Dry Run: skipping submission of job {0}.'.format(jobAttempt))
         else:
             self.jobManager.submitJob(jobAttempt)
-            self.log.info('Submitted jobAttempt with drmaa jobid {0}'.format(jobAttempt.drmaa_jobID))
+            self.log.info('Submitted jobAttempt with drmaa jobid {0}.'.format(jobAttempt.drmaa_jobID))
         node.save()
         self.jobManager.save()
         return jobAttempt
@@ -383,7 +382,7 @@ class Workflow(models.Model):
                 self.save()
                 return False
     
-    def __wait(self,batch=None,stop_on_fail=False):
+    def __wait(self,batch=None,terminate_on_fail=False):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         if batch is omitted or set to None, all running nodes will be waited on
@@ -405,7 +404,8 @@ class Workflow(models.Model):
                 submitted_another_job = self._reattempt_node(node,jobAttempt)
                 if not submitted_another_job:
                     node._has_finished(jobAttempt) #job has failed and out of reattempts
-                    if not self._is_terminating() and stop_on_fail: 
+                    if not self._is_terminating() and terminate_on_fail:
+                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
                         self.terminate()
             
             if node.batch._are_all_nodes_done():
@@ -421,13 +421,15 @@ class Workflow(models.Model):
         return nodes 
 
 
-    def wait(self, batch=None, stop_on_fail=True):
+    def wait(self, batch=None, terminate_on_fail=True):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
-        if batch is omitted or set to None, all running nodes will be waited on
+        If `batch` is omitted or set to None, all running nodes will be waited on.
+        
+        :param terminate_on_fail: If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
         """
-        nodes = self.__wait(batch=batch,stop_on_fail=stop_on_fail)
-        self._check_termination(check_for_leftovers=True)
+        nodes = self.__wait(batch=batch,terminate_on_fail=terminate_on_fail)
+        self._check_termination(check_for_leftovers=True) #this is why there's a separate __wait() - so check_for_leftovers can call __wait() and not wait().  Otherwise checking for leftovers would loop forever!
         return nodes
 
     def run_wait(self,batch):
@@ -439,10 +441,11 @@ class Workflow(models.Model):
 
     def finished(self):
         """
-        call at the end of every workflow.
-        if there any left over jobs that have not been collected,
-        it will wait for all of them them
-        will also run _clean_up()
+        Call at the end of every workflow.
+        If there any left over jobs that have not been collected,
+        It will wait for all of them them
+        
+        Runs _clean_up()
         """
         self._check_and_wait_for_leftover_nodes()
         self._clean_up()
@@ -617,7 +620,7 @@ class Batch(models.Model):
         :param mem_req: (int) Optional setting to tell the DRM how much memory to reserve in MB. Optional.
         :param time_limit: (datetime.time) any other keyword arguments will add `tag`s to the node. Optional.
         """
-        
+        #TODO need a dict for special outputs?
         #validation
         if name == '' or name is None:
             raise ValidationError('name cannot be blank')
@@ -647,10 +650,10 @@ class Batch(models.Model):
             if node.pre_command != pcmd:
                 self.log.error("You can't change the pcmd of a existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
             if node.outputs != outputs:
-                self.log.error("You can't change the outputs of an existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this")
+                self.log.error("You can't change the outputs of an existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
         
         if created:
-            self.log.info("Created node {0} from scratch".format(node))
+            self.log.info("Created node {0} from scratch.".format(node))
             #if adding to a finished batch, set that batch's status to in_progress so new nodes are executed
             batch = node.batch
             if batch.is_done():
@@ -661,7 +664,7 @@ class Batch(models.Model):
         #this error should never occur    
         elif not created and not self.successful:
             if self.workflow.resume_from_last_failure and node.successful:
-                self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history".format(node,node.batch))
+                self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history.".format(node,node.batch))
 
         node.save()
         node.tag(**tags)
@@ -721,7 +724,7 @@ class Batch(models.Model):
         .. note:: a missing tag is considered as None and thus its own grouped with other similar nodes.  You should generally
         try to avoid this scenario and have all nodes tagged by the keywords you're grouping by.
         
-        .. note:: any nodes without a single one of the tags in *args are not included
+        .. note:: any nodes without a single one of the tags in *args are not included.
         """
         node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=args).values() #get this batch's tags
         #filter out any nodes without all args
@@ -737,7 +740,7 @@ class Batch(models.Model):
     
     def delete(self, *args, **kwargs):
         """
-        Deletes this batch and all files associated with it
+        Deletes this batch and all files associated with it.
         """
         self.log.debug('Deleting Batch {0}'.format(self.name))
         self.nodes.all().delete()
@@ -836,7 +839,7 @@ class Node(models.Model):
     
     @property
     def output_paths(self):
-        "Dictionary of outputs and their full absolute paths"
+        "Dictionary of this node's outputs appended to this node's output_dir."
         r = {}
         for key,val in self.outputs.items():
             r[key] = os.path.join(self.job_output_dir,val)
@@ -844,16 +847,16 @@ class Node(models.Model):
     
     @property
     def jobAttempts(self):
-        "This node's jobAttempts"
+        "Queryset of this node's jobAttempts."
         return self._jobAttempts.all().order_by('id')
     
     @property
     def time_to_run(self):
-        "Time it took this node to run"
+        "Time it took this node to run."
         return self.get_successful_jobAttempt().drmaa_utime if self.successful else None
     
     def numAttempts(self):
-        "This node's number of job attempts"
+        "This node's number of job attempts."
         return self._jobAttempts.count()
     
     def get_successful_jobAttempt(self):
@@ -873,7 +876,7 @@ class Node(models.Model):
 
     def _has_finished(self,jobAttempt):
         """
-        Executed whenever this node finishes by the workflow
+        Executed whenever this node finishes by the workflow.
         """
         if self._jobAttempts.filter(successful=True).count():
             self.status = 'successful'
@@ -888,7 +891,7 @@ class Node(models.Model):
         
     def tag(self,**kwargs):
         """
-        tag this node with keys and values.  keys must be unique
+        Tag this node with key value pairs.  If the key already exists, it will be overwritten.
         
         >>> node.tag(color="blue",shape="circle")
         """
@@ -896,18 +899,20 @@ class Node(models.Model):
         for key,value in kwargs.items():
             value = str(value)
             nodetag, created = NodeTag.objects.get_or_create(node=self,key=key,defaults= {'value':value})
+            if not created:
+                nodetag.value = value
             nodetag.save()
 
     @property            
     def tags(self):
         """
-        The dictionary of this node's tags
+        The dictionary of this node's tags.
         """
         return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
     
     @models.permalink    
     def url(self):
-        "This node's url"
+        "This node's url."
         return ('node_view',[str(self.id)])
 
 
@@ -916,6 +921,7 @@ class Node(models.Model):
         Deletes this node and all files associated with it
         """
         self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
+        #todo delete stuff in output_paths that may be extra files
         self._jobAttempts.all().delete()
         self.nodetags.delete()
         if os.path.exists(self.output_dir):

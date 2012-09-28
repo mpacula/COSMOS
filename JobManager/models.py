@@ -240,7 +240,6 @@ class JobManager(models.Model):
         :param drmaa_native_specification: the drmaa_native_specifications tring
         """
         ##TODO - check that jobName is unique? or maybe append the job primarykey to the jobname to avoid conflicts.  maybe add primary key as a subdirectory of drmaa_output_dir
-        ##TODO use shell scripts to launch jobs
         job = JobAttempt(jobManager=self, command_script_path = command_script_path, jobName = jobName, drmaa_output_dir = drmaa_output_dir, drmaa_native_specification=drmaa_native_specification)
         job.command_script_text = job._get_command_shell_script_text()
         job.createJobTemplate(base_template = cosmos_session.drmaa_session.createJobTemplate())

@@ -13,6 +13,8 @@ tmp_dir=cosmos_settings.tmp_dir
 
 
 ### auto generated
+GATK_cmd = 'java -Xmx{memory} -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(memory="5g",gatk_jar = os.path.join(GATK_path,'GenomeAnalysisTKLite.jar'),tmp_dir=tmp_dir)
+ 
 reference_fasta_path = os.path.join(resource_bundle_path,'human_g1k_v37.fasta')
 dbsnp_path = os.path.join(resource_bundle_path,'dbsnp_135.b37.vcf')
 hapmap_path = os.path.join(resource_bundle_path,'hapmap_3.3.b37.sites.vcf')
@@ -23,5 +25,4 @@ indels_1000g_phase1_path = os.path.join(resource_bundle_path,'1000G_phase1.indel
 
 def get_Picard_cmd(jar,memory="5g"):
     return 'java -Xmx{memory} -Djava.io.tmpdir={tmp_dir} -jar {picard_jar}'.format(memory=memory,picard_jar = os.path.join(Picard_path,jar),tmp_dir=tmp_dir)
-def get_Gatk_cmd(memory="5g"):
-    return 'java -Xmx{memory} -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(memory=memory,gatk_jar = os.path.join(GATK_path,'GenomeAnalysisTK.jar'),tmp_dir=tmp_dir)
+

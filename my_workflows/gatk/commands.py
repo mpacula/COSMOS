@@ -92,6 +92,15 @@ def MergeSamFiles(input_bams,output_bam,assume_sorted=True):
     """
     return _parse_cmd(s,INPUTs=INPUTs,output_bam=output_bam,assume_sorted=assume_sorted,Picard_MergeSamFiles=get_Picard_cmd('MergeSamFiles.jar'))
 
+def BuildBamIndex(input_bam,output_bai):
+    s = r"""
+    {Picard_BuildBamIndex} \
+    INPUT={input_bam} \
+    OUTPUT={output_bai}
+    """
+    return _parse_cmd(s,input_bam=input_bam,output_bai=output_bai,Picard_BuildBamIndex=get_Picard_cmd('BuildBamIndex.jar'))
+
+
 def RealignerTargetCreator(input_bam,output_recal_intervals):
     s = r"""
     {settings.GATK_cmd} \

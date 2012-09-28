@@ -70,30 +70,42 @@ if not B_clean_sam.successful:
                              mem_req=1000)
     WF.run_wait(B_clean_sam)
 
-B_merge1 = WF.add_batch("Merge Bams by Sample",hard_reset=False)
-if not B_merge1.successful:
+B_merge_bams = WF.add_batch("Merge Bams by Sample")
+if not B_merge_bams.successful:
     for tags,input_nodes in B_clean_sam.group_nodes_by('sample'):
         sample_name = tags['sample']
         sample_sams = [ n.output_paths['bam'] for n in input_nodes ]
-        B_merge1.add_node(name=sample_name,
+        B_merge_bams.add_node(name=sample_name,
                           pcmd = commands.MergeSamFiles(input_bams=sample_sams,
                                                         output_bam='{output_dir}/{outputs[bam]}',
                                                         assume_sorted=False),
                           outputs = {'bam':'{0}.bam'.format(sample_name)},
                           tags = {'sample':sample_name},
                           mem_req=1000)
-    WF.run_wait(B_merge1)
+    WF.run_wait(B_merge_bams)
+
+B_index = WF.add_batch("Index Merged Bams",hard_reset=True)
+if not B_index.successful:
+    for merge_node in B_merge_bams.nodes:
+        sample_name = merge_node.tags['sample']
+        B_index.add_node(name=sample_name,
+                          pcmd = commands.BuildBamIndex(input_bam=merge_node.output_paths['bam'],
+                                                        output_bai='{outputs[bai]}'),
+                          outputs = {'bai':'{0}.bai'.format(merge_node.output_paths['bam'])},
+                          tags = {'sample':sample_name},
+                          mem_req=1000)
+    WF.run_wait(B_index)
                                             
 ### INDEL Realignment    
  
 B_RTC = WF.add_batch("Realigner Target Creator")
 if not B_RTC.successful:
-    for tags,input_nodes in B_clean_sam.group_nodes_by('sample'):
-        input_bam = input_nodes[0].output_paths['bam']
-        sample_name = tags['sample']
+    for input_node in B_merge_bams.nodes:
+        input_bam = input_node.output_paths['bam']
+        sample_name = input_node.tags['sample']
         B_RTC.add_node(name=sample_name,
                        pcmd = commands.RealignerTargetCreator(input_bam=input_bam,
-                                                     output_recal_intervals='{output_dir}/{outputs[recal]}'),
+                                                              output_recal_intervals='{output_dir}/{outputs[targetIntervals]}'),
                        outputs = {'targetIntervals':'{0}.targetIntervals'.format(sample_name)},
                        tags = {'sample':sample_name},
                        mem_req=2000)
@@ -102,9 +114,9 @@ if not B_RTC.successful:
                                             
 B_IR = WF.add_batch("Indel Realigner")
 if not B_IR.successful:
-    for tags,input_nodes in B_clean_sam.group_nodes_by('sample'):
-        input_bam = input_nodes[0].output_paths['bam']
-        sample_name = tags['sample']
+    for input_node in B_clean_sam.nodes:
+        input_bam = input_node.output_paths['bam']
+        sample_name = input_node.tags['sample']
         targetIntervals = B_RTC.get_nodes_by(sample=sample_name)[0].output_paths['targetIntervals']
         B_IR.add_node(name=sample_name,
                       pcmd = commands.IndelRealigner(input_bams=input_bam,
@@ -120,9 +132,9 @@ if not B_IR.successful:
      
 B_BQSR = WF.add_batch("Base Quality Score Recalibration") #TODO test using SW
 if not B_BQSR.successful:
-    for tags,input_nodes in B_clean_sam.group_nodes_by('sample'):
-        sample_name = tags['sample']
-        input_bam = input_nodes[0].output_paths['bam']
+    for input_node in B_IR:
+        input_bam = input_node.output_paths['bam']
+        sample_name = input_node.tags['sample']
         B_BQSR.add_node(name=sample_name,
                         pcmd = commands.BaseQualityScoreRecalibration(input_bam = input_bam,
                                                                       output_recal_report='{output_dir}/outputs[recal]'),
