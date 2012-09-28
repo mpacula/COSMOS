@@ -1,6 +1,7 @@
 Command Line Interface
 ======================
 
+The CLI can be accessed by typing :command:`cosmos` at your prompt.  See below for usage.
 
 Get Usage Help
 ++++++++++++++

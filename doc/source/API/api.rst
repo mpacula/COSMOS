@@ -1,11 +1,13 @@
 Cosmos API
-==================
+==========
 
    
-* :doc:`Workflow`
 
-* :doc:`Batch`
-
-* :doc:`Node`
-
-* :doc:`JobAttempt`
+.. toctree::
+   :numbered:
+   :maxdepth: 3
+   
+   Workflow
+   Batch
+   Node
+   JobAttempt

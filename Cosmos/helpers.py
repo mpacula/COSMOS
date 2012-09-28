@@ -53,8 +53,10 @@ def get_drmaa_ns(DRM,mem_req,time_limit=None):
 #            duration = ''
 #        return '-R "rusage[{0}{1}]"'.format(rusage_mem_req,duration)
         return '-R "rusage[{0}]"'.format(rusage_mem_req)
-    elif DRM == 'GE':
-        return '-l h_vmem={0},virtual_free={0}'.format(mem_req)
+#    elif DRM == 'GE':
+#        return '-l h_vmem={0},virtual_free={0}'.format(mem_req)
+    else:
+        return ''
 
 def validate_name(txt,field_name=''):
     """

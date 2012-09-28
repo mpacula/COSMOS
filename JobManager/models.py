@@ -84,8 +84,8 @@ class JobAttempt(models.Model):
         self.jobTemplate.remoteCommand = self.command_script_path #TODO create a bash script that this this command_script_text
         #self.jobTemplate.args = self.command_script_text.split(' ')[1:]
         self.jobTemplate.jobName = 'ja-'+self.jobName
-        self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,drmaa.JobTemplate.PARAMETRIC_INDEX+'.out')
-        self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,drmaa.JobTemplate.PARAMETRIC_INDEX+'.err')
+        self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,'stdout')
+        self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,'stderr')
         self.jobTemplate.blockEmail = True
         self.jobTemplate.nativeSpecification = self.drmaa_native_specification
         #create dir if doesn't exist
@@ -110,7 +110,7 @@ class JobAttempt(models.Model):
         files = os.listdir(self.drmaa_output_dir)
         try:
             #filename = filter(lambda x:re.search('(\.o{0}|{0}\.out)'.format(self.drmaa_jobID),x), files)[0]
-            filename = filter(lambda x:re.search('(\d+.out)'.format(self.drmaa_jobID),x), files)[0]
+            filename = filter(lambda x:re.search('(\d+.out)|stdout'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None
@@ -120,7 +120,7 @@ class JobAttempt(models.Model):
         files = os.listdir(self.drmaa_output_dir)
         try:
             #filename = filter(lambda x:re.search('(\.e{0})|({0}\.err)'.format(self.drmaa_jobID),x), files)[0]
-            filename = filter(lambda x:re.search('(\d.err)'.format(self.drmaa_jobID),x), files)[0]
+            filename = filter(lambda x:re.search('(\d.err)|stderr'.format(self.drmaa_jobID),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
             return None

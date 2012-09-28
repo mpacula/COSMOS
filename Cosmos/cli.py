@@ -29,7 +29,12 @@ def shell(args):
 def syncdb(args):
     "Sets up the SQL database"
     os.system('manage syncdb')
-
+    
+def resetentiredb(args):
+    "DELETE ALL DATA in the database and then run a syncdb."
+    os.system('manage reset_db -R default')
+    os.system('syncdb')
+    
 @arg('id',help='workflow id')
 @arg('-q',action="store_true",help='Queued Jobs only')  
 @arg('-jid',action="store_true",help='DRMAA Job id only.  Often used with somethign like |xargs bkill')    
@@ -50,7 +55,7 @@ def list(args):
         print workflow
     
 parser = ArghParser()
-parser.add_commands([runweb,shell,syncdb],namespace='adm',title='Admin')
+parser.add_commands([runweb,shell,syncdb,resetentiredb],namespace='adm',title='Admin')
 parser.add_commands([terminate,list,jobs],namespace='wf',title='Workflow')
 
 if __name__=='__main__':

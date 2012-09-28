@@ -15,8 +15,9 @@ Welcome to Cosmos's documentation!
    getting_started.rst
    first_workflow.rst
    cli
+   shell
    API/api.rst
-
+   glossary
 
 Indices and tables
 ==================

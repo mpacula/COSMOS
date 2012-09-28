@@ -1,26 +1,13 @@
 #Import Cosmos
-import sys
-cosmos_path = '/home2/erik/workspace/Cosmos'
-if cosmos_path not in sys.path:
-    sys.path.append(cosmos_path)
+import sys,os
 import cosmos_session
 from Workflow.models import Workflow
-import os
+from Cosmos.helpers import parse_cmd
 
 input_files_path = '/home2/himanshu/rna-seq-fusion/input'
 
-workflow = Workflow.restart(name='Mouse_RNA_Seq_fusion_3', root_output_dir='/mnt/himanshu')
+workflow = Workflow.restart(name='Mouse_RNA_Seq_fusion_3')
 
-
-def parse_command_string(txt,**kwargs):
-    """removes empty lines and white space.
-    also .format()s with settings and extra_config"""
-    x = txt.format(**kwargs)
-    x = x.split('\n')
-    x = map(lambda x: x.strip(),x)
-    x = filter(lambda x: not x == '' or x == '\\' or x == '\n',x)
-    s = '\n'.join(x)
-    return s
 
 sequences = [
           ('s_1_1_sequence.txt ','s_1_2_sequence.txt'),
@@ -53,9 +40,10 @@ for i, seqs in enumerate(sequences):
     /home2/himanshu/mm9_bowtie_index/mm9 \
     {seq1} {seq2}
     """
-    cmd = parse_command_string(cmd,seq1=seq1,seq2=seq2,output_dir='{output_dir}')
-    fusion_b1_batch.add_node(name="seq{0}".format(i+1),pre_command = cmd, outputs = {})
-        
+    cmd = parse_cmd(cmd,seq1=seq1,seq2=seq2,output_dir='{output_dir}')
+    fusion_b1_batch.add_node(name="seq{0}".format(i+1),
+                             pcmd = cmd,
+                             outputs = {})
         
         
 workflow.run_batch(fusion_b1_batch)

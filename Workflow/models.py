@@ -198,9 +198,10 @@ class Workflow(models.Model):
         
     def add_batch(self,name, hard_reset=False):
         """
-        Adds a batch to this workflow.
+        Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists, return the existing one.
+        
         :parameter name: The name of the batch, must be unique within this Workflow
-        :parameter hard_reset: Delete any batch with this name including all of its nodes
+        :parameter hard_reset: Delete any batch with this name including all of its nodes, and return a new one
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
@@ -529,7 +530,7 @@ class Workflow(models.Model):
     
 class Batch(models.Model):
     """
-    Executes a list of commands via drmaa.
+    A group of jobs that can be run independently.  See `Embarassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_ .
     
     .. note:: A Batch should not be directly created.  Use ``workflow.add_batch()`` to create a new batch.
     A Batch is `Embarrassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_.
@@ -610,9 +611,10 @@ class Batch(models.Model):
     
     def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, mem_req=0, time_limit=None):
         """
-        Adds a node to the batch.
+        Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
+        If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
         
-        :param name: (str) The preformatted command to execute. Required.
+        :param name: (str) The name of the node.  Must be unique within this batch.
         :param pcmd: (str) The preformatted command to execute. Required.
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
         :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
