@@ -6,7 +6,7 @@ import commands
 
 contigs = [str(x) for x in range(1,23)+['X','Y']] #list of chroms: [1,2,3,..X,Y]
 
-workflow = Workflow.resume(name='MGH_BC_Call_Variants_EBS_intervals')
+workflow = Workflow.__resume(name='MGH_BC_Call_Variants_EBS_intervals')
 assert isinstance(workflow, Workflow)
 
 class Sample:

@@ -6,7 +6,7 @@ import cosmos_session
 from Workflow.models import Workflow, Batch
 from datetime import time
 
-workflow = Workflow.restart(name='Test_Workflow')
+workflow = Workflow.start(name='Test_Workflow')
 assert isinstance(workflow, Workflow)
 
 batch_sleep = workflow.add_batch("Job That Runs Too Long")

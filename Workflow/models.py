@@ -32,8 +32,7 @@ class Workflow(models.Model):
     max_reattempts = models.SmallIntegerField(default=3)
     _terminating = models.BooleanField(default=False,help_text='this workflow is terminating')
     
-    created_on = models.DateTimeField(auto_now_add = True)
-    updated_on = models.DateTimeField(auto_now = True)
+    created_on = models.DateTimeField(default=timezone.now())
     finished_on = models.DateTimeField(null=True)
     
     
@@ -42,7 +41,7 @@ class Workflow(models.Model):
         validate_name(self.name)
         #Validate unique name
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
-            raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .resume()'.format(self.name))
+            raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__resume()'.format(self.name))
         #create jobmanager
         if not hasattr(self,'jobManager') or self.jobManager is None:
             self.jobManager = JobManager.objects.create()
@@ -102,12 +101,37 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
     
     @staticmethod
-    def resume(name=None,dry_run=False):
+    def start(name=None, restart=False, dry_run=False, root_output_dir=None):
         """
-        Resumes a workflow from the last failed node.  Automatically deletes any
-        unsuccessful nodes and their associated files, so if you try to
-        `add_node()` a node with a name that already exists but failed,
-        you can change its parameters like pre_command and outputs.
+        Starts a workflow.  If a workflow with this name already exists, return the workflow.
+        
+        :param name: A unique name for this workflow
+        :param __restart: Restart the workflow by deleting it and creating a new one
+        :param dry_run: Don't actually execute jobs
+        :param root_output_dir: If not None, sets the root_output_dir.  If None, uses the value in settings.  If the workflow already exists, this param is ignored.
+        """
+
+        if name is None:
+            raise ValidationError('Name of a workflow cannot be None')
+        
+        name = re.sub("\s","_",name)
+        
+        if root_output_dir is None:
+            root_output_dir = cosmos_settings.default_root_output_dir
+            
+        if Workflow.objects.filter(name=name).count()>0:
+            if restart:
+                return Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run)
+            else:
+                return Workflow.__resume(name=name, dry_run=dry_run)
+        else:
+            return Workflow.__create(name=name, dry_run=False, root_output_dir=root_output_dir)
+        
+    
+    @staticmethod
+    def __resume(name=None,dry_run=False):
+        """
+        Resumes a workflow from the last failed node.
         
         :param name: A unique name for this workflow
         :type name: str
@@ -116,23 +140,22 @@ class Workflow(models.Model):
         :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
         :type root_output_dir: str
         """
-        name = re.sub("\s","_",name)
+
         if Workflow.objects.filter(name=name).count() == 0:
-            print >> sys.stderr,'Workflow {0} does not exist, cannot resume it'.format(name)
-            return Workflow.create(name=name)
+            raise ValidationError('Workflow {0} does not exist, cannot resume it'.format(name))
         wf = Workflow.objects.get(name=name)
         wf._terminating=False
         wf.resume_from_last_failure=True
         wf.dry_run=dry_run
+        
         wf.save()
         wf.log.info('Resuming this workflow.')
         Batch.objects.filter(workflow=wf).update(order_in_workflow=None)
-        if dry_run:
-            wf.log.info('Doing a Dry Run.')
+        
         return wf
 
     @staticmethod
-    def restart(name=None,root_output_dir=None,dry_run=False):
+    def __restart(name=None,root_output_dir=None,dry_run=False):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
@@ -144,11 +167,7 @@ class Workflow(models.Model):
         :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
         :type root_output_dir: str
         """
-        name = re.sub("\s","_",name)
         old_wf_exists = Workflow.objects.filter(name=name).count() > 0
-        
-        if root_output_dir is None:
-            root_output_dir = cosmos_settings.default_root_output_dir
             
         if old_wf_exists:
             old_wf = Workflow.objects.get(name=name)
@@ -157,15 +176,14 @@ class Workflow(models.Model):
         else:
             wf_id=None
         
-        new_wf = Workflow.create(_wf_id=wf_id,name=name,root_output_dir=root_output_dir,dry_run=dry_run)
-        if not old_wf_exists:
-            new_wf.log.warning('Tried to restart a workflow that doesn\'t exist yet'.format(name))
+        new_wf = Workflow.__create(_wf_id=wf_id,name=name,root_output_dir=root_output_dir,dry_run=dry_run)
+        
         new_wf.log.info('Restarting this Workflow.')
         
         return new_wf
                 
     @staticmethod
-    def create(name=None,dry_run=False,root_output_dir=None,_wf_id=None):
+    def __create(name=None,dry_run=False,root_output_dir=None,_wf_id=None):
         """
         Creates a new workflow
         
@@ -176,23 +194,13 @@ class Workflow(models.Model):
         :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
         :type root_output_dir: str
         """
-        name = re.sub("\s","_",name)
-        if name is None:
-            raise ValidationError('Name of a workflow cannot be None')
-        #set default output_dir?
-        if root_output_dir is None:
-            root_output_dir = cosmos_settings.default_root_output_dir
         
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
             
-        wf = Workflow.objects.create(id=_wf_id,name=name,
-                            output_dir=output_dir,
-                            dry_run=dry_run)
+        wf = Workflow.objects.create(id=_wf_id,name=name, output_dir=output_dir, dry_run=dry_run)
         wf.save()
         wf.log.info('Created Workflow {0}.'.format(wf))
-        if dry_run:
-            wf.log.info('Doing a Dry Run.')
         return wf
             
         
@@ -213,20 +221,20 @@ class Workflow(models.Model):
         else:
             order_in_workflow = m+1
         
-        batch_exists = Batch.objects.filter(workflow=self,name=name)
-        
-        if hard_reset:
-            if not batch_exists:
-                self.log.warning("Batch does not exist so there is no hard_reset to perform.")
-            else:
+        batch_exists = Batch.objects.filter(workflow=self,name=name).count()>0
+        _old_id = None
+        if batch_exists:
+            old_batch = Batch.objects.get(workflow=self,name=name)
+            _old_id = old_batch.id
+            if hard_reset:
                 self.log.info("Doing a hard reset on batch {0}.".format(name))
-                Batch.objects.get(workflow=self,name=name).delete()
+                old_batch.delete()
                 
-        b, created = Batch.objects.get_or_create(workflow=self,name=name)
+        b, created = Batch.objects.get_or_create(workflow=self,name=name,id=_old_id)
         if created:
             self.log.info('Creating {0} from scratch.'.format(b))
         else:
-            self.log.info('{0} already exists, and resume is on so loading it from history...'.format(b))
+            self.log.info('{0} already exists, loading it from history...'.format(b))
             
         b.order_in_workflow = order_in_workflow
         b.save()
@@ -388,7 +396,6 @@ class Workflow(models.Model):
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         if batch is omitted or set to None, all running nodes will be waited on
         """
-        waiting_on_workflow = self
         nodes = []
         if batch is None:
             self.log.info('Waiting on all nodes...')
@@ -422,7 +429,7 @@ class Workflow(models.Model):
         return nodes 
 
 
-    def wait(self, batch=None, terminate_on_fail=True):
+    def wait(self, batch=None, terminate_on_fail=False):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         If `batch` is omitted or set to None, all running nodes will be waited on.
@@ -440,16 +447,17 @@ class Workflow(models.Model):
         self.run_batch(batch=batch)
         return self.wait(batch=batch)
 
-    def finished(self):
+    def finished(self,delete_unused_batches=True):
         """
         Call at the end of every workflow.
         If there any left over jobs that have not been collected,
         It will wait for all of them them
         
-        Runs _clean_up()
+        :param delete_unused_batches: Any batches and their output_dir from previous workflows that weren't loaded since the last create, __resume, or __restart, using add_batch() are deleted.
+        
         """
         self._check_and_wait_for_leftover_nodes()
-        self._clean_up()
+        self._clean_up(delete_unused_batches=delete_unused_batches)
         self.finished_on = timezone.now()
         self.save()
         self.log.info('Finished.')
@@ -460,12 +468,13 @@ class Workflow(models.Model):
             self.log.warning("There are left over nodes in the queue, waiting for them to finish")
             self.__wait()
         
-    def _clean_up(self):
+    def _clean_up(self,delete_unused_batches=False):
         """
         Should be executed at the end of a workflow.
         """
         self.log.debug("Cleaning up workflow")
-        Batch.objects.filter(workflow=self,order_in_workflow=None).delete() #these batches weren't used again after a restart
+        if delete_unused_batches:
+            Batch.objects.filter(workflow=self,order_in_workflow=None).delete() #these batches weren't used again after a __restart
                
 #        if self._is_terminating():
 #            for batch in self.batch_set.filter(status='in_progress').all():
@@ -493,40 +502,55 @@ class Workflow(models.Model):
     def url(self):
         return ('workflow_view',[str(self.id)])
     
-    
-    def get_nodes_by(self,batch=None,_op="and",**kwargs):
+    def get_nodes_by(self,batch=None,op="and",**kwargs):
         """
-        Searches for nodes by their tags
+        Returns the list of nodes that are tagged by the keys and vals in **kwargs dictionary
         
-        :param _op: Choose either 'and' or 'or' as the logic to filter tags with
+        :param op: Choose either 'and' or 'or' as the logic to filter tags with
         :param **kwargs: Any keywords you'd like to search for
         :returns: a query result of the filtered nodes
         
-        >>> node.get_nodes_by(_op='or',color='grey',color='orange')
-        >>> node.get_nodes_by(_op='and',color='grey',shape='square')
+        >>> node.get_nodes_by(op='or',color='grey',color='orange')
+        >>> node.get_nodes_by(op='and',color='grey',shape='square')
         """
         
-        if len(kwargs) == 0: #no tags
-            if batch: return batch.nodes
-            return self.nodes
-            
-        if batch is None:
-            nodeTag_matches = NodeTag.objects.filter(node__batch__workflow=self)
+        if op == 'or':
+            raise NotImplemented('sorry')
+        
+        if batch:
+            nodes = batch.nodes
         else:
-            nodeTag_matches = NodeTag.objects.filter(node__batch=batch)
+            nodes = self.nodes
             
-
-        Q_list = []
-        for key,val in kwargs.items():
-            Q_list.append(Q(key=key,value=val))
-        if _op == 'and':
-            Qs = reduce(lambda x,y: x & y,Q_list)
-        else:
-            Qs = reduce(lambda x,y: x | y,Q_list)
-             
-        return Node.objects.filter(nodetag__in=nodeTag_matches.filter(Qs))
+        alltags = NodeTag.objects.filter(node__in=nodes)
+            
+        for k,v in kwargs.items():
+            nodes = nodes.filter(nodetag__in=alltags.filter(key=k,value=v))
+            
+        return nodes
 
 
+    def get_node_by(self,batch=None,op="and",**kwargs):
+        """
+        Returns the list of nodes that are tagged by the keys and vals in **kwargs dictionary.
+        
+        :raises Exception: if more or less than one node is returned
+        
+        :param op: Choose either 'and' or 'or' as the logic to filter tags with
+        :param **kwargs: Any keywords you'd like to search for
+        :returns: a query result of the filtered nodes
+        
+        >>> node.get_node_by(op='or',color='grey',color='orange')
+        >>> node.get_node_by(op='and',color='grey',shape='square')
+        """
+    
+        nodes = self.get_nodes_by(batch=batch,op=op,**kwargs)
+        n = nodes.count()
+        if n>1:
+            raise Exception("More than one node with tags {0}".format(kwargs))
+        elif n == 0:
+            raise Exception("No nodes with with tags {0}.".format(kwargs))
+        return nodes[0]
     
 class Batch(models.Model):
     """
@@ -540,8 +564,7 @@ class Batch(models.Model):
     order_in_workflow = models.IntegerField(null=True)
     status = models.CharField(max_length=200,choices=status_choices,default='no_attempt') 
     successful = models.BooleanField(default=False)
-    created_on = models.DateTimeField(auto_now_add = True)
-    updated_on = models.DateTimeField(auto_now = True)
+    created_on = models.DateTimeField(default=timezone.now())
     finished_on = models.DateTimeField(null=True,default=None)
     
     
@@ -614,6 +637,8 @@ class Batch(models.Model):
         Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
         If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
         
+        .. note:: all spaces are converted to underscores
+        
         :param name: (str) The name of the node.  Must be unique within this batch.
         :param pcmd: (str) The preformatted command to execute. Required.
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
@@ -624,12 +649,14 @@ class Batch(models.Model):
         """
         #TODO need a dict for special outputs?
         #validation
+        
+        name = re.sub("\s","_",name) #user convenience
+        
         if name == '' or name is None:
             raise ValidationError('name cannot be blank')
         if pcmd == '' or pcmd is None:
             raise ValidationError('pre_command cannot be blank')
         
-        name = re.sub("\s","_",name) #user convenience
         
         node_exists = Node.objects.filter(batch=self,name=name).count() > 0
         if node_exists:
@@ -705,13 +732,21 @@ class Batch(models.Model):
         self.finished_on = timezone.now()
         self.save()
     
-    def get_nodes_by(self,_op='and',**kwargs):
+    def get_nodes_by(self,op='and',**kwargs):
         """
         An alias for :func:`Workflow.get_nodes_by` with batch=self
         
         :returns: a queryset of filtered nodes
         """
-        return self.workflow.get_nodes_by(batch=self, _op=_op, **kwargs)
+        return self.workflow.get_nodes_by(batch=self, op=op, **kwargs)
+    
+    def get_node_by(self,op='and',**kwargs):
+        """
+        An alias for :func:`Workflow.get_node_by` with batch=self
+        
+        :returns: a queryset of filtered nodes
+        """
+        return self.workflow.get_node_by(batch=self, op=op, **kwargs)
                 
     def group_nodes_by(self,*args):
         """
@@ -739,6 +774,8 @@ class Batch(models.Model):
         for tags,node_id_and_tags_tuple in helpers.groupby(node_id2tags.items(),lambda x: x[1]):
             node_ids = [ x[0] for x in node_id_and_tags_tuple ]
             yield tags, Node.objects.filter(pk__in=node_ids)
+    
+    
     
     def delete(self, *args, **kwargs):
         """
@@ -794,8 +831,7 @@ class Node(models.Model):
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     outputs = PickledObjectField(null=True) #dictionary of outputs
     
-    created_on = models.DateTimeField(auto_now_add = True)
-    updated_on = models.DateTimeField(auto_now = True)
+    created_on = models.DateTimeField(default=timezone.now())
     finished_on = models.DateTimeField(null=True,default=None)
     
     

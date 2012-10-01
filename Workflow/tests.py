@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 
 class Test_Workflow(TestCase):
     def setUp(self):
-        self.wF = Workflow.create(name='Test_WF',root_output_dir='/tmp')
+        self.wF = Workflow.__create(name='Test_WF',root_output_dir='/tmp')
         
     def tearDown(self):
         self.wF.delete()
@@ -33,10 +33,10 @@ class Test_Workflow(TestCase):
         self.wF.run_batch(b)
  
         #run second time, have to setup again
-        self.wF  = Workflow.resume(name='Test_WF')
+        self.wF  = Workflow.__resume(name='Test_WF')
         assert self.wF.batches.count() == 1
         
-        #next command shouldn't create a new node since it already exists
+        #next command shouldn't __create a new node since it already exists
         b = self.wF.add_batch(name='Test_Batch')
         b.add_node(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
         
@@ -62,10 +62,10 @@ class Test_Workflow(TestCase):
 #
 #class Test_Echo(LiveServerTestCase):
 #    def setUp(self):
-#        self.JM = JobManager.objects.create()
+#        self.JM = JobManager.objects.__create()
 #        self.JM.init()
 #        self.JM.save()
-#        self.WF = Workflow.objects.create()
+#        self.WF = Workflow.objects.__create()
 #        self.WF.save()
 #        
 #    def tearDown(self):

@@ -12,6 +12,13 @@
 <a href="{% url 'workflow_view_log' workflow.id %}" class="btn btn-info">View Log</a>
 </p>
 {% for batch in batches_ordered %}
+	{% if batch.order_in_workflow %}
 	{%include "Workflow/Batch/batch.html"%}
+	{% endif %}
+{% endfor %}
+{% for batch in batches_ordered %}
+	{% if batch.order_in_workflow == None %}
+	{%include "Workflow/Batch/batch.html"%}
+	{% endif %}
 {% endfor %}
 {%endblock%}

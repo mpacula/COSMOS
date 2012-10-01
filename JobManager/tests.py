@@ -18,7 +18,7 @@ test_script = os.path.join(os.getcwd(),'JobManager/test/test_script.py')
 
 class Test_JobManager(TestCase):
     def setUp(self):
-        self.JM = JobManager.objects.create()
+        self.JM = JobManager.objects.__create()
         self.JM.init_session()
         self.JM.save()
         

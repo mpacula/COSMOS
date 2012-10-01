@@ -40,8 +40,7 @@ class JobAttempt(models.Model):
     )
     state_choices = zip(decode_drmaa_state.keys(),decode_drmaa_state.values()) #dict2tuple
     
-    created_on = models.DateTimeField(auto_now_add = True)
-    updated_on = models.DateTimeField(auto_now = True)
+    created_on = models.DateTimeField(default=timezone.now())
     finished_on = models.DateTimeField(null=True,default=None)
     
     jobManager = models.ForeignKey('JobManager',related_name='+')
@@ -84,8 +83,8 @@ class JobAttempt(models.Model):
         self.jobTemplate.remoteCommand = self.command_script_path #TODO create a bash script that this this command_script_text
         #self.jobTemplate.args = self.command_script_text.split(' ')[1:]
         self.jobTemplate.jobName = 'ja-'+self.jobName
-        self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,'stdout')
-        self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,'stderr')
+        self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stdout'.format(self.id))
+        self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stderr'.format(self.id))
         self.jobTemplate.blockEmail = True
         self.jobTemplate.nativeSpecification = self.drmaa_native_specification
         #create dir if doesn't exist
@@ -207,8 +206,7 @@ class JobManager(models.Model):
     """
     Note there can only be one of these instantiated at a time
     """
-    created_on = models.DateTimeField(auto_now_add = True)
-    updated_on = models.DateTimeField(auto_now = True)
+    created_on = models.DateTimeField(default=timezone.now())
         
     @property
     def jobAttempts(self):

@@ -11,7 +11,7 @@ import re
 contigs = [str(x) for x in range(1,23)+['X','Y']] #list of chroms: [1,2,3,..X,Y]
 
 #workflow = Workflow.restart(name='MGH_BC_Call_Variants_EBS_intervals',root_output_dir='/2GATK/Cosmos_Out')
-workflow = Workflow.resume(name='MGH_BC_Call_Variants_EBS_intervals')
+workflow = Workflow.__resume(name='MGH_BC_Call_Variants_EBS_intervals')
 assert isinstance(workflow, Workflow)
 
 class Sample:

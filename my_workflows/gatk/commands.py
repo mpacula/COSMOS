@@ -10,7 +10,7 @@ def _parse_cmd(s,**kwargs):
 
 def bwa_aln(fastq,output_sai):
     s = r"""
-    {settings.bwa_path} aln {settings.reference_fasta_path} {fastq} > {output_sai}
+    {settings.bwa_path} aln {settings.bwa_reference_fasta_path} {fastq} > {output_sai}
     """
     return _parse_cmd(s,fastq=fastq,output_sai=output_sai)
 
@@ -20,7 +20,7 @@ def bwa_sampe(output_sam,r1_sai,r2_sai,r1_fq,r2_fq,ID,LIBRARY,SAMPLE_NAME,PLATFO
     {settings.bwa_path} sampe \
     -f {output_sam} \
     -r "@RG\tID:{ID}\tLB:{LIBRARY}\tSM:{SAMPLE_NAME}\tPL:{PLATFORM}" \
-    {settings.reference_fasta_path} \
+    {settings.bwa_reference_fasta_path} \
     {r1_sai} \
     {r2_sai} \
     {r1_fq} \
@@ -58,14 +58,25 @@ def queue(input_bam_list):
     """
     return _parse_cmd(s,)
 
-def CleanSam(input,output):
+def CleanSam(input_bam ,output_bam):
     # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
     s = r"""
     {Picard_CleanSam} \
-    I={input} \
-    O={output}
+    I={input_bam} \
+    O={output_bam}
     """
-    return _parse_cmd(s,input=input,output=output,Picard_CleanSam=get_Picard_cmd('CleanSam.jar'))
+    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,Picard_CleanSam=get_Picard_cmd('CleanSam.jar'))
+    
+
+def SortSam(input_bam,output_bam,sort_order='coordinate'):
+    # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
+    s = r"""
+    {Picard_SortSam} \
+    I={input_bam} \
+    O={output_bam} \
+    SORT_ORDER={sort_order}
+    """
+    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,sort_order=sort_order,Picard_SortSam=get_Picard_cmd('SortSam.jar'))
     
 
 def ReduceBam(input_bam,output_bam,interval):
@@ -113,34 +124,40 @@ def RealignerTargetCreator(input_bam,output_recal_intervals):
     """
     return _parse_cmd(s,input_bam=input_bam,output_recal_intervals=output_recal_intervals)
 
-def IndelRealigner(input_bam,targetIntervals,output_bam):
+def IndelRealigner(input_bam,targetIntervals,output_bam,model='USE_READS'):
+    """
+    :param model: USE_READS or KNOWNS_ONLY or USE_SW
+    """
     #TODO use SW?
     s = r"""
     {settings.GATK_cmd} \
     -T IndelRealigner \
     -R {settings.reference_fasta_path} \
     -I {input_bam} \
-    -targetIntervals {target_intervals} \
+    -targetIntervals {targetIntervals} \
     -o {output_bam} \
-    --known {settings.indels_1000g_phase1_path} \
-    --known {settings.mills_path}
+    -known {settings.indels_1000g_phase1_path} \
+    -known {settings.mills_path} \
+    -model {model}
     """
-    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,targetIntervals=targetIntervals)
+    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,targetIntervals=targetIntervals,model=model)
 
 def BaseQualityScoreRecalibration(input_bam,output_recal_report):
     #TODO use SW?
+    #--disable_indel_quals required by gatk2 lite
     s = r"""
     {settings.GATK_cmd} \
     -T BaseRecalibrator \
     -R {settings.reference_fasta_path} \
     -I {input_bam} \
-    -o {output_report} \
-    --known {settings.indels_1000g_phase1_path} \
-    --known {settings.mills_path} \
+    -o {output_recal_report} \
+    -knownSites {settings.indels_1000g_phase1_path} \
+    -knownSites {settings.mills_path} \
+    --disable_indel_quals \
     -cov ReadGroupCovariate \
     -cov QualityScoreCovariate \
     -cov CycleCovariate \
-    -cov DinucCovariate
+    -cov ContextCovariate
     """
     return _parse_cmd(s,input_bam=input_bam,output_recal_report=output_recal_report)
 

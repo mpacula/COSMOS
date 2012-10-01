@@ -14,6 +14,7 @@ Welcome to Cosmos's documentation!
    config
    getting_started.rst
    first_workflow.rst
+   advanced_workflows.rst
    cli
    shell
    API/api.rst

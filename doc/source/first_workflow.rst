@@ -32,7 +32,7 @@ The simplest workflow you could have.  Edit :file:`firstflow.py`, and put the fo
    from Workflow.models import Workflow
    
    # Create workflow
-   my_workflow = Workflow.create('My First Workflow')
+   my_workflow = Workflow.start('My First Workflow')
    
    # Create batch and node
    first_batch = my_workflow.add_batch('My First Batch')
@@ -56,32 +56,37 @@ or by calling ``node.get_successful_jobAttempt().get_drmaa_STDOUT_filepath()`` i
 Resume a Workflow
 _________________
 
-Cosmos will keep track of output files for you, if you want it to.  Open up :file:`firstflow.py` again, and make these changes:
+First, get familiar with the APIs of these functions, especially their first few parameters:
 
-* Call :function:`resume` on the workflow instead of create.
-* Rename some variables to get more succinct code
+.. automethod:: Workflow.models.Workflow.create()
+   :noindex:
 
 .. automethod:: Workflow.models.Workflow.add_batch()
    :noindex:
    
 .. automethod:: Workflow.models.Batch.add_node()
    :noindex:
-   
-* When you run a batch or node that has already been successful
+
+So with the code changes below, Cosmos will resume the workflow and skip the first batch since it was already successful.  It will then
+run 5 jobs in the second batch.
 
 .. code-block:: python
    :linenos:
 
    import cosmos_session
    from Workflow.models import Workflow
+   import os
    
-   WF = Workflow.resume('My First Workflow')
+   WF = Workflow.start('My First Workflow')
    
    B_one = WF.add_batch('My First Batch')
    first_node = B_one.add_node(name='My First Node', pcmd='echo "Hello World"')
-   WF.run_and_wait(first_batch)  
+   WF.run_and_wait(first_batch)
    
-   batch2 = my_
+   B_two = WF.add_batch('My Second Batch')
+   for i in range(1,5):
+       node1 = B_one.add_node(name='node %i'%i, pcmd='echo "Hello World #%s" % i')
+   WF.run_and_wait(B_two)
    
    # Finish the workflow; every workflow ends with this command
    WF.finished()  

@@ -18,7 +18,7 @@ def index(request):
 
 def view(request,pid):
     workflow = Workflow.objects.get(pk=pid)
-    batches_ordered = Batch.objects.filter(workflow=workflow).exclude(order_in_workflow = None).order_by('order_in_workflow')
+    batches_ordered = Batch.objects.filter(workflow=workflow).order_by('order_in_workflow')
     return render_to_response('Workflow/view.html', { 'request':request,'workflow': workflow, 'batches_ordered':batches_ordered }, context_instance=RequestContext(request))
 
 def batch_view(request,pid):

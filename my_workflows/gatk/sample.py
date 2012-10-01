@@ -1,10 +1,4 @@
-#Import Cosmos
-import sys,os,re,pickle,itertools,csv
-
-from Workflow.models import Workflow, Batch
-import subprocess
-
-input_dir = '/nas/erik/48exomes'
+import re,os,csv,itertools
 
 #Get fastq_pair info
 def groupby(iterable,fxn):
@@ -12,7 +6,7 @@ def groupby(iterable,fxn):
     return itertools.groupby(sorted(iterable,key=fxn),fxn)
 def fastq2lane(filename):
     return re.search('L(\d+)',filename).group(1)
-def fastq2readGroupNumber(filename):
+def fastq2partNumber(filename):
     return re.search('_(\d+)\.f',filename).group(1)   
            
 class Sample:   
@@ -40,32 +34,24 @@ class Sample:
                 raise Exception('flowcell not as expected')
                 
             return Sample(name=re.sub('Sample_','',filename),input_path=path,flowcell=flowcell)
-    
-    @property
-    def fastq_pairs(self):
-        if not hasattr(self, '_fastq_pairs'):
-            print 'Getting Sample Fastq Info'
-            self._fastq_pairs = [ fqps for fqps in self.yield_fastq_pairs() ]
-        return self._fastq_pairs
-            
         
     def yield_fastq_pairs(self):
         all_fastqs = filter(lambda x:re.search('\.fastq|\.fq$',x),os.listdir(self.input_path))
         for lane,fastqs_in_lane in groupby(all_fastqs,fastq2lane):
-            for readGroupNumber,fastqs_in_readgroup in groupby(fastqs_in_lane,fastq2readGroupNumber):
+            for partNumber,fastqs_in_readgroup in groupby(fastqs_in_lane,fastq2partNumber):
                 fqs = [f for f in fastqs_in_readgroup]
-                yield (Fastq(filename=fqs[0],lane=lane,rgn=readGroupNumber,input_dir=self.input_path),
-                       Fastq(filename=fqs[1],lane=lane,rgn=readGroupNumber,input_dir=self.input_path))
+                yield (Fastq(filename=fqs[0],lane=lane,partNumber=partNumber,input_dir=self.input_path),
+                       Fastq(filename=fqs[1],lane=lane,partNumber=partNumber,input_dir=self.input_path))
         
 class Fastq:
     filename = None #filename of the first set of reads
     lane = None
-    readGroupNumber = None
+    partNumber = None
 
-    def __init__(self,filename,lane,rgn,input_dir):
+    def __init__(self,filename,lane,partNumber,input_dir):
         self.filename=filename
         self.lane=lane
-        self.readGroupNumber = rgn
+        self.partNumber = partNumber
         self.input_dir= input_dir
         
     @property
@@ -73,22 +59,5 @@ class Fastq:
         return os.path.join(self.input_dir,self.filename)
         
     def __str__(self):
-        return "FastQ_Pair| r1: {0.r1}, r2: {0.r2}, lane: {0.lane}, readGroupNumber: {0.readGroupNumber}".format(self)   
+        return "FastQ_Pair| r1: {0.r1}, r2: {0.r2}, lane: {0.lane}, partNumber: {0.partNumber}".format(self)   
         
-samples = []
-
-#Get Sample Input Information
-for pool_dir in os.listdir(input_dir):
-    for sample_dir in os.listdir(os.path.join(input_dir,pool_dir)):
-        if re.match('Sample',sample_dir):
-            samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
-
-#
-##pickle samples so we don't have to keep recalculating initial fastq pair data with each script run
-#if not os.path.exists('samples.p'):
-#    for sample in samples:
-#        sample.fastq_pairs
-#    pickle.dump(samples, open("samples.p", "wb"))
-#else:
-#    print 'Loading pickled sample data from samples.p'
-#    samples = pickle.load(open("samples.p","rb"))

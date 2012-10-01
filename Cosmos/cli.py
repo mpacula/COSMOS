@@ -33,7 +33,7 @@ def syncdb(args):
 def resetentiredb(args):
     "DELETE ALL DATA in the database and then run a syncdb."
     os.system('manage reset_db -R default')
-    os.system('syncdb')
+    os.system('manage syncdb')
     
 @arg('id',help='workflow id')
 @arg('-q',action="store_true",help='Queued Jobs only')  
