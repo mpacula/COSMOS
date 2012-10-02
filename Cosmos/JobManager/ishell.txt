@@ -1,0 +1,9 @@
+#example workflow
+import tempfile
+tmpdir = tempfile.gettempdir()
+jm = JobManager.objects.create()
+jm.init()
+job = jm.addJob(cmd="/bin/echo",cmdArgs="'hi'", jobName="test_addJob", output_dir=tmpdir)
+jm.save()
+jm.submitJob(job)
+jm.waitForJob(job)

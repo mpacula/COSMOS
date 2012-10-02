@@ -1,0 +1,8 @@
+.pagination_big ul {
+list-style-type: none;
+padding: 0px;
+}
+.pagination_big li {
+display:inline;
+padding-right: 5px;
+}

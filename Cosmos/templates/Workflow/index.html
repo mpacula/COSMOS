@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{%block content%}
+
+<h1>Workflows</h1>
+	<table class="table table-hover table-striped">
+{% for workflow in workflows %}
+    <tr><td><h4><a href="{{workflow.url}}">{{ workflow }}</a></h4></td></tr>
+{% endfor %}
+	</table>
+{%endblock%}
