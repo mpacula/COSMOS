@@ -64,7 +64,7 @@ if not B_bwa_sampe.successful:
                             mem_req=5000)
     WF.run_wait(B_bwa_sampe)
 
-B_clean_sam = WF.add_batch("Clean Bams",hard_reset=True)
+B_clean_sam = WF.add_batch("Clean Bams")
 if not B_clean_sam.successful:
     for n in B_bwa_sampe.nodes:
         name = '{tags[sample]} L{tags[lane]} PN{tags[fq_partNumber]}'.format(tags=n.tags)

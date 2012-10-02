@@ -11,7 +11,8 @@
 </ul>
 <h1>{{jobAttempt}}</h1>
 <dl class="dl-horizontal">
-<dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.command_script_text}}</pre></dd>
+<dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
+<dt><em>time</em> Output</dt><dd><a href="{% url jobAttempt_time_output jobAttempt.id%}"><code>{{jobAttempt.time_output_path}}</code></a></dd>
 <dt>Output Directory</dt><dd><code>{{jobAttempt.node.job_output_dir}}</code></dd>
 <dt>Node File Size</dt><dd>{%if settings.show_jobAttempt_file_sizes%}{{jobAttempt.file_size}}{%else%}OFF{%endif%}</dd>
 <dt>Outputs<strong></strong></dt>

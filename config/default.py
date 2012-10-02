@@ -4,6 +4,7 @@ import os
 home_path = '/home2/erik/workspace/Cosmos' #bioseq
 default_root_output_dir = '/mnt' #The root directory to output workflows to
 DRM = 'GE' # 'LSF' or 'GE'
+time_path = '/usr/bin/time'
 
 #starcluster
 DATABASE = {

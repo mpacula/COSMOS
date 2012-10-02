@@ -48,7 +48,7 @@ class JobAttempt(models.Model):
     #job status and input fields
     queue_status = models.CharField(max_length=150, default="not_queued",choices = queue_status_choices)
     successful = models.BooleanField(default=False)
-    command_script_text = models.TextField(max_length=1000,default='')
+    command = models.TextField(max_length=1000,default='')
     command_script_path = models.TextField(max_length=1000)
     jobName = models.CharField(max_length=150,validators = [RegexValidator(regex='^[A-Z0-9_]*$')])
     drmaa_output_dir = models.CharField(max_length=1000)
@@ -171,8 +171,23 @@ class JobAttempt(models.Model):
         else:
             with open(path,'rb') as f:
                 return f.read()
+    @property
+    def time_output_path(self):
+        "Read the time output which contains verbose information on resource usage"
+        return os.path.join(self.drmaa_output_dir,str(self.id)+'.time')
+        
+    @property
+    def time_output_txt(self):
+        path = self.time_output_path
+        if path is None:
+            return 'File does not exist.'
+        else:
+            with open(path,'rb') as f:
+                return f.read()
+        
     
-    def _get_command_shell_script_text(self):
+    
+    def get_command_shell_script_text(self):
         "Read the command.sh file"
         with open(self.command_script_path,'rb') as f:
             return f.read()
@@ -212,7 +227,6 @@ class JobManager(models.Model):
     def jobAttempts(self):
         "This JobManager's jobAttempts"
         return JobAttempt.objects.filter(jobManager=self)
-    
         
     def __init__(self,*args,**kwargs):
         super(JobManager,self).__init__(*args,**kwargs)
@@ -228,21 +242,31 @@ class JobManager(models.Model):
 #        
 #    def terminate_jobAttempt(self,jobAttempt):
 #        cosmos_session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+
+    def __create_command_sh(self,job):
+        """Create a sh script that will execute command"""
+        with open(job.command_script_path,'wb') as f:
+            f.write('#!/bin/sh\n')
+            f.write("{time} -o {time_out} --verbose \\".format(time=cosmos_session.cosmos_settings.time_path,time_out=job.time_output_path))
+            f.write("\n")
+            f.write(job.command)
+        os.system('chmod 700 {0}'.format(job.command_script_path))
         
-    def addJobAttempt(self, command_script_path, drmaa_output_dir, jobName = "Generic_Job_Name", drmaa_native_specification=''):
+    def addJobAttempt(self, command, drmaa_output_dir, jobName = "Generic_Job_Name", drmaa_native_specification=''):
         """
         Adds a new JobAttempt
-        :param command_script_path: The system command_script_path to run.  this is generally an sh script that executes the binary or script you actually want to run.
+        :param command: The system command to run
         :param jobName: an optional name for the job 
         :param drmaa_output_dir: the directory to story the stdout and stderr files
         :param drmaa_native_specification: the drmaa_native_specifications tring
         """
         ##TODO - check that jobName is unique? or maybe append the job primarykey to the jobname to avoid conflicts.  maybe add primary key as a subdirectory of drmaa_output_dir
-        job = JobAttempt(jobManager=self, command_script_path = command_script_path, jobName = jobName, drmaa_output_dir = drmaa_output_dir, drmaa_native_specification=drmaa_native_specification)
+        job = JobAttempt(jobManager=self, command = command, jobName = jobName, drmaa_output_dir = drmaa_output_dir, drmaa_native_specification=drmaa_native_specification)
+        cmd_script_file_path = os.path.join(job.drmaa_output_dir,'command.sh')
+        job.command_script_path = cmd_script_file_path
         job.save()
-        job.command_script_text = job._get_command_shell_script_text()
         job.createJobTemplate(base_template = cosmos_session.drmaa_session.createJobTemplate())
-        job.save()
+        self.__create_command_sh(job)
         return job
         
         
@@ -313,7 +337,7 @@ class JobManager(models.Model):
             
     def delete(self,*args,**kwargs):
         "Deletes this job manager"
-        #self.jobAttempts.delete()
+        self.jobAttempts.delete()
         super(JobManager,self).__init__(self,*args,**kwargs)
         
     def toString(self):

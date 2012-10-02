@@ -54,7 +54,7 @@ class Workflow(models.Model):
     
     def terminate(self):
         """
-        Terminates this workflow.  Generally executing via the command.py terminate
+        Terminates this workflow.  Generally executing via the cli.py terminate
         command line interface.  qdels all jobs and tells the workflow to terminate
         """
         self.log.warning("Terminating this workflow...")
@@ -240,34 +240,26 @@ class Workflow(models.Model):
         b.order_in_workflow = order_in_workflow
         b.save()
         return b
-        
- 
-    def yield_resource_usage(self):
-        "Yield's each node in the Workflow's resource usage"
-        yield 'Batch,memory,time'
+    
+    def get_all_tag_keywords_used(self):
+        """Returns a set of all the keyword tags used on any node in this workflow"""
+        return set([ d['key'] for d in NodeTag.objects.filter(node__in=self.nodes).values('key') ])
+    
+    def save_resource_usage_as_csv(self,filename):
+        """Save resource usage to filename"""
+        import csv
+        keys = list(self.get_all_tag_keywords_used()) + ['batch','memory','utime']
+        f = open(filename, 'wb')
+        dict_writer = csv.DictWriter(f, keys)
+        dict_writer.writer.writerow(keys)
+        for batch_resources in self.yield_batch_resource_usage():
+            dict_writer.writerows(batch_resources)
+
+    def yield_batch_resource_usage(self):
+        "Yield's every batch's list of node's resource usage"
         for batch in self.batches:
-            for node in batch.nodes:
-                sja = node.get_successful_jobAttempt()
-                memory = '0'
-                utime = 0
-                if sja and sja._drmaa_info: #TODO missing this  stuff is caused by errors.  fix those errors and delete this
-                        if sja.drmaa_utime: utime = sja.drmaa_utime 
-                        try:
-                            memory = sja._drmaa_info['resourceUsage']['mem']
-                        except KeyError:
-                            pass
-                #fs = helpers.folder_size(node.output_dir,human_readable=False) #TODO make obj.file_size a fxn not a property
-                
-                yield '{batch.name},{memory},{utime}'.format(batch=batch,node=node,fs=fs,memory=memory,sja=sja,utime=utime)
-                
-     
-#    def save_resource_usage(self):
-#        "Saves this workflow's resource usage to disk"
-#        d = os.path.join(self.output_dir,'_plots')
-#        with file(d,'wb') as f:
-#            for line in self.yield_resource_usage():
-#                f.write(line+"\n")
-             
+            yield [ n for n in batch.yield_node_resource_usage() ]
+            
                 
 #    def _close_session(self):
 #        """Shuts down this workflow's jobmanager"""
@@ -287,7 +279,6 @@ class Workflow(models.Model):
         if 'delete_files' in kwargs:
             delete_files = kwargs.pop('delete_files')
         
-        super(Workflow, self).delete(*args, **kwargs)
         
         #delete_files=True will delete all output files
         if delete_files:
@@ -297,13 +288,9 @@ class Workflow(models.Model):
             if os.path.exists(self.output_dir):
                 os.system('rm -rf {0}'.format(self.output_dir))
                 
-        
-    def __create_command_sh(self,command,file_path):
-        """Create a sh script that will execute command"""
-        with open(file_path,'wb') as f:
-            f.write('#!/bin/sh\n')
-            f.write(command)
-        os.system('chmod 700 {0}'.format(file_path))
+        self.batches.delete()
+        super(Workflow, self).delete(*args, **kwargs)
+                
 
     def _check_termination(self,check_for_leftovers = True):
         """
@@ -338,10 +325,8 @@ class Workflow(models.Model):
             helpers.formatError(node.pre_command,{'output_dir':node.job_output_dir,'outputs': node.outputs})
                 
         #create command.sh that gets executed
-        command_script_path = os.path.join(node.output_dir,'command.sh')
-        self.__create_command_sh(node.exec_command,command_script_path)
         
-        jobAttempt = self.jobManager.addJobAttempt(command_script_path=command_script_path,
+        jobAttempt = self.jobManager.addJobAttempt(command=node.exec_command,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
                                      drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement))
@@ -633,6 +618,30 @@ class Batch(models.Model):
         "The number of nodes in this batch"
         return Node.objects.filter(batch=self).count()
     
+    def get_all_tag_keywords_used(self):
+        """Returns a set of all the keyword tags used on any node in this batch"""
+        return set([ d['key'] for d in NodeTag.objects.filter(node__in=self.nodes).values('key') ])
+        
+    def yield_node_resource_usage(self):
+        """
+        Yield Resource Usage as a dictionary of resources and tags per node
+        """
+        for node in self.nodes: 
+            sja = node.get_successful_jobAttempt()
+            memory = '0'
+            utime = 0
+            if sja and sja._drmaa_info: #TODO missing this  stuff is caused by errors.  fix those errors and delete this
+                    if sja.drmaa_utime: utime = sja.drmaa_utime 
+                    try:
+                        memory = sja._drmaa_info['resourceUsage']['mem']
+                    except KeyError:
+                        pass
+            #fs = helpers.folder_size(node.output_dir,human_readable=False) #TODO make obj.file_size a fxn not a property
+            info = { 'batch':self.name, 'memory':memory,'utime':utime }
+            for k,v in node.tags.items():
+                info[k] = v
+            yield info
+        
     def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, mem_req=0, time_limit=None):
         """
         Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
@@ -782,7 +791,7 @@ class Batch(models.Model):
         Deletes this batch and all files associated with it.
         """
         self.log.debug('Deleting Batch {0}'.format(self.name))
-        self.nodes.all().delete()
+        self.nodes.delete()
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         super(Batch, self).delete(*args, **kwargs)
