@@ -58,13 +58,13 @@ _________________
 
 First, get familiar with the APIs of these functions, especially their first few parameters:
 
-.. automethod:: Workflow.models.Workflow.create()
+.. automethod:: Workflow.models.Workflow.start
    :noindex:
 
-.. automethod:: Workflow.models.Workflow.add_batch()
+.. automethod:: Workflow.models.Workflow.add_batch
    :noindex:
    
-.. automethod:: Workflow.models.Batch.add_node()
+.. automethod:: Workflow.models.Batch.add_node
    :noindex:
 
 So with the code changes below, Cosmos will resume the workflow and skip the first batch since it was already successful.  It will then
@@ -90,4 +90,3 @@ run 5 jobs in the second batch.
    
    # Finish the workflow; every workflow ends with this command
    WF.finished()  
-

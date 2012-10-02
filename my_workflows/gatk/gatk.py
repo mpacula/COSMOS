@@ -61,19 +61,19 @@ if not B_bwa_sampe.successful:
                                                       output_sam='{output_dir}/{outputs[sam]}'),
                             outputs = {'sam':'sampe.sam'},
                             tags = tags,
-                            mem_req=3500)
+                            mem_req=5000)
     WF.run_wait(B_bwa_sampe)
 
-B_clean_sam = WF.add_batch("Clean Bams")
+B_clean_sam = WF.add_batch("Clean Bams",hard_reset=True)
 if not B_clean_sam.successful:
     for n in B_bwa_sampe.nodes:
         name = '{tags[sample]} L{tags[lane]} PN{tags[fq_partNumber]}'.format(tags=n.tags)
         B_clean_sam.add_node(name=name,
-                             pcmd = commands.SortSam(input_bam=n.output_paths['sam'],
+                             pcmd = commands.CleanSam(input_bam=n.output_paths['sam'],
                                                       output_bam='{output_dir}/{outputs[bam]}'),
                              outputs = {'bam':'cleaned.bam'},
                              tags = n.tags,
-                             mem_req=2500)
+                             mem_req=3000)
     WF.run_wait(B_clean_sam)
     
 B_sort_bams = WF.add_batch("Sort Bams")
@@ -81,11 +81,11 @@ if not B_sort_bams.successful:
     for n in B_clean_sam.nodes:
         name = n.name
         B_sort_bams.add_node(name=name,
-                             pcmd = commands.CleanSam(input_bam=n.output_paths['bam'],
+                             pcmd = commands.SortSam(input_bam=n.output_paths['bam'],
                                                       output_bam='{output_dir}/{outputs[bam]}'),
                              outputs = {'bam':'sorted.bam'},
                              tags = n.tags,
-                             mem_req=2500)
+                             mem_req=3000)
     WF.run_wait(B_sort_bams)    
 
 #index
@@ -96,7 +96,7 @@ if not B_index.successful:
                        pcmd = commands.BuildBamIndex(input_bam=n.output_paths['bam'],
                                                      output_bai=n.output_paths['bam']+'.bai'),
                        tags = n.tags,
-                       mem_req=2500)
+                       mem_req=3000)
     WF.run_wait(B_index)
                                             
 ### INDEL Realignment    
@@ -110,7 +110,7 @@ if not B_RTC.successful:
                                                               ),
                        outputs = {'targetIntervals':'list.intervals'},
                        tags = n.tags,
-                       mem_req=2500)
+                       mem_req=3000)
     WF.run_wait(B_RTC)
                                             
 B_IR = WF.add_batch("Indel Realigner")
@@ -123,7 +123,7 @@ if not B_IR.successful:
                                                     ),
                       outputs = {'bam':'realigned.bam'},
                       tags = n.tags,
-                      mem_req=2500)
+                      mem_req=3000)
     WF.run_wait(B_IR)
 
 ### Base Quality Score Recalibration
@@ -136,7 +136,7 @@ if not B_BQSR.successful:
                                                                       output_recal_report='{output_dir}/{outputs[recal]}'),
                         outputs = {'recal':'bqsr.recal'},
                         tags = n.tags,
-                        mem_req=2500)
+                        mem_req=3000)
     WF.run_wait(B_BQSR)
     
 B_PR = WF.add_batch("Apply BQSR") #TODO test using SW
@@ -149,7 +149,7 @@ if not B_PR.successful:
                                                  input_recal_report=bqsr_node.output_paths['recal']),
                       outputs = {'bam':'recalibrated.bam'},
                       tags = n.tags,
-                      mem_req=2500)
+                      mem_req=3000)
     WF.run_wait(B_PR) 
 
 
@@ -165,7 +165,7 @@ def MergeAndIndexBySample(input_batch,name1,name2):
                                                             assume_sorted=False),
                               outputs = {'bam':'{0}.bam'.format(sample_name)},
                               tags = tags,
-                              mem_req=1000)
+                              mem_req=3000)
         WF.run_wait(B_merge_bams)
     
     B_index = WF.add_batch(name2)
@@ -176,7 +176,7 @@ def MergeAndIndexBySample(input_batch,name1,name2):
                                                             output_bai='{outputs[bai]}'),
                               outputs = {'bai':'{0}.bai'.format(n.output_paths['bam'])},
                               tags = n.tags,
-                              mem_req=2500)
+                              mem_req=3000)
         WF.run_wait(B_index)    
     return B_merge_bams, B_index
 
@@ -199,7 +199,7 @@ if not B_UG.successful:
                                                             interval=chrom),
                               outputs = {'vcf':'raw.vcf'.format(sample_name)},
                               tags = {'sample':sample_name,'chr':chrom, 'glm':glm},
-                              mem_req=2500)
+                              mem_req=3000)
     WF.run_wait(B_UG)
 
 # Merge VCFS
@@ -214,7 +214,7 @@ if not B_CV1.successful:
                                                            genotypeMergeOptions='REQUIRE_UNIQUE'),
                       tags=tags,
                       outputs={'vcf':'raw.vcf'},
-                      mem_req=2000)
+                      mem_req=3000)
     WF.run_wait(B_CV1)
 
 B_CV2 = WF.add_batch(name="Combine Variants into MasterVCF")
@@ -227,7 +227,7 @@ if not B_CV2.successful:
                                                    genotypeMergeOptions='PRIORITIZE'),
                       tags=tags,
                       outputs={'vcf':'raw.vcf'},
-                      mem_req=2000)
+                      mem_req=3000)
     WF.run_wait(B_CV2)
 
 
@@ -248,7 +248,7 @@ if not B_VQR.successful:
                                                                 haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'),
                       tags=n.tags,
                       outputs={'recal':'output_bam.recal','tranches':'output_bam.tranches','rscript':'plot.R'},
-                      mem_req=2500)
+                      mem_req=3000)
     WF.run_wait(B_VQR)
 
 B_AR = WF.add_batch(name="Apply Recalibration")
@@ -263,7 +263,7 @@ if not B_AR.successful:
                                                       haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'),
                       tags=n.tags,
                       outputs={'vcf':'recalibrated.vcf'},
-                      mem_req=2500)
+                      mem_req=3000)
     WF.run_wait(B_AR)
         
 WF.finished(delete_unused_batches=True)

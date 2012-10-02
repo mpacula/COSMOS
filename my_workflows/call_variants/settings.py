@@ -5,6 +5,7 @@ import os
 GATK_path = '/home2/erik/2gatk/GenomeAnalysisTK-2.1-8-g5efb575'
 Picard_path = '/home2/erik/picard-tools-1.74'
 resource_bundle_path = '/home2/erik/gatk/bundle/b37'
+#/nas/erik/bundle/1.5/b37/
 queue_output_dir = '/vol3/cai_testgluster'
 tmp_dir='/mnt/tmp'
 

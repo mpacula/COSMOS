@@ -1,5 +1,6 @@
 settings = {
    delay=0,
+   logfile = "/home/erik/log/lsyncd.log",
    statusFile = "/home/erik/log/lsyncd-status.log",
    statusInterval = 100 }
 sync{

@@ -105,10 +105,10 @@ class Workflow(models.Model):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
         
-        :param name: A unique name for this workflow
-        :param __restart: Restart the workflow by deleting it and creating a new one
-        :param dry_run: Don't actually execute jobs
-        :param root_output_dir: If not None, sets the root_output_dir.  If None, uses the value in settings.  If the workflow already exists, this param is ignored.
+        :param name: A unique name for this workflow. All spaces are converted to underscores. Required.
+        :param restart: Restart the workflow by deleting it and creating a new one. Optional.
+        :param dry_run: Don't actually execute jobs. Optional.
+        :param root_output_dir: Replaces the directory used in settings as the workflow output directory. Optional.
         """
 
         if name is None:
@@ -160,7 +160,7 @@ class Workflow(models.Model):
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
         
-        :param name: A unique name for this workflow
+        :param name: A unique name for this workflow. All spaces are converted to underscores.  
         :type name: str
         :param dry_run: This workflow is a dry run.  No jobs will actually be executed
         :type dry_run: bool
@@ -208,8 +208,8 @@ class Workflow(models.Model):
         """
         Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists, return the existing one.
         
-        :parameter name: The name of the batch, must be unique within this Workflow
-        :parameter hard_reset: Delete any batch with this name including all of its nodes, and return a new one
+        :parameter name: The name of the batch, must be unique within this Workflow. Required.
+        :parameter hard_reset: Delete any batch with this name including all of its nodes, and return a new one. Optional.
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
@@ -235,6 +235,7 @@ class Workflow(models.Model):
             self.log.info('Creating {0} from scratch.'.format(b))
         else:
             self.log.info('{0} already exists, loading it from history...'.format(b))
+            self.finished_on = None #resuming, so reset this
             
         b.order_in_workflow = order_in_workflow
         b.save()
@@ -243,7 +244,7 @@ class Workflow(models.Model):
  
     def yield_resource_usage(self):
         "Yield's each node in the Workflow's resource usage"
-        yield 'Batch,failures,file_size,memory,time'
+        yield 'Batch,memory,time'
         for batch in self.batches:
             for node in batch.nodes:
                 sja = node.get_successful_jobAttempt()
@@ -255,16 +256,17 @@ class Workflow(models.Model):
                             memory = sja._drmaa_info['resourceUsage']['mem']
                         except KeyError:
                             pass
-                fs = helpers.folder_size(node.output_dir,human_readable=False) #TODO make obj.file_size a fxn not a property
-                yield '{batch.name},-1,{fs},{memory},{utime}'.format(batch=batch,node=node,fs=fs,memory=memory,sja=sja,utime=utime)
+                #fs = helpers.folder_size(node.output_dir,human_readable=False) #TODO make obj.file_size a fxn not a property
+                
+                yield '{batch.name},{memory},{utime}'.format(batch=batch,node=node,fs=fs,memory=memory,sja=sja,utime=utime)
                 
      
-    def save_resource_usage(self):
-        "Saves this workflow's resource usage to disk"
-        d = os.path.join(self.output_dir,'_plots')
-        with file(d,'wb') as f:
-            for line in self.yield_resource_usage():
-                f.write(line+"\n")
+#    def save_resource_usage(self):
+#        "Saves this workflow's resource usage to disk"
+#        d = os.path.join(self.output_dir,'_plots')
+#        with file(d,'wb') as f:
+#            for line in self.yield_resource_usage():
+#                f.write(line+"\n")
              
                 
 #    def _close_session(self):
@@ -637,9 +639,8 @@ class Batch(models.Model):
         Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
         If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
         
-        .. note:: all spaces are converted to underscores
         
-        :param name: (str) The name of the node.  Must be unique within this batch.
+        :param name: (str) The name of the node.  Must be unique within this batch. All spaces are converted to underscores.  Required.
         :param pcmd: (str) The preformatted command to execute. Required.
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
         :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.

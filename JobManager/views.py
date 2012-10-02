@@ -2,12 +2,14 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from models import JobAttempt
 import math
-#
+from django.views.decorators.cache import never_cache
 
+@never_cache
 def jobAttempt(request,jobid):
     jobAttempt = JobAttempt.objects.get(pk=jobid)
     return render_to_response('JobManager/JobAttempt/view.html', { 'request':request,'jobAttempt': jobAttempt }, context_instance=RequestContext(request))
 
+@never_cache
 def jobAttempt_output(request,jobid,output_name):
     jobAttempt = JobAttempt.objects.get(pk=jobid)
     output_path = jobAttempt.node.output_paths[output_name]

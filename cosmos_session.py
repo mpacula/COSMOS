@@ -18,8 +18,6 @@ if path not in sys.path:
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'Cosmos.settings'
 
-from django.conf import settings as django_settings
-
 #DRMAA
 import drmaa
 drmaa_enabled = True

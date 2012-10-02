@@ -14,9 +14,16 @@ The following will:
 
    git clone github@git:path/to/Cosmos
    cd Cosmos
-   virtualenv venv
+   virtualenv --no-site-packages venv
    source venv/bin/activate
    pip install -r pip_requirements.txt
    
    
 Other than that, DRMAA must be installed on the system
+
+Optionally, if you want the graphic capabilities, install R and the package ggplot2:
+
+.. code-block:: bash
+   sudo apt-get install r # or whatever works on your OS
+   sudo R
+   > install.packages("ggplot2")

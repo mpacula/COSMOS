@@ -4,23 +4,28 @@ from models import Workflow, Batch, Node, NodeTag
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from Cosmos.helpers import groupby
 from models import status_choices
-import re
-from models import Q
 from django.utils.datastructures import SortedDict
+from django.http import HttpResponse
+import os
+from django.views.decorators.cache import never_cache
 
+@never_cache
 def _get_batches_dict(workflow):
     #batches_dict = Batch.objects.get(workflow=workflow).values('successful',')
     pass
 
+@never_cache
 def index(request):
     workflows = Workflow.objects.all()
     return render_to_response('Workflow/index.html', { 'request':request,'workflows': workflows }, context_instance=RequestContext(request))
 
+@never_cache
 def view(request,pid):
     workflow = Workflow.objects.get(pk=pid)
     batches_ordered = Batch.objects.filter(workflow=workflow).order_by('order_in_workflow')
     return render_to_response('Workflow/view.html', { 'request':request,'workflow': workflow, 'batches_ordered':batches_ordered }, context_instance=RequestContext(request))
 
+@never_cache
 def batch_view(request,pid):
     batch = Batch.objects.get(pk=pid)
 
@@ -67,16 +72,41 @@ def batch_view(request,pid):
         
     return render_to_response('Workflow/Batch/view.html', { 'request':request, 'current_filters':all_filters,'filter_url':filter_url ,'filter_choices':filter_choices, 'batch': batch,'page_size':page_size,'paged_nodes':nodes, 'page_slice':page_slice }, context_instance=RequestContext(request))
 
+@never_cache
 def node_view(request,pid):
     node = Node.objects.get(pk=pid)
     jobAttempts_list = node._jobAttempts.all()
     return render_to_response('Workflow/Node/view.html', { 'request':request,'node': node, 'jobAttempts_list':jobAttempts_list }, context_instance=RequestContext(request))
 
+@never_cache
 def view_log(request,pid):
     workflow = Workflow.objects.get(pk=pid)
     return render_to_response('Workflow/view_log.html', { 'request':request,'workflow': workflow }, context_instance=RequestContext(request))
 
-#def workflow(request, workflow_id):
-#    workflow = Workflow.objects.get(pk=workflow_id)
-#    return render_to_response('Workflow/workflow.html', { 'workflow':workflow}, context_instance=RequestContext(request))
+
+@never_cache
+def analysis(request,pid):
+    from rpy2.robjects import r as R
+    from django.conf import settings
+    
+    R("""renderer <- function(filename, title, units) {
+    dat <- rnorm(1000)
+    png(file=filename, width=720, height=480)
+    hist(dat, main=title, xlab=units)
+    dev.off()
+    }""")
+    
+    wf = Workflow.objects.get(pk=pid)
+    
+    units ='test'
+    siteName='sitename'
+    resultsDir = 'Workflow/plots'
+    resultsFile = "{0}.png".format(wf.id)
+    resultsFile_path = os.path.join(settings.MEDIA_ROOT,resultsDir,resultsFile) 
+    plot_url = os.path.join(settings.MEDIA_URL,resultsDir,resultsFile)
+    
+    R.renderer(resultsFile_path, "Random data for site %s (%s)" % (siteName, units), units)
+    return render_to_response('Workflow/analysis.html', { 'request':request,'plot_url':plot_url}, context_instance=RequestContext(request))
+
+
 

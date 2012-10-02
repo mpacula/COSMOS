@@ -18,7 +18,7 @@ first two lines.
 	:emphasize-lines: 1,2
 
 	export COSMOS_HOME_PATH=/path/to/Cosmos          # The path to Cosmos
-	export LIB_DRMAA_PATH=/usr/lib/libdrmaa.so       # The path to the :term:`DRMAA` library
+	export DRMAA_LIBRARY_PATH=/usr/lib/libdrmaa.so       # The path to the :term:`DRMAA` library
 	export COSMOS_SETTINGS_MODULE=config.default
 	export PYTHONPATH=$COSMOS_HOME_PATH:$PYTHONPATH
 	export PATH=$COSMOS_HOME_PATH/bin:$PATH
@@ -58,13 +58,15 @@ Edit :file:`config/default.py`, and configure it to your liking.  There are only
 on a network shared drive.
 
 
-3. Create SQL Tables
-____________________
+3. Create SQL Tables and Load Static Files
+__________________________________________
 
-Once you've configured Cosmos, setting up the SQL database tables is easy.
+Once you've configured Cosmos, setting up the SQL database tables is easy.  Django requires you to run the collectstatic
+command, which moves all the necessary image, css, and javascript files to the static/ directory.
 
 .. code-block:: bash
 
    $ cosmos adm syncdb
+   $ manage collectstatic
    
    

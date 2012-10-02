@@ -68,12 +68,13 @@ You can use the web interface to explore the history and debug all workflows.  T
 
 .. code-block:: bash
 
-   cosmos adm runweb
+   cosmos adm runweb -p 8080
   
 
 .. note:: Currently the system you're running the web interface on must be the same you're running the workflow on.
    
-Visit http://your-ip:8080 to access it.   
+Visit http://your-ip:8080 to access it.  If you can't access the website, its likely firewalled off.  Fortunately, the Cosmos website
+works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080` 
 
 .. figure:: imgs/webinterface.png
    :width: 75%
@@ -82,9 +83,11 @@ Visit http://your-ip:8080 to access it.
 Terminating a Workflow
 ______________________
 
-Currently, we do not support pressing ctrl+c (coming soon!) to terminate a workflow.  *Avoid pressing ctrl+c while a workflow is running!*
-If you do, Cosmos will not be able to properly update the database.  It will be fine when you restart things, but for example, your latest batch
-will still have the status of "in_progress" instead of "failed".
+Currently, we do not support pressing ctrl+c (coming soon!) to terminate a workflow.  *Avoid pressing ctrl+c while a workflow is running*
+If you do, Cosmos will not be able to properly update the database and things get out of sync.  It will be fine when you restart or resume
+the workflow, but for example, your latest batch will still have the status of "in_progress" instead of "failed".  If you did not terminate
+gracefully, make sure there are no left over Cosmos jobs running before you start the next workflow, which would probably reuslt in file output
+conflicts. 
 
 To terminate a workflow properly, first find it's ID:
 
@@ -94,6 +97,7 @@ To terminate a workflow properly, first find it's ID:
    $ cosmos wf listcosmos wf list
    Workflow[3] Terminate Me
    Workflow[5] My other Workflow
+   ...
    
 Then, use the workflow's id to terminate it:
 
@@ -103,6 +107,7 @@ Then, use the workflow's id to terminate it:
    Telling Workflow[3] Terminate Me to terminate
    WARNING: 2012-09-27 17:01:14: Terminating this workflow...
    Request <14182> is being terminated
+   ...
    
    
 
