@@ -110,7 +110,7 @@ if not B_RTC.successful:
                                                               ),
                        outputs = {'targetIntervals':'list.intervals'},
                        tags = n.tags,
-                       mem_req=3000)
+                       mem_req=2250)
     WF.run_wait(B_RTC)
                                             
 B_IR = WF.add_batch("Indel Realigner")

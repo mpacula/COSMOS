@@ -573,8 +573,7 @@ class Batch(models.Model):
     def __init__(self,*args,**kwargs):
         super(Batch,self).__init__(*args,**kwargs)
         validate_not_null(self.workflow)
-        if self.id is None: #creating for the first time 
-            check_and_create_output_dir(self.output_dir)
+        check_and_create_output_dir(self.output_dir)
         
         validate_name(self.name,'Batch_Name')
         #validate unique name
