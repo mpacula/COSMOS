@@ -2,9 +2,14 @@ from django import template
 from django.core.urlresolvers import reverse
 import time
 from django.core.validators import ValidationError
+import re
+from JobManager.models import JobAttempt
 
 register = template.Library()
 
+@register.filter
+def underscore2space(s):
+    return re.sub('_',' ',s)
 
 @register.filter
 def key2val(d, key_name):
@@ -30,6 +35,18 @@ def status2csstype(status):
 def mult(value, arg):
     "Multiplies the arg and the value"
     return int(value) * int(arg)
+
+@register.simple_tag
+def format_resource_usage(in_field_name,val):
+    for units,field_names in JobAttempt.time_field_units.items():
+        if in_field_name in field_names:
+            if units == 'seconds':
+                return format_time(val)
+            elif units == 'kilobytes':
+                pass
+    return val
+            
+        
 
 @register.filter
 def format_time(seconds):

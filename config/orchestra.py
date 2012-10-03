@@ -2,7 +2,7 @@ import os
 
 #Cosmos Settings
 home_path = '/home/esg21/workspace/Cosmos' #orchestra
-default_root_output_dir = '/scratch/esg21' #orchestra
+default_root_output_dir = '/groups/cbmi/erik/cosmos_out' #orchestra
 DRM = 'LSF'
 time_path = '/usr/bin/time'
 

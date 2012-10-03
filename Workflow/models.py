@@ -248,7 +248,7 @@ class Workflow(models.Model):
     def save_resource_usage_as_csv(self,filename):
         """Save resource usage to filename"""
         import csv
-        keys = list(self.get_all_tag_keywords_used()) + ['batch','memory','utime']
+        keys = list(self.get_all_tag_keywords_used()) + ['batch','memory','time']
         f = open(filename, 'wb')
         dict_writer = csv.DictWriter(f, keys)
         dict_writer.writer.writerow(keys)
@@ -586,7 +586,7 @@ class Batch(models.Model):
     @property
     def max_job_time(self):
         "Max job time of all jobs in this batch"
-        m = JobAttempt.objects.filter(node_set__in = Node.objects.filter(batch=self)).aggregate(models.Max('drmaa_utime'))['drmaa_utime__max']
+        m = JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Max('cpu_time'))['cpu_time__max']
         if m is None:
             return None
         return m
@@ -594,7 +594,7 @@ class Batch(models.Model):
     @property
     def total_job_time(self):
         "Total job time of all jobs in this batch"
-        t = JobAttempt.objects.filter(node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('drmaa_utime'))['drmaa_utime__sum']
+        t = JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('cpu_time'))['cpu_time__sum']
         if t is None:
             return None
         return t
@@ -626,10 +626,11 @@ class Batch(models.Model):
         """
         Yield Resource Usage as a dictionary of resources and tags per node
         """
+        #TODO rework with time fields
         for node in self.nodes: 
             sja = node.get_successful_jobAttempt()
             memory = '0'
-            utime = 0
+            cpu_time = 0
             if sja and sja._drmaa_info: #TODO missing this  stuff is caused by errors.  fix those errors and delete this
                     if sja.drmaa_utime: utime = sja.drmaa_utime 
                     try:
@@ -637,7 +638,7 @@ class Batch(models.Model):
                     except KeyError:
                         pass
             #fs = helpers.folder_size(node.output_dir,human_readable=False) #TODO make obj.file_size a fxn not a property
-            info = { 'batch':self.name, 'memory':memory,'utime':utime }
+            info = { 'batch':self.name, 'memory':memory,'time':time }
             for k,v in node.tags.items():
                 info[k] = v
             yield info
@@ -900,7 +901,7 @@ class Node(models.Model):
     @property
     def time_to_run(self):
         "Time it took this node to run."
-        return self.get_successful_jobAttempt().drmaa_utime if self.successful else None
+        return self.get_successful_jobAttempt().cpu_time if self.successful else None
     
     def numAttempts(self):
         "This node's number of job attempts."

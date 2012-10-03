@@ -176,17 +176,18 @@ def PrintReads(input_bam,output_bam,input_recal_report):
 def HaplotypeCaller(input_bam,output_bam,interval,glm):
     pass
 
-def UnifiedGenotyper(input_bam,output_bam,interval,glm):
+def UnifiedGenotyper(input_bams,output_bam,interval,glm):
     """
     need to make variant annotation a separate step since some annotations use multi-sample info
     """
+    input_bams = ' '.join([ '-I {}'.format(ib) for ib in input_bams ])
     s = r"""
     {settings.GATK_cmd} \
     -T UnifiedGenotyper \
     -R {settings.reference_fasta_path} \
     --dbsnp {settings.dbsnp_path} \
     -glm {glm} \
-    -I {input_bam} \
+    -I {input_bams} \
     -o {output_bam} \
     -A DepthOfCoverage \
     -A HaplotypeScore \
@@ -194,7 +195,7 @@ def UnifiedGenotyper(input_bam,output_bam,interval,glm):
     -baq CALCULATE_AS_NECESSARY \
     -L {interval}
     """ 
-    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,interval=interval,glm=glm)
+    return _parse_cmd(s,input_bams=input_bams,output_bam=output_bam,interval=interval,glm=glm)
 
 
 def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):

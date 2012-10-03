@@ -64,6 +64,8 @@ if not B_bwa_sampe.successful:
                             mem_req=5000)
     WF.run_wait(B_bwa_sampe)
 
+WF.restart_from_here()    
+
 B_clean_sam = WF.add_batch("Clean Bams")
 if not B_clean_sam.successful:
     for n in B_bwa_sampe.nodes:
@@ -73,49 +75,51 @@ if not B_clean_sam.successful:
                                                       output_bam='{output_dir}/{outputs[bam]}'),
                              outputs = {'bam':'cleaned.bam'},
                              tags = n.tags,
-                             mem_req=3000)
+                             mem_req=3500)
     WF.run_wait(B_clean_sam)
     
-B_sort_bams = WF.add_batch("Sort Bams")
-if not B_sort_bams.successful:
-    for n in B_clean_sam.nodes:
-        name = n.name
-        B_sort_bams.add_node(name=name,
-                             pcmd = commands.SortSam(input_bam=n.output_paths['bam'],
+    
+B_merge_bams = WF.add_batch("Merge Cleaned Bams")
+if not B_merge_bams.successful:
+    for tags,input_nodes in B_clean_sam.group_nodes_by('sample','lane'):
+        input_bams = [ n.output_paths['bam'] for n in input_nodes ]
+        name = "{tags[sample]} L{tags[lane]}".format(tags=tags)
+        B_merge_bams.add_node(name=name,
+                             pcmd = commands.MergeSamFiles(input_bams=input_bams,
                                                       output_bam='{output_dir}/{outputs[bam]}'),
-                             outputs = {'bam':'sorted.bam'},
-                             tags = n.tags,
-                             mem_req=3000)
-    WF.run_wait(B_sort_bams)    
+                             outputs = {'bam':'lane.bam'},
+                             tags = tags,
+                             mem_req=3500)
+    WF.run_wait(B_merge_bams)    
 
 #index
-B_index = WF.add_batch("Index Sorted Bams")
+B_index = WF.add_batch("Index Merged Bams")
 if not B_index.successful:
-    for n in B_sort_bams.nodes:
+    for n in B_merge_bams.nodes:
         B_index.add_node(name=n.name,
                        pcmd = commands.BuildBamIndex(input_bam=n.output_paths['bam'],
                                                      output_bai=n.output_paths['bam']+'.bai'),
                        tags = n.tags,
-                       mem_req=3000)
+                       mem_req=2000)
     WF.run_wait(B_index)
                                             
 ### INDEL Realignment    
  
 B_RTC = WF.add_batch("Realigner Target Creator")
 if not B_RTC.successful:
-    for n in B_sort_bams.nodes:
+    for n in B_merge_bams.nodes:
         B_RTC.add_node(name=n.name,
                        pcmd = commands.RealignerTargetCreator(input_bam=n.output_paths['bam'],
                                                               output_recal_intervals='{output_dir}/{outputs[targetIntervals]}'
                                                               ),
                        outputs = {'targetIntervals':'list.intervals'},
                        tags = n.tags,
-                       mem_req=2250)
+                       mem_req=3000)
     WF.run_wait(B_RTC)
                                             
 B_IR = WF.add_batch("Indel Realigner")
 if not B_IR.successful:
-    for n in B_sort_bams.nodes:
+    for n in B_merge_bams.nodes:
         B_IR.add_node(name=n.name,
                       pcmd = commands.IndelRealigner(input_bam=n.output_paths['bam'],
                                                     targetIntervals=B_RTC.get_node_by(**n.tags).output_paths['targetIntervals'],
@@ -180,42 +184,43 @@ def MergeAndIndexBySample(input_batch,name1,name2):
         WF.run_wait(B_index)    
     return B_merge_bams, B_index
 
-B_merge_bams, B_index = MergeAndIndexBySample(B_PR,"Merge Bams by Sample","Index Merged Bams")
+B_merge_bams_sample, B_index = MergeAndIndexBySample(B_PR,"Merge Bams by Sample","Index Merged Bams")
 
 
 ### Genotype
 
 B_UG = WF.add_batch(name="Unified Genotyper")
 if not B_UG.successful:
-    for tags,input_nodes in B_merge_bams.group_nodes_by('sample'):
-        input_bam = input_nodes[0].output_paths['bam']
+    for tags,input_nodes in B_merge_bams_sample.group_nodes_by('sample'):
+        input_bams = [ n.output_paths['bam'] for n in input_nodes ]
         sample_name = tags['sample']
         for chrom in contigs:
             for glm in ['INDEL','SNP']:
-                B_UG.add_node(name='{0} {1} chr{2}'.format(sample_name,glm,chrom),
-                              pcmd = commands.UnifiedGenotyper(input_bam=input_bam,
+                B_UG.add_node(name='{1} chr{2}'.format(glm,chrom),
+                              pcmd = commands.UnifiedGenotyper(input_bams=input_bams,
                                                             output_bam='{output_dir}/{outputs[vcf]}',
                                                             glm=glm,
                                                             interval=chrom),
                               outputs = {'vcf':'raw.vcf'.format(sample_name)},
-                              tags = {'sample':sample_name,'chr':chrom, 'glm':glm},
+                              tags = {'chr':chrom,
+                                      'glm':glm},
                               mem_req=3000)
     WF.run_wait(B_UG)
 
 # Merge VCFS
 
-B_CV1 = WF.add_batch(name="Combine Variants into Sample VCFs")
-if not B_CV1.successful:
-    for tags,nodes_by_chr in B_UG.group_nodes_by('glm','sample'):
-        sample_vcfs = [ (tags['sample'],n.output_paths['vcf']) for n in nodes_by_chr ]
-        B_CV1.add_node(name="{tags[sample]} {tags[glm]}".format(tags=tags),
-                      pcmd=commands.CombineVariants(input_vcfs=sample_vcfs,
-                                                           output_vcf="{output_dir}/{outputs[vcf]}",
-                                                           genotypeMergeOptions='REQUIRE_UNIQUE'),
-                      tags=tags,
-                      outputs={'vcf':'raw.vcf'},
-                      mem_req=3000)
-    WF.run_wait(B_CV1)
+#B_CV1 = WF.add_batch(name="Combine Variants into Sample VCFs")
+#if not B_CV1.successful:
+#    for tags,nodes_by_chr in B_UG.group_nodes_by('glm','sample'):
+#        sample_vcfs = [ (tags['sample'],n.output_paths['vcf']) for n in nodes_by_chr ]
+#        B_CV1.add_node(name="{tags[sample]} {tags[glm]}".format(tags=tags),
+#                      pcmd=commands.CombineVariants(input_vcfs=sample_vcfs,
+#                                                           output_vcf="{output_dir}/{outputs[vcf]}",
+#                                                           genotypeMergeOptions='REQUIRE_UNIQUE'),
+#                      tags=tags,
+#                      outputs={'vcf':'raw.vcf'},
+#                      mem_req=3000)
+#    WF.run_wait(B_CV1)
 
 B_CV2 = WF.add_batch(name="Combine Variants into MasterVCF")
 if not B_CV2.successful:

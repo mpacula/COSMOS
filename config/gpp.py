@@ -2,7 +2,7 @@ import os
 
 # Cosmos Settings
 home_path = '/home/ch158749/workspace/Cosmos' #gpp
-default_root_output_dir = '/nas/erik/cosmos_out' #gpp
+default_root_output_dir = '/nas/erik/cosmos_output' #gpp
 DRM = 'LSF' #LSF, or GE
 tmp_dir = '/nas/erik/tmp'
 time_path = '/usr/bin/time'
