@@ -416,7 +416,7 @@ class Workflow(models.Model):
         return nodes 
 
 
-    def wait(self, batch=None, terminate_on_fail=False):
+    def wait(self, batch=None, terminate_on_fail=True):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         If `batch` is omitted or set to None, all running nodes will be waited on.
@@ -575,13 +575,14 @@ class Batch(models.Model):
         Percent of nodes that have completed
         """
         done = Node.objects.filter(batch=self,successful=True).count()
-        total = self.numNodes()
+        total = self.num_nodes
         status = self.status
         if total == 0 or done == 0:
             if status == 'in_progress' or status == 'failed':
                 return 1
             return 0
-        return int(100 * float(done) / float(total))
+        r = round(100 * float(done) / float(total))
+        return r if r > 1 else 1
     
     @property
     def max_job_time(self):
@@ -614,7 +615,8 @@ class Batch(models.Model):
         "Queryset of this batch's nodes"
         return Node.objects.filter(batch=self)
     
-    def numNodes(self):
+    @property
+    def num_nodes(self):
         "The number of nodes in this batch"
         return Node.objects.filter(batch=self).count()
     
@@ -784,8 +786,6 @@ class Batch(models.Model):
         for tags,node_id_and_tags_tuple in helpers.groupby(node_id2tags.items(),lambda x: x[1]):
             node_ids = [ x[0] for x in node_id_and_tags_tuple ]
             yield tags, Node.objects.filter(pk__in=node_ids)
-    
-    
     
     def delete(self, *args, **kwargs):
         """
