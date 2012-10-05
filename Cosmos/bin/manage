@@ -1,2 +1,0 @@
-#!/bin/bash
-python $COSMOS_HOME_PATH/Cosmos/manage.py $@
