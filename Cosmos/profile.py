@@ -50,7 +50,7 @@ def and_descendants(pid):
 
 
 class Profile:
-    fields_to_get = ['FDSize','VmPeak','VmSize','VmLck','VmHWM','VmRSS','VmData','VmLib','VmPTE']
+    status_fields_to_get = ['FDSize','VmPeak','VmSize','VmLck','VmHWM','VmRSS','VmData','VmLib','VmPTE']
     proc = None #the main subprocess object
     command = None
     records = None # a list of polling information for all jobs per poll_interval
@@ -89,7 +89,7 @@ class Profile:
         try:
             with open('/proc/{0}/status'.format(pid),'r') as f:
                 status = dict(map(line2tuple,f.readlines()))
-                return status['Name'],dict((key,status[key]) for key in self.fields_to_get)
+                return status['Name'],dict((key,status[key]) for key in self.status_fields_to_get)
         except IOError:
             return
     

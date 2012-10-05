@@ -1,5 +1,3 @@
-import subprocess,time,sys,re,os,sqlite3,json
-
 """
     Sample some process statistics from /proc/[pid]/status
      
@@ -21,12 +19,16 @@ import subprocess,time,sys,re,os,sqlite3,json
     And returns:
     MAX(FDSize), AVG(FDSize), MAX(VmPeak), AVG(VmSize), MAX(VmLck), AVG(VmLck), AVG(VmRSS), AVG(VmData), MAX(VmData), AVG(VmLib), MAX(VmPTE), AVG(VmPTE) 
 """
+import subprocess,time,sys,re,os,sqlite3,json
+import read_man_proc
 
 class Profile:
-
-    fields_to_get = ['FDSize','VmPeak','VmSize','VmLck','VmHWM','VmRSS','VmData','VmLib','VmPTE','voluntary_ctxt_switches','nonvoluntary_ctxt_switches']
-    how_to_analyze = {'max' : ['VmPeak','VmHWM'],
-                      'mean':['FDSize','VmSize','VmLck','VmRSS','VmData','VmLib','VmPTE']}
+    fields_to_get = {'UPDATE': ['VmPeak','VmHWM'] + #/proc/status
+                               ['minflt','cminflt','majflt','utime','stime','cutime','cstime','nice','priority','exit_signal','delayacct_blkio_ticks','rsslim'], #/proc/stat
+                     'INSERT': ['FDSize','VmSize','VmLck','VmRSS','VmData','VmLib','VmPTE'] + #/proc/status
+                               ['num_threads'] #/proc/stat
+                     }
+    
     proc = None #the main subprocess object
     
     @property
@@ -39,8 +41,14 @@ class Profile:
         self.poll_interval = poll_interval
         self.conn = sqlite3.connect(':memory:')
         self.c = self.conn.cursor()
-        sqfields = ', '.join(map(lambda x: x + ' INTEGER', self.fields_to_get))
-        self.c.execute("CREATE TABLE polls (pid INTEGER, name TEXT, {0})".format(sqfields))
+        #Create Records Table
+        insert_fields = self.fields_to_get['INSERT']
+        sqfields = ', '.join(map(lambda x: x + ' INTEGER', insert_fields))
+        self.c.execute("CREATE TABLE record (pid INTEGER, {0})".format(sqfields))
+        #Create Processes Table
+        update_fields = self.fields_to_get['UPDATE']
+        sqfields = ', '.join(map(lambda x: x + ' INTEGER', insert_fields))
+        self.c.execute("CREATE TABLE process (pid INTEGER PRIMARY KEY, name TEXT, {0})".format(update_fields))
         
     def _unnest(self,a_list):
         """
@@ -60,60 +68,67 @@ class Profile:
         if len(children) == 0:
             return [pid]
         else: 
-            return [pid] + self.unnest([ self.and_descendants(int(child)) for child in children ])
-    
-    def insert_dict(self,table):
-        """
-        Insert a dictionary of data into table
-        """
-        
+            return [pid] + self._unnest([ self.and_descendants(int(child)) for child in children ])
     
     
     def run(self):
         """Runs a process and records the memory usage of it and all of its descendants"""
         self.proc = subprocess.Popen(self.command, shell=True)
         while True:
-            for pid,name,status in self.profile_all_procs():
-                keys=','.join(map(lambda x:x[0],status))
-                vals = map(lambda x:x[1],status)      
-                self.c.execute("insert into polls(pid,name,{keys}) values({q})".format(keys=keys,
-                                                                              q=', '.join(['?']*(len(vals)+2)),
-                                                                              ),
-                                                                              [pid,name] + vals)
+            self.poll_all_procs()
             time.sleep(1)
             if self.proc.poll() != None:
                 self.finish()
     
-    def profile_all_procs(self):
-        """Return a dictionary of process names and their current resource usage"""
-        return filter(lambda x: x,[ self.profile_proc(pid) for pid in self.all_pids ])
-    
-    def profile_proc(self,pid):
+    def parseVal(self,val):
+        "Remove kB and return ints"
+        return int(val) if val[-2:] != 'kB' else int(val[0:-3])
+        
+    def poll_all_procs(self):
+        """Updates the sql table with all descendant processes' resource usage"""
+        for pid in self.all_pids:
+            try:
+                all_stats = self.read_proc_stat(pid)
+                all_stats += self.read_proc_status(pid)
+                #Inserts
+                inserts = [ (name,self.parseVal(val)) for name,val in all_stats if name in self.fields_to_get['INSERT'] ] + [('pid',pid)]
+                keys,vals = zip(*inserts) #unzip
+                q = "INSERT into record ({keys}) values({s})".format(s = ','.join(['?']*len(vals)),
+                                                                     keys = ', '.join(keys))
+                self.c.execute(q,vals)
+                #Updates
+                
+            except IOError:
+                pass # job finished
+                 
+        
+    def read_proc_stat(self,pid):
         """
-        Gets resource information of a process from /proc/[pid]/status and /proc/[pid]/stat
-        :returns: a tuple that looks like (self.fields_to_get found in /proc/[pid]/status, name of the pid, [(status field, status value)])
+        :returns: (field_name,value) from /proc/pid/stat or None if its empty
+        """
+        stat_fields = read_man_proc.get_stat_fields()
+        with open('/proc/{0}/stat'.format(pid),'r') as f:
+            stat_all = f.readline().split(' ')
+            return map(lambda x: (x[0][0],x[1]),zip(stat_fields,stat_all))
+        
+    def read_proc_status(self,pid):
+        """
+        :returns: (field_name,value) from /proc/pid/status or None if its empty
         """
         def line2tuple(l):
             m = re.search(r"\s*(.+):\s*(.+)\s*",l)
             return m.group(1),m.group(2)
-        def parseVal(key,val):
-            "Remove kB and return"
-            return key,int(val) if val[-2:] != 'kB' else int(val[0:-3])
-        try:
-            with open('/proc/{0}/status'.format(pid),'r') as f:
-                status_all = map(line2tuple,f.readlines())
-                name = filter(lambda x: x[0] == 'Name',status_all)[0][1]
-                status_filtered = filter(lambda x: x[0] in self.fields_to_get,status_all)
-                status_parsed = map(lambda x: parseVal(*x),status_filtered)
-                return pid,name,status_parsed
-        except IOError:
-            return
+        with open('/proc/{0}/status'.format(pid),'r') as f:
+            return map(line2tuple,f.readlines())
+        
         
     def analyze_records(self):
-#        for pid in self.records:
-        self.c.execute('SELECT name,pid, MAX(FDSize), AVG(FDSize), MAX(VmPeak), AVG(VmSize), MAX(VmLck), AVG(VmLck), AVG(VmRSS), AVG(VmData), MAX(VmData), AVG(VmLib), MAX(VmPTE), AVG(VmPTE) FROM polls GROUP BY pid,name')
+        #self.c.execute('SELECT name,pid, MAX(FDSize), AVG(FDSize), MAX(VmPeak), AVG(VmSize), MAX(VmLck), AVG(VmLck), AVG(VmRSS), AVG(VmData), MAX(VmData), AVG(VmLib), MAX(VmPTE), AVG(VmPTE) FROM polls GROUP BY pid,name')
+        import pprint
+        self.c.execute('SELECT * from record')
         keys = [ x[0] for x in self.c.description]
-        print [ json.dumps(dict(zip(keys,vals)),sort_keys=True) for vals in self.c ]
+        pprint.pprint( [ json.dumps(dict(zip(keys,vals)),sort_keys=True) for vals in self.c ] )
+        
     
     def finish(self):
         self.analyze_records()

@@ -179,14 +179,14 @@ def yield_fields(manpage):
     for i,part in enumerate(parts):
         name,x,txt = re.search("(.+?)\s(.+?)\s+(.*)",part.strip(),re.DOTALL).groups()
         txt = re.sub("\s\s+"," ",txt)
-        yield (name,(i,txt))
+        yield (name,i,txt)
         
-def get_fields():
+def get_stat_fields():
     """
     Returns a list of all the items in /proc/pid/stat
-    [('name of field1',(column #1, "description1"),
-    ('name of field2',(column #2, "description2"),
-    ('name of field3',(column #3, "description3")]
+    [('name of field1', column #1, "description1"),
+    ('name of field2', column #2, "description2"),
+    ('name of field3', column #3, "description3")]
     
     You can easily convert to a dict using dict(get_fields())
     """
