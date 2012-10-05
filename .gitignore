@@ -6,7 +6,7 @@ lsync.conf*
 .project
 .git/
 build/
-my_workflows/gatk/data
+my_workflows/gatk/data/
 .metadata/
 migrations/
 .settings/

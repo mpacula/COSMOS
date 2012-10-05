@@ -177,10 +177,7 @@ def HaplotypeCaller(input_bam,output_bam,interval,glm):
     pass
 
 def UnifiedGenotyper(input_bams,output_bam,interval,glm):
-    """
-    need to make variant annotation a separate step since some annotations use multi-sample info
-    """
-    input_bams = ' '.join([ '-I {}'.format(ib) for ib in input_bams ])
+    input_bams = ' '.join([ '-I {0}'.format(ib) for ib in input_bams ])
     s = r"""
     {settings.GATK_cmd} \
     -T UnifiedGenotyper \

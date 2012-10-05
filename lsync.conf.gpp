@@ -7,8 +7,6 @@ sync{
    default.rsyncssh,
    source="/home/erik/workspace/Cosmos/",
    targetdir="workspace/Cosmos/",
-   host="esg21@orchestra",
-   host="erik@bioseq.info",
    host="ch158749@gpp",
    rsyncOps={
 	"--exclude-from=/home/erik/workspace/Cosmos/.gitignore",

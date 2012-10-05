@@ -125,7 +125,7 @@ class Workflow(models.Model):
             else:
                 return Workflow.__resume(name=name, dry_run=dry_run)
         else:
-            return Workflow.__create(name=name, dry_run=False, root_output_dir=root_output_dir)
+            return Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir)
         
     
     @staticmethod
@@ -434,7 +434,7 @@ class Workflow(models.Model):
         self.run_batch(batch=batch)
         return self.wait(batch=batch)
 
-    def finished(self,delete_unused_batches=True):
+    def finished(self,delete_unused_batches=False):
         """
         Call at the end of every workflow.
         If there any left over jobs that have not been collected,

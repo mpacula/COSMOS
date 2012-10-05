@@ -181,7 +181,7 @@ def yield_fields(manpage):
         txt = re.sub("\s\s+"," ",txt)
         yield (name,i,txt)
         
-def get_stat_fields():
+def get_stat_and_status_fields():
     """
     Returns a list of all the items in /proc/pid/stat
     [('name of field1', column #1, "description1"),

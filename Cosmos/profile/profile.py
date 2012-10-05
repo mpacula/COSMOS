@@ -3,7 +3,8 @@
      
     polls these fields from /proc/pid/stat:
     see "man proc" for more info, or see read_man_proc.py
-    minflt, cminflt, majflt, utime, stime, cutime, cstime, priority, nice, num_threads, rsslim, exit_signal, delayacct_blkio_ticks
+    minflt, cminflt, majflt, utime, stime, cutime, cstime, priority, nice, num_threads, exit_signal, delayacct_blkio_ticks
+    *removed rsslim for now*
 
     polls these fields from /proc/pid/status:
     * FDSize: Number of file descriptor slots currently allocated.
@@ -24,12 +25,13 @@ import read_man_proc
 
 class Profile:
     fields_to_get = {'UPDATE': ['VmPeak','VmHWM'] + #/proc/status
-                               ['minflt','cminflt','majflt','utime','stime','cutime','cstime','nice','priority','exit_signal','delayacct_blkio_ticks','rsslim'], #/proc/stat
+                               ['minflt','cminflt','majflt','utime','stime','cutime','cstime','delayacct_blkio_ticks'], #/proc/stat
                      'INSERT': ['FDSize','VmSize','VmLck','VmRSS','VmData','VmLib','VmPTE'] + #/proc/status
                                ['num_threads'] #/proc/stat
                      }
     
     proc = None #the main subprocess object
+    poll_number = 0 #number of polls
     
     @property
     def all_pids(self):
@@ -44,11 +46,11 @@ class Profile:
         #Create Records Table
         insert_fields = self.fields_to_get['INSERT']
         sqfields = ', '.join(map(lambda x: x + ' INTEGER', insert_fields))
-        self.c.execute("CREATE TABLE record (pid INTEGER, {0})".format(sqfields))
+        self.c.execute("CREATE TABLE record (pid INTEGER, poll_number INTEGER, {0})".format(sqfields))
         #Create Processes Table
         update_fields = self.fields_to_get['UPDATE']
-        sqfields = ', '.join(map(lambda x: x + ' INTEGER', insert_fields))
-        self.c.execute("CREATE TABLE process (pid INTEGER PRIMARY KEY, name TEXT, {0})".format(update_fields))
+        sqfields = ', '.join(map(lambda x: x + ' INTEGER', update_fields))
+        self.c.execute("CREATE TABLE process (pid INTEGER PRIMARY KEY, poll_number INTEGER, name TEXT, {0})".format(sqfields))
         
     def _unnest(self,a_list):
         """
@@ -81,22 +83,31 @@ class Profile:
                 self.finish()
     
     def parseVal(self,val):
-        "Remove kB and return ints"
+        "Remove kB and return ints."
         return int(val) if val[-2:] != 'kB' else int(val[0:-3])
         
     def poll_all_procs(self):
         """Updates the sql table with all descendant processes' resource usage"""
+        self.poll_number = self.poll_number + 1
         for pid in self.all_pids:
             try:
                 all_stats = self.read_proc_stat(pid)
                 all_stats += self.read_proc_status(pid)
                 #Inserts
-                inserts = [ (name,self.parseVal(val)) for name,val in all_stats if name in self.fields_to_get['INSERT'] ] + [('pid',pid)]
+                inserts = [ (name,self.parseVal(val)) for name,val in all_stats if name in self.fields_to_get['INSERT'] ] + [('pid',pid),('poll_number',self.poll_number)]
                 keys,vals = zip(*inserts) #unzip
-                q = "INSERT into record ({keys}) values({s})".format(s = ','.join(['?']*len(vals)),
+                q = "INSERT INTO record ({keys}) values({s})".format(s = ','.join(['?']*len(vals)),
                                                                      keys = ', '.join(keys))
                 self.c.execute(q,vals)
                 #Updates
+                proc_name = filter(lambda x: x[0]=='Name' ,all_stats)[0][1]
+                updates = [ (name,self.parseVal(val)) for name,val in all_stats if name in self.fields_to_get['UPDATE'] ] + [('pid',pid),('Name',proc_name),('poll_number',self.poll_number)]
+                keys,vals = zip(*updates) #unzip
+                q = "INSERT OR REPLACE INTO process ({keys}) values({s})".format(s = ','.join(['?']*len(vals)),
+                                                                     keys = ', '.join(keys))
+                print q
+                print vals
+                self.c.execute(q,vals)
                 
             except IOError:
                 pass # job finished
@@ -106,7 +117,7 @@ class Profile:
         """
         :returns: (field_name,value) from /proc/pid/stat or None if its empty
         """
-        stat_fields = read_man_proc.get_stat_fields()
+        stat_fields = read_man_proc.get_stat_and_status_fields()
         with open('/proc/{0}/stat'.format(pid),'r') as f:
             stat_all = f.readline().split(' ')
             return map(lambda x: (x[0][0],x[1]),zip(stat_fields,stat_all))
@@ -123,11 +134,62 @@ class Profile:
         
         
     def analyze_records(self):
-        #self.c.execute('SELECT name,pid, MAX(FDSize), AVG(FDSize), MAX(VmPeak), AVG(VmSize), MAX(VmLck), AVG(VmLck), AVG(VmRSS), AVG(VmData), MAX(VmData), AVG(VmLib), MAX(VmPTE), AVG(VmPTE) FROM polls GROUP BY pid,name')
         import pprint
-        self.c.execute('SELECT * from record')
+        #descendant process summaries
+        self.c.execute("""
+            SELECT * FROM
+            (
+            SELECT pid, 
+            MAX(FDSize), AVG(FDSize), 
+            AVG(VmSize), 
+            MAX(VmLck), AVG(VmLck), 
+            AVG(VmRSS), 
+            MAX(VmData), AVG(VmData), 
+            MAX(VmLib), AVG(VmLib), 
+            MAX(VmPTE), AVG(VmPTE),
+            MAX(num_threads), AVG(num_threads) 
+            FROM record
+            GROUP BY pid ) as foo
+            JOIN
+            (SELECT * from process) as bar
+            on foo.pid=bar.pid
+            """)
         keys = [ x[0] for x in self.c.description]
-        pprint.pprint( [ json.dumps(dict(zip(keys,vals)),sort_keys=True) for vals in self.c ] )
+        pprint.pprint( [ dict(zip(keys,vals)) for vals in self.c ] )
+        
+        #Combined summary
+        self.c.execute("""
+            (SELECT pid, 
+            MAX(FDSize), AVG(FDSize), 
+            AVG(VmSize), 
+            MAX(VmLck), AVG(VmLck), 
+            AVG(VmRSS), 
+            MAX(VmData), AVG(VmData), 
+            MAX(VmLib), AVG(VmLib), 
+            MAX(VmPTE), AVG(VmPTE),
+            MAX(num_threads), AVG(num_threads) 
+            FROM
+                (
+                SELECT pid, 
+                SUM(FDSize),
+                SUM(VmSize), 
+                SUM(VmLck), 
+                SUM(VmLck), 
+                SUM(VmData),
+                SUM(VmLib), 
+                SUM(VmPTE),
+                SUM(num_threads)
+                FROM record
+                GROUP BY pid,poll_number )
+            ) as foo
+            JOIN
+            (SELECT * from process) as bar
+            on foo.pid=bar.pid
+            
+                """)
+        keys = [ x[0] for x in self.c.description]
+        pprint.pprint( [ dict(zip(keys,vals)) for vals in self.c ] )
+        
         
     
     def finish(self):

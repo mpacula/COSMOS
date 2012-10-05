@@ -177,10 +177,7 @@ def HaplotypeCaller(input_bam,output_bam,interval,glm):
     pass
 
 def UnifiedGenotyper(input_bams,output_bam,interval,glm):
-    """
-    need to make variant annotation a separate step since some annotations use multi-sample info
-    """
-    input_bams = ' '.join([ '-I {}'.format(ib) for ib in input_bams ])
+    input_bams = ' '.join([ '-I {0}'.format(ib) for ib in input_bams ])
     s = r"""
     {settings.GATK_cmd} \
     -T UnifiedGenotyper \
@@ -207,7 +204,8 @@ def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
         UNSORTED - Take the genotypes in any order.
         REQUIRE_UNIQUE - Require that all samples/genotypes be unique between all inputs.
     """
-    INPUTs = " \\\n".join(["--variant:{0},VCF {1}".format(vcf[0],vcf[1]) for vcf in input_vcfs])
+    #INPUTs = " \\\n".join(["--variant:{0},VCF {1}".format(vcf[0],vcf[1]) for vcf in input_vcfs])
+    INPUTs = " \\\n".join(["--variant {1}".format(vcf) for vcf in input_vcfs])
     s = r"""
     {settings.GATK_cmd} \
     -T CombineVariants \

@@ -62,9 +62,7 @@ if not B_bwa_sampe.successful:
                             outputs = {'sam':'sampe.sam'},
                             tags = tags,
                             mem_req=5000)
-    WF.run_wait(B_bwa_sampe)
-
-WF.restart_from_here()    
+    WF.run_wait(B_bwa_sampe)    
 
 #### Clean and Merge
 
@@ -95,7 +93,7 @@ if not B_merge_bams.successful:
                              mem_req=3500)
     WF.run_wait(B_merge_bams)    
 
-B_index = WF.add_batch("Index Merged Bams")
+B_index = WF.add_batch("Index Merged Cleaned Bams")
 if not B_index.successful:
     for n in B_merge_bams.nodes:
         B_index.add_node(name=n.name,
@@ -186,7 +184,7 @@ def MergeAndIndexBySample(input_batch,name1,name2):
         WF.run_wait(B_index)    
     return B_merge_bams, B_index
 
-B_merge_bams_sample, B_index = MergeAndIndexBySample(B_PR,"Merge Bams by Sample","Index Merged Bams")
+B_merge_bams_sample, B_index = MergeAndIndexBySample(B_PR,"Merge Bams by Sample","Index Merged Sample Bams")
 
 
 ### Genotype
@@ -196,7 +194,7 @@ if not B_UG.successful:
     input_bams = [ n.output_paths['bam'] for n in B_merge_bams_sample.nodes ]
     for chrom in contigs:
         for glm in ['INDEL','SNP']:
-            B_UG.add_node(name='{1} chr{2}'.format(glm,chrom),
+            B_UG.add_node(name='{0} chr{1}'.format(glm,chrom),
                           pcmd = commands.UnifiedGenotyper(input_bams=input_bams,
                                                         output_bam='{output_dir}/{outputs[vcf]}',
                                                         glm=glm,
@@ -208,27 +206,27 @@ if not B_UG.successful:
     WF.run_wait(B_UG)
 
 ### Merge VCFS
-B_CV2 = WF.add_batch(name="Combine Variants")
-if not B_CV2.successful:
+B_CV = WF.add_batch(name="Combine Variants")
+if not B_CV.successful:
     for tags,input_nodes in B_UG.group_nodes_by('glm'):
-        glm_vcfs = [ (n.tags['sample'],n.output_paths['vcf']) for n in input_nodes ]
-        B_CV2.add_node(name=tags['glm'],
+        glm_vcfs = [ n.output_paths['vcf'] for n in input_nodes ]
+        B_CV.add_node(name=tags['glm'],
                       pcmd=commands.CombineVariants(input_vcfs=glm_vcfs,
                                                    output_vcf="{output_dir}/{outputs[vcf]}",
-                                                   genotypeMergeOptions='PRIORITIZE'),
+                                                   genotypeMergeOptions='UNSORTED'),
                       tags=tags,
                       outputs={'vcf':'raw.vcf'},
                       mem_req=3000)
-    WF.run_wait(B_CV2)
+    WF.run_wait(B_CV)
 
 
 ### Variant Recalibration
 
 B_VQR = WF.add_batch(name="Variant Quality Recalibration")
 if not B_VQR.successful:
-    for n in B_UG.nodes:
+    for n in B_CV.nodes:
         input_vcf = n.output_paths['vcf']
-        B_VQR.add_node(name=n.tags['glm'],
+        B_VQR.add_node(name=n.name,
                        pcmd=commands.VariantQualityRecalibration(input_vcf=input_vcf,
                                                                 inbreedingcoeff=False,
                                                                 output_recal="{output_dir}/{outputs[recal]}",

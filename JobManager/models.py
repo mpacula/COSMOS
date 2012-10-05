@@ -166,17 +166,21 @@ class JobAttempt(models.Model):
                 time = f.read().strip()
                 letter2timeVal = dict([ tuple(re.split(':',x)) for x in re.split('\s',time) ])
                 letter2name = dict([ (f.help_text[0:1],f.name) for f in filter(lambda f: f.name in self.time_fields_as_list,self._meta.fields) ])
-                for letter,timeVal in letter2timeVal.items():
-                    n = letter2name[letter]
-                    if n in ['user_time','system_time','wall_time']:
-                        val = round(float(timeVal))
-                    elif n == 'percent_cpu':
-                        val = int(timeVal[0:-1])
-                    else:
-                        val = int(timeVal)
-                    setattr(self,n,val)
-                self.cpu_time = self.user_time+self.system_time
-                self.save()
+                
+                try:
+                    for letter,timeVal in letter2timeVal.items():
+                        n = letter2name[letter]
+                        if n in ['user_time','system_time','wall_time']:
+                            val = round(float(timeVal))
+                        elif n == 'percent_cpu':
+                            val = int(timeVal[0:-1])
+                        else:
+                            val = int(timeVal)
+                        setattr(self,n,val)
+                    self.cpu_time = self.user_time+self.system_time
+                    self.save()
+                except Exception as e:
+                    print e
     
     def createJobTemplate(self,base_template):
         """
