@@ -1,3 +1,7 @@
+import subprocess,time,sys,re,os,sqlite3,collections,json
+import read_man_proc
+import argparse
+
 """
     Sample some process statistics from /proc/[pid]/status
      
@@ -20,12 +24,10 @@
     And returns:
     MAX(FDSize), AVG(FDSize), MAX(VmPeak), AVG(VmSize), MAX(VmLck), AVG(VmLck), AVG(VmRSS), AVG(VmData), MAX(VmData), AVG(VmLib), MAX(VmPTE), AVG(VmPTE) 
 """
-import subprocess,time,sys,re,os,sqlite3,json
-import read_man_proc
 
 class Profile:
     fields_to_get = {'UPDATE': ['VmPeak','VmHWM'] + #/proc/status
-                               ['minflt','cminflt','majflt','utime','stime','cutime','cstime','delayacct_blkio_ticks'], #/proc/stat
+                               ['minflt','cminflt','cmajflt','cutime','cstime','majflt','utime','stime','delayacct_blkio_ticks'], #/proc/stat removed 
                      'INSERT': ['FDSize','VmSize','VmLck','VmRSS','VmData','VmLib','VmPTE'] + #/proc/status
                                ['num_threads'] #/proc/stat
                      }
@@ -51,21 +53,28 @@ class Profile:
         update_fields = self.fields_to_get['UPDATE']
         sqfields = ', '.join(map(lambda x: x + ' INTEGER', update_fields))
         self.c.execute("CREATE TABLE process (pid INTEGER PRIMARY KEY, poll_number INTEGER, name TEXT, {0})".format(sqfields))
-        
+    
+    #Not Using, only when i want to monitor all descendants
     def _unnest(self,a_list):
         """
         unnests a list
         
         .. example::
         >>> _unnest([1,2,[3,4],[5]])
-        >>> [1,2,3,4,5]
+        [1,2,3,4,5]
         """
         return [ item for items in a_list for item in items ]
-    
-    def and_descendants(self,pid):
-        """Returns a list of this pid and all of its descendent process (children's children, etc) ids"""
-        p = subprocess.Popen('ps h --ppid {0} -o pid'.format(pid),shell=True,stdout=subprocess.PIPE)
+
+    def get_children(self,pid):
+        "returns a list of this pid's children"
+        p = subprocess.Popen('/bin/ps h --ppid {0} -o pid'.format(pid).split(' '),shell=False,stdout=subprocess.PIPE)
         children = map(lambda x: x.strip(),filter(lambda x: x!='',p.communicate()[0].strip().split('\n')))
+        return children
+    
+    #Not Using, only when i want to monitor all descendants
+    def and_descendants(self,pid):
+        "Returns a list of this pid and all of its descendant process (children's children, etc) ids"
+        children = self.get_children(pid)
         
         if len(children) == 0:
             return [pid]
@@ -73,23 +82,27 @@ class Profile:
             return [pid] + self._unnest([ self.and_descendants(int(child)) for child in children ])
     
     
-    def run(self):
-        """Runs a process and records the memory usage of it and all of its descendants"""
-        self.proc = subprocess.Popen(self.command, shell=True)
+    def run(self,output_file=None):
+        """
+        Runs a process and records the memory usage of it and all of its descendants"""
+        self.start_time = time.time()
+        self.proc = subprocess.Popen(self.command,shell=True)
         while True:
-            self.poll_all_procs()
+            pids = self.all_pids
+            self.poll_all_procs(pids=pids)
             time.sleep(1)
             if self.proc.poll() != None:
-                self.finish()
+                self.end_time = time.time()
+                self.finish(output_file=output_file)
     
     def parseVal(self,val):
         "Remove kB and return ints."
         return int(val) if val[-2:] != 'kB' else int(val[0:-3])
         
-    def poll_all_procs(self):
+    def poll_all_procs(self,pids):
         """Updates the sql table with all descendant processes' resource usage"""
         self.poll_number = self.poll_number + 1
-        for pid in self.all_pids:
+        for pid in pids:
             try:
                 all_stats = self.read_proc_stat(pid)
                 all_stats += self.read_proc_status(pid)
@@ -105,8 +118,6 @@ class Profile:
                 keys,vals = zip(*updates) #unzip
                 q = "INSERT OR REPLACE INTO process ({keys}) values({s})".format(s = ','.join(['?']*len(vals)),
                                                                      keys = ', '.join(keys))
-                print q
-                print vals
                 self.c.execute(q,vals)
                 
             except IOError:
@@ -134,69 +145,97 @@ class Profile:
         
         
     def analyze_records(self):
-        import pprint
-        #descendant process summaries
+        #Summarize poll information
         self.c.execute("""
-            SELECT * FROM
-            (
-            SELECT pid, 
-            MAX(FDSize), AVG(FDSize), 
-            AVG(VmSize), 
-            MAX(VmLck), AVG(VmLck), 
-            AVG(VmRSS), 
-            MAX(VmData), AVG(VmData), 
-            MAX(VmLib), AVG(VmLib), 
-            MAX(VmPTE), AVG(VmPTE),
-            MAX(num_threads), AVG(num_threads) 
+            --average and max of cross sections at each poll
+            SELECT
+                num_polls,
+                num_processes,
+                MAX(FDSize) as max_fdsize_mem, AVG(FDSize) as avg_fdsize_mem, 
+                MAX(VmSize) as max_virtual_mem, AVG(VmSize) as avg_virtual_mem, 
+                MAX(VmLck) as max_locked_mem, AVG(VmLck) as avg_locked_mem, 
+                MAX(VmRSS) as max_rss_mem, AVG(VmRSS) as avg_rss_mem, 
+                MAX(VmData) as max_data_mem, AVG(VmData) as avg_data_mem, 
+                MAX(VmLib) as max_lib_mem, AVG(VmLib) as avg_lib_mem, 
+                MAX(VmPTE) as max_pte_mem, AVG(VmPTE) as avg_pte_mem,
+                MAX(num_threads) as max_num_threads, AVG(num_threads) as avg_num_threads
+            FROM
+            --sum up resource usage of all processes at each poll (1 cross section)
+            (SELECT
+                Max(poll_number) as num_polls,
+                Count(pid) as num_processes,
+                SUM(FDSize) as FDSize, 
+                SUM(VmSize) as VmSize,
+                SUM(VmRSS) as VmRSS, 
+                SUM(VmLck) as VmLck, 
+                SUM(VmData) as VmData, 
+                SUM(VmLib) as VmLib,  
+                SUM(VmPTE) as VmPTE, 
+                SUM(num_threads) as num_threads,
+                SUM(FDSize) as FDSize
             FROM record
-            GROUP BY pid ) as foo
-            JOIN
-            (SELECT * from process) as bar
-            on foo.pid=bar.pid
+            GROUP BY poll_number )
             """)
         keys = [ x[0] for x in self.c.description]
-        pprint.pprint( [ dict(zip(keys,vals)) for vals in self.c ] )
+        profiled_inserts = zip(keys,self.c.next())
         
-        #Combined summary
+        #Get process information
         self.c.execute("""
-            (SELECT pid, 
-            MAX(FDSize), AVG(FDSize), 
-            AVG(VmSize), 
-            MAX(VmLck), AVG(VmLck), 
-            AVG(VmRSS), 
-            MAX(VmData), AVG(VmData), 
-            MAX(VmLib), AVG(VmLib), 
-            MAX(VmPTE), AVG(VmPTE),
-            MAX(num_threads), AVG(num_threads) 
-            FROM
-                (
-                SELECT pid, 
-                SUM(FDSize),
-                SUM(VmSize), 
-                SUM(VmLck), 
-                SUM(VmLck), 
-                SUM(VmData),
-                SUM(VmLib), 
-                SUM(VmPTE),
-                SUM(num_threads)
-                FROM record
-                GROUP BY pid,poll_number )
-            ) as foo
-            JOIN
-            (SELECT * from process) as bar
-            on foo.pid=bar.pid
-            
-                """)
+            SELECT
+                group_concat(name) as names,
+                group_concat(pid) as pids,
+                SUM(delayacct_blkio_ticks) as block_io_delays,
+                SUM(utime) as user_time,
+                SUM(stime) as system_time,
+                MAX(cutime) as c_user_time,
+                MAX(cstime) as c_system_time,
+                SUM(majflt) as major_page_faults,
+                SUM(minflt) as minor_page_faults,
+                MAX(cminflt) as c_minor_page_faults,
+                MAX(cmajflt) as c_major_page_faults
+            FROM process
+            """)
+        
         keys = [ x[0] for x in self.c.description]
-        pprint.pprint( [ dict(zip(keys,vals)) for vals in self.c ] )
+        profiled_updates = zip(keys,self.c.next())
+       
         
-        
+#        self.c.execute("SELECT * FROM process")
+#        keys = [ x[0] for x in self.c.description]
+#        pprint.pprint([dict(zip(keys,vals)) for vals in self.c])
+        json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode('{"foo":1, "bar": 2}')
+        profiled_procs = collections.OrderedDict(profiled_inserts + profiled_updates)
+
+        profiled_procs['wall_time'] = self.end_time - self.start_time
+        profiled_procs['cpu_time'] = profiled_procs['user_time'] + profiled_procs['system_time']
+        profiled_procs['percent_cpu'] = round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)
+        profiled_procs['SC_CLK_TCK'] = os.sysconf(os.sysconf_names['SC_CLK_TCK'])# usually is 100, aka centiseconds 
+        return profiled_procs
     
-    def finish(self):
-        self.analyze_records()
+    def finish(self,output_file):
+        result = self.analyze_records()
+        if output_file:
+            with open(output_file,'w') as f:
+                f.write(json.dumps(result,indent=4))
+        else:
+            print 'Profile:'
+            print json.dumps(result,indent=4)
         sys.exit(self.proc.poll())
 
 if __name__ == '__main__':
-    profile = Profile('wc -l ~/Downloads/Revolution.2012.S01E01.720p.HDTV.X264-DIMENSION.mkv')
-    profile = Profile('sleep 3')
-    profile.run()
+    #Argparse
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('-f', '--file', nargs=1, type=argparse.FileType('w'), help='File to store output to')
+    #parser.add_argument('-d', '-dump', action="store_true", help='dump all data')
+    parser.add_argument('command', nargs=argparse.REMAINDER,help="The command to run.  Required.")
+    args = parser.parse_args()
+    if len(args.command)==0:
+        parser.print_help()
+        sys.exit(1)
+    
+    #Run Profile
+    p = Profile(command=' '.join(args.command))
+    result = p.run(output_file=args.file)
+    print json.dumps(result,indent=4)
+    
+    

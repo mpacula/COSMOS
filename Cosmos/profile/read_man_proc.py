@@ -175,7 +175,7 @@ manpage ="""      pid %d      The process ID.
 import re
 
 def yield_fields(manpage):
-    parts = re.split("\n\n",manpage)
+    parts = re.split("\n\s*\n",manpage)
     for i,part in enumerate(parts):
         name,x,txt = re.search("(.+?)\s(.+?)\s+(.*)",part.strip(),re.DOTALL).groups()
         txt = re.sub("\s\s+"," ",txt)
@@ -191,4 +191,7 @@ def get_stat_and_status_fields():
     You can easily convert to a dict using dict(get_fields())
     """
     return [ field for field in yield_fields(manpage) ]
-    
+
+if __name__ == '__main__':
+    import pprint
+    pprint.pprint(get_stat_and_status_fields(),indent=2)
