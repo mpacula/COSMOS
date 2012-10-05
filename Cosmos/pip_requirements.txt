@@ -1,0 +1,12 @@
+Django==1.4.1
+MySQL-python==1.2.3
+South==0.7.6
+argh==0.15.1
+argparse==1.2.1
+django-debug-toolbar==0.9.4
+django-extensions==0.9
+django-pdb==0.3.2
+django-picklefield==0.2.1
+drmaa==0.5
+gunicorn==0.14.6
+ipython==0.13

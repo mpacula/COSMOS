@@ -581,7 +581,7 @@ class Batch(models.Model):
             if status == 'in_progress' or status == 'failed':
                 return 1
             return 0
-        r = round(100 * float(done) / float(total))
+        r = int(100 * float(done) / float(total))
         return r if r > 1 else 1
     
     @property

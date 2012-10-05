@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load extras %}
+{%block content%}
+
+<ul class="breadcrumb">
+  <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
+  <li><a href="{{batch.workflow.url }}">{{batch.workflow}}</a> <span class="divider">/</span></li>
+  <li class="active">{{batch}}</li>
+</ul>
+{% with details=1 %}
+{%include "Workflow/Batch/batch.html"%}
+{% endwith %}
+<h3>Nodes</h3>
+<div class="accordion" id="accordion2">
+	<div class="accordion-group">
+		<div class="accordion-heading">
+			<a class="accordion-toggle" data-toggle="collapse" data-parent="#accordion2" href="#collapseOne">
+			<button class="bt btn-inverse btn-large">Filter</button>
+			</a>
+		</div>
+		<div id="collapseOne" class="accordion-body collapse">
+			<div class="accordion-inner">
+				<form method="GET" action="{{ request.url }}" class="form-horizontal">
+					<input type="hidden" name="filter" value="True"/>
+					{% csrf_token %}
+					{% for key,values in filter_choices.items %}
+				 	<div class="control-group">
+					<label class="control-label" for="id_{{key}}">{%if key == "f_status"%}status{%else%}{{key}}{%endif%}</label>
+					<div class="controls">
+					<select id="id_{{key}}" name="{{key}}">
+							<option value="{{v}}"{%if current_filters.key == "" %}selected="selected"{%endif%}></option>
+						{%for v in values%}
+							<option value="{{v}}"{%if current_filters|key2val:key == v %}selected="selected"{%endif%}>{{v}}</option>
+						{%endfor%}
+					</select>
+					</div>
+					</div>
+					{%endfor%}
+					<div class="controls">
+					<input type="submit" value="filter" class="btn btn-primary">
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+
+</div>
+
+{% if paged_nodes.paginator.num_pages > 1 %}
+	{% if paged_nodes.paginator.page_range|length <= 10 %}
+	<div class="pagination">
+	{%else%}
+	<div class="pagination_big">
+	{%endif%}
+	    <span class="step-links">
+	        <ul>
+	        {% if paged_nodes.has_previous %}
+	            <li><a href="?page={{ paged_nodes.previous_page_number }}{{filter_url}}">«</a></li>
+	        {% endif %}
+	        {% for pagenum in paged_nodes.paginator.page_range%}
+	            <li {%if pagenum == paged_nodes.number%}class="active"{%endif%}><a href="?page={{pagenum}}{{filter_url}}">{{pagenum|add:"-1"|mult:page_size|add:"1"}} -
+				{%if forloop.last %} {{paged_nodes.paginator.count}}
+				{%else%}
+				 {{pagenum|mult:page_size}}{%endif%}</a>{% if paged_nodes.paginator.page_range|length > 10 %}, {%endif%}</li>
+	        	{%endfor %}
+	
+	        {% if paged_nodes.has_next %}
+	            <li><a href="?page={{ paged_nodes.next_page_number }}{{filter_url}}">»</a></li>
+	        {% endif %}
+	        </ul>
+	    </span>
+	</div>
+{% endif %}
+
+<table class="table table-hover table-striped">
+{% for node in paged_nodes %}
+    <tr><td>
+        {%if node.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
+        {%if node.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
+        <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong>
+        (status: {{node.status}}, 
+        file_size: {%if settings.show_batch_file_sizes%}{{node.file_size}}{%else%}OFF{%endif%}, 
+        time_to_run: {{node.time_to_run|format_time}}, 
+        successful: {{node.successful}})
+        <ul>
+        {% for j in node.jobAttempts %}
+            <li style="list-style-type:none">
+                {% with qs=j.queue_status %}
+                    {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
+	                {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
+	                {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
+	                	{%with ds=j.get_drmaa_status %}
+			                {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
+		                    {%if ds == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
+	                	{% endwith%}
+	                {%endif%}
+                {% endwith%}
+                <a href="{{j.url}}">{{ j }}</a>
+            </li>
+        {% empty %}
+          No job attempts in this node.
+        {% endfor %}
+        </ul>
+    </td></tr>
+{% empty %}
+  No nodes.
+{% endfor %}
+</table>
+
+{% endblock %}
