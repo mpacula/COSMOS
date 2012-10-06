@@ -1,4 +1,4 @@
-import subprocess,time,sys,re,os,sqlite3,collections,json
+import subprocess,time,sys,re,os,sqlite3,json,signal
 import read_man_proc
 import argparse
 
@@ -27,7 +27,7 @@ import argparse
 
 class Profile:
     fields_to_get = {'UPDATE': ['VmPeak','VmHWM'] + #/proc/status
-                               ['minflt','cminflt','cmajflt','cutime','cstime','majflt','utime','stime','delayacct_blkio_ticks'], #/proc/stat removed 
+                               ['minflt','majflt','utime','stime','delayacct_blkio_ticks','voluntary_ctxt_switches','nonvoluntary_ctxt_switches'], #/proc/stat removed 
                      'INSERT': ['FDSize','VmSize','VmLck','VmRSS','VmData','VmLib','VmPTE'] + #/proc/status
                                ['num_threads'] #/proc/stat
                      }
@@ -40,11 +40,13 @@ class Profile:
         """This main process and all of its descendant's pids"""
         return self.and_descendants(os.getpid())
     
-    def __init__(self,command,poll_interval=1):
+    def __init__(self,command,poll_interval=1,output_file=None):
         self.command = command
         self.poll_interval = poll_interval
+        self.output_file = output_file
         self.conn = sqlite3.connect(':memory:')
         self.c = self.conn.cursor()
+        
         #Create Records Table
         insert_fields = self.fields_to_get['INSERT']
         sqfields = ', '.join(map(lambda x: x + ' INTEGER', insert_fields))
@@ -53,7 +55,9 @@ class Profile:
         update_fields = self.fields_to_get['UPDATE']
         sqfields = ', '.join(map(lambda x: x + ' INTEGER', update_fields))
         self.c.execute("CREATE TABLE process (pid INTEGER PRIMARY KEY, poll_number INTEGER, name TEXT, {0})".format(sqfields))
-    
+
+
+
     #Not Using, only when i want to monitor all descendants
     def _unnest(self,a_list):
         """
@@ -82,7 +86,7 @@ class Profile:
             return [pid] + self._unnest([ self.and_descendants(int(child)) for child in children ])
     
     
-    def run(self,output_file=None):
+    def run(self):
         """
         Runs a process and records the memory usage of it and all of its descendants"""
         self.start_time = time.time()
@@ -92,8 +96,7 @@ class Profile:
             self.poll_all_procs(pids=pids)
             time.sleep(1)
             if self.proc.poll() != None:
-                self.end_time = time.time()
-                self.finish(output_file=output_file)
+                self.finish()
     
     def parseVal(self,val):
         "Remove kB and return ints."
@@ -187,12 +190,12 @@ class Profile:
                 SUM(delayacct_blkio_ticks) as block_io_delays,
                 SUM(utime) as user_time,
                 SUM(stime) as system_time,
-                MAX(cutime) as c_user_time,
-                MAX(cstime) as c_system_time,
                 SUM(majflt) as major_page_faults,
                 SUM(minflt) as minor_page_faults,
-                MAX(cminflt) as c_minor_page_faults,
-                MAX(cmajflt) as c_major_page_faults
+                MAX(VmPeak) as single_proc_max_peak_virtual_rss,
+                MAX(VmHWM) as single_proc_max_peak_rss,
+                SUM(voluntary_ctxt_switches) as voluntary_context_switches,
+                SUM(nonvoluntary_ctxt_switches) as nonvoluntary_context_switches
             FROM process
             """)
         
@@ -203,39 +206,46 @@ class Profile:
 #        self.c.execute("SELECT * FROM process")
 #        keys = [ x[0] for x in self.c.description]
 #        pprint.pprint([dict(zip(keys,vals)) for vals in self.c])
-        json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode('{"foo":1, "bar": 2}')
-        profiled_procs = collections.OrderedDict(profiled_inserts + profiled_updates)
+        profiled_procs = dict(profiled_inserts + profiled_updates)
 
-        profiled_procs['wall_time'] = self.end_time - self.start_time
+        SC_CLK_TCK = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
+        profiled_procs['wall_time'] = (self.end_time - self.start_time) * SC_CLK_TCK
         profiled_procs['cpu_time'] = profiled_procs['user_time'] + profiled_procs['system_time']
         profiled_procs['percent_cpu'] = round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)
-        profiled_procs['SC_CLK_TCK'] = os.sysconf(os.sysconf_names['SC_CLK_TCK'])# usually is 100, aka centiseconds 
+        profiled_procs['exit_status'] = self.proc.poll()
+        profiled_procs['SC_CLK_TCK'] = SC_CLK_TCK #usually is 100, aka centiseconds 
         return profiled_procs
     
-    def finish(self,output_file):
+    def finish(self):
+        print 'test'
+        self.end_time = time.time()
         result = self.analyze_records()
-        if output_file:
-            with open(output_file,'w') as f:
-                f.write(json.dumps(result,indent=4))
+        if self.output_file != None:
+            self.output_file.write(json.dumps(result,indent=4))
         else:
-            print 'Profile:'
-            print json.dumps(result,indent=4)
-        sys.exit(self.proc.poll())
+            print >>sys.stderr, 'Profile:'
+            print >>sys.stderr, json.dumps(result,indent=4)
+            sys.stdout.flush()
+            sys.exit(result['exit_status'])
+
 
 if __name__ == '__main__':
     #Argparse
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('-f', '--file', nargs=1, type=argparse.FileType('w'), help='File to store output to')
+    parser.add_argument('-f', '--file', type=argparse.FileType('w'), help='File to store output to')
     #parser.add_argument('-d', '-dump', action="store_true", help='dump all data')
-    parser.add_argument('command', nargs=argparse.REMAINDER,help="The command to run.  Required.")
+    parser.add_argument('command', nargs=argparse.REMAINDER,help="The command to run. Required.")
     args = parser.parse_args()
     if len(args.command)==0:
         parser.print_help()
         sys.exit(1)
-    
+
     #Run Profile
-    p = Profile(command=' '.join(args.command))
-    result = p.run(output_file=args.file)
-    print json.dumps(result,indent=4)
+    profile = Profile(command=' '.join(args.command),output_file=args.file)
+    try:
+        result = profile.run()
+    except:
+        os.kill(profile.proc.pid,signal.SIGINT)
+        profile.finish()
     
     
