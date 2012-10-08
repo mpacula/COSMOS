@@ -1,9 +1,11 @@
 import subprocess,time,sys,re,os,sqlite3,json,signal
 import read_man_proc
+import logging
 import argparse
 
 """
-    Sample some process statistics from /proc/[pid]/status
+    Samples resource usage statistics about a process and all of its descendants from /proc/[pid]/status
+    The output is a JSON dictionary that summarizes the resource usage
      
     polls these fields from /proc/pid/stat:
     see "man proc" for more info, or see read_man_proc.py
@@ -25,6 +27,7 @@ import argparse
     MAX(FDSize), AVG(FDSize), MAX(VmPeak), AVG(VmSize), MAX(VmLck), AVG(VmLck), AVG(VmRSS), AVG(VmData), MAX(VmData), AVG(VmLib), MAX(VmPTE), AVG(VmPTE) 
 """
 
+
 class Profile:
     fields_to_get = {'UPDATE': ['VmPeak','VmHWM'] + #/proc/status
                                ['minflt','majflt','utime','stime','delayacct_blkio_ticks','voluntary_ctxt_switches','nonvoluntary_ctxt_switches'], #/proc/stat removed 
@@ -33,18 +36,23 @@ class Profile:
                      }
     
     proc = None #the main subprocess object
-    poll_number = 0 #number of polls
+    poll_number = 0 #number of polls so far
     
     @property
     def all_pids(self):
         """This main process and all of its descendant's pids"""
         return self.and_descendants(os.getpid())
     
-    def __init__(self,command,poll_interval=1,output_file=None):
+    def __init__(self,command,poll_interval=1,output_file=None,database_file=':memory:'):
         self.command = command
         self.poll_interval = poll_interval
         self.output_file = output_file
-        self.conn = sqlite3.connect(':memory:')
+        self.database_file = database_file
+        
+        #Setup SQLite
+        if os.path.exists(database_file):
+            os.unlink(database_file)
+        self.conn = sqlite3.connect(database_file)
         self.c = self.conn.cursor()
         
         #Create Records Table
@@ -55,10 +63,10 @@ class Profile:
         update_fields = self.fields_to_get['UPDATE']
         sqfields = ', '.join(map(lambda x: x + ' INTEGER', update_fields))
         self.c.execute("CREATE TABLE process (pid INTEGER PRIMARY KEY, poll_number INTEGER, name TEXT, {0})".format(sqfields))
+        
+        #setup logging
+        self.log=logging
 
-
-
-    #Not Using, only when i want to monitor all descendants
     def _unnest(self,a_list):
         """
         unnests a list
@@ -75,7 +83,6 @@ class Profile:
         children = map(lambda x: x.strip(),filter(lambda x: x!='',p.communicate()[0].strip().split('\n')))
         return children
     
-    #Not Using, only when i want to monitor all descendants
     def and_descendants(self,pid):
         "Returns a list of this pid and all of its descendant process (children's children, etc) ids"
         children = self.get_children(pid)
@@ -85,16 +92,15 @@ class Profile:
         else: 
             return [pid] + self._unnest([ self.and_descendants(int(child)) for child in children ])
     
-    
     def run(self):
         """
         Runs a process and records the memory usage of it and all of its descendants"""
         self.start_time = time.time()
         self.proc = subprocess.Popen(self.command,shell=True)
         while True:
-            pids = self.all_pids
-            self.poll_all_procs(pids=pids)
-            time.sleep(1)
+            self.poll_all_procs(pids=self.all_pids)
+            
+            time.sleep(self.poll_interval)
             if self.proc.poll() != None:
                 self.finish()
     
@@ -124,7 +130,7 @@ class Profile:
                 self.c.execute(q,vals)
                 
             except IOError:
-                pass # job finished
+                pass # process finished between before file could be read
                  
         
     def read_proc_stat(self,pid):
@@ -148,7 +154,10 @@ class Profile:
         
         
     def analyze_records(self):
-        #Summarize poll information
+        """
+        Summarizes and aggregates all the resource usage of self.all_pids
+        """
+        #aggregate and summarize all the polls
         self.c.execute("""
             --average and max of cross sections at each poll
             SELECT
@@ -163,7 +172,7 @@ class Profile:
                 MAX(VmPTE) as max_pte_mem, AVG(VmPTE) as avg_pte_mem,
                 MAX(num_threads) as max_num_threads, AVG(num_threads) as avg_num_threads
             FROM
-            --sum up resource usage of all processes at each poll (1 cross section)
+            --sum up resource usage of all processes at each poll (=1 cross section)
             (SELECT
                 Max(poll_number) as num_polls,
                 Count(pid) as num_processes,
@@ -182,7 +191,7 @@ class Profile:
         keys = [ x[0] for x in self.c.description]
         profiled_inserts = zip(keys,self.c.next())
         
-        #Get process information
+        #Summarize the updates
         self.c.execute("""
             SELECT
                 group_concat(name) as names,
@@ -201,29 +210,27 @@ class Profile:
         
         keys = [ x[0] for x in self.c.description]
         profiled_updates = zip(keys,self.c.next())
-       
         
-#        self.c.execute("SELECT * FROM process")
-#        keys = [ x[0] for x in self.c.description]
-#        pprint.pprint([dict(zip(keys,vals)) for vals in self.c])
+        self.c.execute("SELECT * FROM process")
+        keys = [ x[0] for x in self.c.description]
+        self.log.debug([dict(zip(keys,vals)) for vals in self.c])
+        
         profiled_procs = dict(profiled_inserts + profiled_updates)
-
         SC_CLK_TCK = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
         profiled_procs['wall_time'] = (self.end_time - self.start_time) * SC_CLK_TCK
         profiled_procs['cpu_time'] = profiled_procs['user_time'] + profiled_procs['system_time']
         profiled_procs['percent_cpu'] = round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)
         profiled_procs['exit_status'] = self.proc.poll()
-        profiled_procs['SC_CLK_TCK'] = SC_CLK_TCK #usually is 100, aka centiseconds 
+        profiled_procs['SC_CLK_TCK'] = SC_CLK_TCK #usually is 100, or centiseconds 
         return profiled_procs
     
     def finish(self):
-        print 'test'
+        """Executed when self.proc has finished"""
         self.end_time = time.time()
         result = self.analyze_records()
         if self.output_file != None:
             self.output_file.write(json.dumps(result,indent=4))
         else:
-            print >>sys.stderr, 'Profile:'
             print >>sys.stderr, json.dumps(result,indent=4)
             sys.stdout.flush()
             sys.exit(result['exit_status'])
@@ -232,8 +239,9 @@ class Profile:
 if __name__ == '__main__':
     #Argparse
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('-f', '--file', type=argparse.FileType('w'), help='File to store output to')
-    #parser.add_argument('-d', '-dump', action="store_true", help='dump all data')
+    parser.add_argument('-f', '--file', type=argparse.FileType('w'), help='File to store output of profile to.')
+    parser.add_argument('-i', '--interval', type=int, default=1, help='How often to poll the resource usage information in /proc, in seconds.')
+    parser.add_argument('-db', '--dbfile', type=str, default=':memory:', help='File to store sqlite data to (default is in memory).  Will overwrite if the database already exists.')
     parser.add_argument('command', nargs=argparse.REMAINDER,help="The command to run. Required.")
     args = parser.parse_args()
     if len(args.command)==0:
@@ -241,11 +249,13 @@ if __name__ == '__main__':
         sys.exit(1)
 
     #Run Profile
-    profile = Profile(command=' '.join(args.command),output_file=args.file)
+    profile = Profile(command=' '.join(args.command),output_file=args.file,database_file=args.dbfile,poll_interval=args.interval)
     try:
         result = profile.run()
-    except:
+    except KeyboardInterrupt:
         os.kill(profile.proc.pid,signal.SIGINT)
         profile.finish()
+    except:
+        raise
     
     

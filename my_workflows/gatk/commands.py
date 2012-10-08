@@ -197,7 +197,7 @@ def UnifiedGenotyper(input_bams,output_bam,interval,glm):
 
 def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
     """
-    :param input_vcfs: a list of (sample.name,file_path_to_vcf) tuples
+    :param input_vcfs: a list of paths to variants
     :param: genotypemergeoptions: select from the following
         UNIQUIFY - Make all sample genotypes unique by file. Each sample shared across RODs gets named sample.ROD.
         PRIORITIZE - Take genotypes in priority order (see the priority argument).
@@ -205,7 +205,7 @@ def CombineVariants(input_vcfs,output_vcf,genotypeMergeOptions):
         REQUIRE_UNIQUE - Require that all samples/genotypes be unique between all inputs.
     """
     #INPUTs = " \\\n".join(["--variant:{0},VCF {1}".format(vcf[0],vcf[1]) for vcf in input_vcfs])
-    INPUTs = " \\\n".join(["--variant {1}".format(vcf) for vcf in input_vcfs])
+    INPUTs = " \\\n".join(["--variant {0}".format(vcf) for vcf in input_vcfs])
     s = r"""
     {settings.GATK_cmd} \
     -T CombineVariants \
