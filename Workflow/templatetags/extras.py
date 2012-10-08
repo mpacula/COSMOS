@@ -38,12 +38,12 @@ def mult(value, arg):
 
 @register.simple_tag
 def format_resource_usage(in_field_name,val):
-    for units,field_names in JobAttempt.time_field_units.items():
-        if in_field_name in field_names:
-            if units == 'seconds':
-                return format_time(val)
-            elif units == 'kilobytes':
-                pass
+#    for units,field_names in JobAttempt.time_field_units.items():
+#        if in_field_name in field_names:
+#            if units == 'seconds':
+#                return format_time(val)
+#            elif units == 'kilobytes':
+#                pass
     return val
             
         

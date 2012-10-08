@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from JobManager.models import JobAttempt,JobManager
-import os,sys,re,logging
+import os,sys,re,logging,signal
 from Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from Cosmos import helpers
 from django.core.exceptions import ValidationError
@@ -9,7 +9,17 @@ from picklefield.fields import PickledObjectField
 from cosmos_session import cosmos_settings
 from django.utils import timezone
 
-waiting_on_workflow = None #set to whichever workflow has a wait().  used by ctrl_c to terminate it
+active_workflows = [] #set to whichever workflows have been started.  used by ctrl_c to know which workflow to terminate
+
+def ctrl_c(signal,frame):
+    for wf_id in active_workflows:
+        wf = Workflow.objects.get(pk=wf_id)
+        #if not wf._is_terminating():
+        wf.remote_terminate()
+try:
+    signal.signal(signal.SIGINT, ctrl_c)
+except ValueError: #signal only works in main thread
+    pass
 
 status_choices=(
                 ('successful','Successful'),
@@ -50,12 +60,22 @@ class Workflow(models.Model):
         check_and_create_output_dir(self.output_dir)
         
         self.log, self.log_path = get_workflow_logger(self)
+
         
     
     def terminate(self):
         """
-        Terminates this workflow.  Generally executing via the cli.py terminate
-        command line interface.  qdels all jobs and tells the workflow to terminate
+        Terminates this workflow.
+        """
+        self.remote_terminate()
+        self.finished()
+        sys.exit(1)
+        #self.log.warning('Executed {0}'.format(cmd))
+    
+    def remote_terminate(self):
+        """
+        Can be executed by a remote process to terminate this workflow.  Generally executed
+        via the cli.py terminate command line interface.  qdels all jobs and tells the workflow to terminate
         """
         self.log.warning("Terminating this workflow...")
         self._terminating = True
@@ -116,16 +136,20 @@ class Workflow(models.Model):
         
         name = re.sub("\s","_",name)
         
+        
         if root_output_dir is None:
             root_output_dir = cosmos_settings.default_root_output_dir
             
         if Workflow.objects.filter(name=name).count()>0:
             if restart:
-                return Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run)
+                wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run)
             else:
-                return Workflow.__resume(name=name, dry_run=dry_run)
+                wf = Workflow.__resume(name=name, dry_run=dry_run)
         else:
-            return Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir)
+            wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir)
+        
+        active_workflows.append(wf.id) #used by ctrl+c signal to terminate
+        return wf
         
     
     @staticmethod
@@ -326,7 +350,7 @@ class Workflow(models.Model):
                 
         #create command.sh that gets executed
         
-        jobAttempt = self.jobManager.addJobAttempt(command=node.exec_command,
+        jobAttempt = self.jobManager.add_jobAttempt(command=node.exec_command,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
                                      drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement))
@@ -335,7 +359,7 @@ class Workflow(models.Model):
         if self.dry_run:
             self.log.info('Dry Run: skipping submission of job {0}.'.format(jobAttempt))
         else:
-            self.jobManager.submitJob(jobAttempt)
+            self.jobManager.submit_job(jobAttempt)
             self.log.info('Submitted jobAttempt with drmaa jobid {0}.'.format(jobAttempt.drmaa_jobID))
         node.save()
         self.jobManager.save()
@@ -389,7 +413,7 @@ class Workflow(models.Model):
         else:
             self.log.info('Waiting on batch {0}...'.format(batch))
         
-        for jobAttempt in self.jobManager.yield_All_Queued_Jobs():
+        for jobAttempt in self.jobManager.yield_all_queued_jobs():
             node = jobAttempt.node
             #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,node,node.batch))
             nodes.append(node)

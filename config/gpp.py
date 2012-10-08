@@ -5,7 +5,6 @@ home_path = '/home/ch158749/workspace/Cosmos' #gpp
 default_root_output_dir = '/nas/erik/cosmos_output' #gpp
 DRM = 'LSF' #LSF, or GE
 tmp_dir = '/nas/erik/tmp'
-time_path = '/usr/bin/time'
 
 # Web interface settings
 show_batch_file_sizes = False # on some systems, file i/o slows down a lot when running a lot of jobs making this feature very slow

@@ -9,7 +9,7 @@ def terminate(args):
         raise CommandError('please choose a name OR an id')
     wf = Workflow.objects.get(pk=args.id)
     print "Telling {0} to terminate".format(wf)
-    wf.terminate()
+    wf.remote_terminate()
 
     #lsf qdel all: bjobs|cut -d " " -f 1 -|sed 1d|xargs -t -L 1 qdel
 

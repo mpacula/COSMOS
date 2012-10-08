@@ -44,7 +44,12 @@ class Profile:
         return self.and_descendants(os.getpid())
     
     def __init__(self,command,poll_interval=1,output_file=None,database_file=':memory:'):
-        self.command = command
+        def add_quotes(arg):
+            "quotes get stripped off by the shell when it interprets the command, so this adds them back in"
+            if re.search("\s",arg):
+                return "\""+arg+"\""
+            else: return arg
+        self.command = ' '.join(map(add_quotes, command))
         self.poll_interval = poll_interval
         self.output_file = output_file
         self.database_file = database_file
@@ -211,13 +216,13 @@ class Profile:
         keys = [ x[0] for x in self.c.description]
         profiled_updates = zip(keys,self.c.next())
         
-        self.c.execute("SELECT * FROM process")
-        keys = [ x[0] for x in self.c.description]
-        self.log.debug([dict(zip(keys,vals)) for vals in self.c])
+#        self.c.execute("SELECT * FROM process")
+#        keys = [ x[0] for x in self.c.description]
+#        self.log.debug([dict(zip(keys,vals)) for vals in self.c])
         
         profiled_procs = dict(profiled_inserts + profiled_updates)
         SC_CLK_TCK = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
-        profiled_procs['wall_time'] = (self.end_time - self.start_time) * SC_CLK_TCK
+        profiled_procs['wall_time'] = round((self.end_time - self.start_time) * SC_CLK_TCK)
         profiled_procs['cpu_time'] = profiled_procs['user_time'] + profiled_procs['system_time']
         profiled_procs['percent_cpu'] = round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)
         profiled_procs['exit_status'] = self.proc.poll()
@@ -229,11 +234,10 @@ class Profile:
         self.end_time = time.time()
         result = self.analyze_records()
         if self.output_file != None:
-            self.output_file.write(json.dumps(result,indent=4))
+            self.output_file.write(json.dumps(result,indent=4,sort_keys=True))
         else:
-            print >>sys.stderr, json.dumps(result,indent=4)
-            sys.stdout.flush()
-            sys.exit(result['exit_status'])
+            print >>sys.stderr, json.dumps(result,indent=4,sort_keys=True)
+        sys.exit(result['exit_status'])
 
 
 if __name__ == '__main__':
@@ -249,7 +253,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     #Run Profile
-    profile = Profile(command=' '.join(args.command),output_file=args.file,database_file=args.dbfile,poll_interval=args.interval)
+    profile = Profile(command=args.command,output_file=args.file,database_file=args.dbfile,poll_interval=args.interval)
     try:
         result = profile.run()
     except KeyboardInterrupt:
@@ -257,5 +261,3 @@ if __name__ == '__main__':
         profile.finish()
     except:
         raise
-    
-    

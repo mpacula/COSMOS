@@ -14,7 +14,7 @@
 
 <dl class="dl-horizontal">
 <dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
-<dt><em>time</em> Output</dt><dd><a href="{% url jobAttempt_time_output jobAttempt.id%}"><code>{{jobAttempt.time_output_path}}</code></a></dd>
+<dt><em>time</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
 <dt>Output Directory</dt><dd><code>{{jobAttempt.node.job_output_dir}}</code></dd>
 <dt>Node File Size</dt><dd>{%if settings.show_jobAttempt_file_sizes%}{{jobAttempt.file_size}}{%else%}OFF{%endif%}</dd>
 <dt>Outputs<strong></strong></dt>
@@ -35,9 +35,9 @@
 </dl>
 
 <h4>Resource Usage
-	 <i class="icon icon-resize-full" data-toggle="collapse" data-target="#demo" style="cursor:pointer"></i>
+	 <i class="icon icon-resize-full" data-toggle="collapse" data-target="#ru_table" style="cursor:pointer"></i>
 </h4>
-<div id="demo" class="collapse in ">
+<div id="ru_table" class="collapse">
 <table class='table table-condensed'>
 	<thead>
 	<tr><th>Name</th><th style="padding:0 35px">Value</th><th style="padding:0 35px">Type</th><th>Description</th></tr>

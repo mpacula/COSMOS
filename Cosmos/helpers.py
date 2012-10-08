@@ -35,6 +35,12 @@ def parse_cmd(txt,**kwargs):
     return s
 
 
+def spinning_cursor(i):
+    ":reutrn: a string that represents part of a spinning cursor"
+    cursor='/-\|'
+    while 1:
+        return cursor[i % len(cursor)]
+
 def get_drmaa_ns(DRM,mem_req,time_limit=None):
     """Returns the DRM specific resource usage flags for the drmaa_native_specification
     :param time_limit: as datetime.time object

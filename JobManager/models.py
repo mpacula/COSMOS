@@ -1,11 +1,9 @@
 from django.db import models
-import os
+import os,re,json,time,sys
 from picklefield.fields import PickledObjectField
-import math
-import re
 from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
-from Cosmos.helpers import check_and_create_output_dir
+from Cosmos.helpers import check_and_create_output_dir,spinning_cursor
 import cosmos_session
 from cosmos_session import drmaa
 from django.utils import timezone
@@ -59,80 +57,44 @@ class JobAttempt(models.Model):
     #drmaa related and job output fields
     #drmaa_state = models.CharField(max_length=150, null=True, choices = state_choices) #drmaa state
     drmaa_jobID = models.BigIntegerField(null=True) #drmaa drmaa_jobID, note: not database primary key
-    #drmaa_exitStatus = models.SmallIntegerField(null=True)
-    #drmaa_utime = models.IntegerField(null=True) #in seconds
     
-
     
-    #Time Fields
-    exit_status = models.IntegerField(help_text="x. Exit status of the command.", null=True)
-    system_time = models.IntegerField(help_text="S. Total number of CPU-seconds used by the system on behalf of the process (in kernel mode), in seconds.", null=True)
-    user_time = models.IntegerField(help_text="U. Total number of CPU-seconds that the process used directly (in user mode), in seconds.", null=True)
-    wall_time = models.IntegerField(help_text="e. Elapsed real (wall clock) time used by the process, in seconds.", null=True)
-    percent_cpu = models.IntegerField(help_text="P. Percentage of the CPU that this job got. This is just user + system times divided by the total running time.", null=True)
-    average_total_memory = models.IntegerField(help_text="K. Average total (data+stack+text) memory use of the process, in Kilobytes.", null=True)
-    memory_swaps = models.IntegerField(help_text="W. Number of times the process was swapped out of main memory.", null=True)
-    avg_unshared_data = models.IntegerField(help_text="D. Average size of the process's unshared data area, in Kilobytes.", null=True)
-    avg_unshared_stack_size = models.IntegerField(help_text="p. Average unshared stack size of the process, in Kilobytes.", null=True)
-    minor_page_faults = models.IntegerField(help_text="R. Number of minor, or recoverable, page faults. These are pages that are not valid (so they fault) but which have not yet been claimed by other virtual pages. Thus the data in the page is still valid but the system tables must be updated.", null=True)
-    major_page_faults = models.IntegerField(help_text="F. Number of major, or I/O-requiring, page faults that occurred while the process was running. These are faults where the page has actually migrated out of primary memory.", null=True)
-    file_system_inputs = models.IntegerField(help_text="I. Number of file system inputs by the process.", null=True)
-    max_rss = models.IntegerField(help_text="M. Maximum resident set size of the process during its lifetime, in Kilobytes.", null=True)
-    avg_rss = models.IntegerField(help_text="t. Average resident set size of the process, in Kilobytes.", null=True)
-    max_file_system_outputs = models.IntegerField(help_text="O. Number of file system outputs by the process.", null=True)
-    avg_shared_text = models.IntegerField(help_text="X. Average amount of shared text in the process, in Kilobytes.", null=True)
-    page_size = models.IntegerField(help_text="Z. System's page size, in bytes. This is a per-system constant, but varies between systems.", null=True)
-    vol_context_switches = models.IntegerField(help_text="w. Number of times that the program was context-switched voluntarily, for instance while waiting for an I/O operation to complete.", null=True)
-    invol_context_switches = models.IntegerField(help_text="c. Number of times the process was context-switched involuntarily (because the time slice expired).", null=True)
-    number_signals = models.IntegerField(help_text="k. Number of signals delivered to the process.", null=True)
-    socket_messages_rcvd = models.IntegerField(help_text="r. Number of socket messages received by the process.", null=True)
-    socket_messages_sent = models.IntegerField(help_text="s. Number of socket messages sent by the process.", null=True)
+    avg_data_mem = models.IntegerField(null=True,help_text='')
+    max_data_mem = models.IntegerField(null=True,help_text='')
+    avg_fdsize_mem = models.IntegerField(null=True,help_text='')
+    avg_lib_mem = models.IntegerField(null=True,help_text='')
+    avg_locked_mem = models.IntegerField(null=True,help_text='')
+    avg_num_threads = models.IntegerField(null=True,help_text='')
+    avg_pte_mem = models.IntegerField(null=True,help_text='')
+    avg_rss_mem = models.IntegerField(null=True,help_text='')
+    avg_virtual_mem = models.IntegerField(null=True,help_text='')
+    block_io_delays = models.IntegerField(null=True,help_text='')
+    cpu_time = models.IntegerField(null=True,help_text='')
+    exit_status = models.IntegerField(null=True,help_text='')
+    major_page_faults = models.IntegerField(null=True,help_text='')
+    max_fdsize_mem = models.IntegerField(null=True,help_text='')
+    max_lib_mem = models.IntegerField(null=True,help_text='')
+    max_locked_mem = models.IntegerField(null=True,help_text='')
+    max_num_threads = models.IntegerField(null=True,help_text='')
+    max_pte_mem = models.IntegerField(null=True,help_text='')
+    max_rss_mem = models.IntegerField(null=True,help_text='')
+    max_virtual_mem = models.IntegerField(null=True,help_text='')
+    minor_page_faults = models.IntegerField(null=True,help_text='')
+    names = models.CharField(max_length=255,null=True,help_text='')
+    nonvoluntary_context_switches = models.IntegerField(null=True,help_text='')
+    num_polls = models.IntegerField(null=True,help_text='')
+    num_processes = models.IntegerField(null=True,help_text='')
+    percent_cpu = models.IntegerField(null=True,help_text='')
+    pids = models.CharField(max_length=255,null=True,help_text='')
+    single_proc_max_peak_rss = models.IntegerField(null=True,help_text='')
+    single_proc_max_peak_virtual_rss = models.IntegerField(null=True,help_text='')
+    system_time = models.IntegerField(null=True,help_text='')
+    user_time = models.IntegerField(null=True,help_text='')
+    voluntary_context_switches = models.IntegerField(null=True,help_text='')
+    wall_time = models.IntegerField(null=True,help_text='')
+    SC_CLK_TCK = models.IntegerField(null=True,help_text='')
     
-    time_field_units = { 'seconds' : ['system_time','user_time','wall_time','cpu_time'],
-                        }
- 
-    time_fields = [
-                   ('info', [
-                    'exit_status',         
-                    ]),
-                   ('time', [
-                    'system_time',
-                    'user_time',
-                   'wall_time',
-                   'percent_cpu'
-                   ]),
-                   ('memory',[
-                   'max_rss',
-                   'avg_rss',
-                   'average_total_memory',
-                   'avg_unshared_data',
-                   'avg_unshared_stack_size',
-                   'avg_shared_text',
-                   'page_size',
-                   'major_page_faults',
-                   'minor_page_faults',
-                   'memory_swaps',
-                   'vol_context_switches',
-                   'invol_context_switches',
-                   ]),
-                   ('I/O',
-                    [
-                   'file_system_inputs',
-                   'max_file_system_outputs',
-                   'number_signals',
-                   'socket_messages_rcvd','socket_messages_sent',
-                   ])
-                  ]
-    @property
-    def time_fields_as_list(self):
-        """
-        returns a simple list of all time fields
-        """
-        return [ f for x in self.time_fields for f in x[1]  ]
-        
-
-    cpu_time = models.IntegerField(help_text="Total number of seconds the process used. cpu_time = system_time + user_time.", null=True) #i calculate this myself
-    
+    profile_fields = ['major_page_faults', 'max_num_threads', 'nonvoluntary_context_switches', 'exit_status', 'single_proc_max_peak_virtual_rss', 'avg_pte_mem', 'max_rss_mem', 'avg_num_threads', 'max_pte_mem', 'names', 'avg_locked_mem', 'pids', 'percent_cpu', 'avg_data_mem', 'wall_time', 'max_virtual_mem', 'num_polls', 'user_time', 'max_lib_mem', 'max_data_mem', 'num_processes', 'system_time', 'avg_fdsize_mem', 'minor_page_faults', 'avg_virtual_mem', 'avg_rss_mem', 'avg_lib_mem', 'single_proc_max_peak_rss', 'cpu_time', 'voluntary_context_switches', 'block_io_delays', 'max_fdsize_mem', 'max_locked_mem', 'SC_CLK_TCK']
     
     drmaa_info = PickledObjectField(null=True) #drmaa_info object returned by python-drmaa will be slow to access
     jobTemplate = None 
@@ -145,43 +107,20 @@ class JobAttempt(models.Model):
             
     @property
     def resource_usage(self):
-        def foo(f,skip3=True):
-            "take a field a return a tuple of the field's value and help_text"
-            help = self._meta.get_field(f).help_text
-            if skip3:
-                help = help[3:]
-            val = getattr(self,f)
-            return (f,val,help)
-            
-        r = [ foo(field_name)+(type,) for type,field_list in self.time_fields for field_name in field_list ]
-        r.insert(3, foo('cpu_time',skip3=False)+('time',))
-        return r
-            
-    def update_from_time(self):
-        """Updates the resource usage from time tool output"""
-        def rnd(x):
-            return round(float(x))
-        if os.path.exists(self.time_output_path):
-            with file(self.time_output_path,'rb') as f:
-                time = f.read().strip()
-                letter2timeVal = dict([ tuple(re.split(':',x)) for x in re.split('\s',time) ])
-                letter2name = dict([ (f.help_text[0:1],f.name) for f in filter(lambda f: f.name in self.time_fields_as_list,self._meta.fields) ])
-                
-                try:
-                    for letter,timeVal in letter2timeVal.items():
-                        n = letter2name[letter]
-                        if n in ['user_time','system_time','wall_time']:
-                            val = round(float(timeVal))
-                        elif n == 'percent_cpu':
-                            val = int(timeVal[0:-1])
-                        else:
-                            val = int(timeVal)
-                        setattr(self,n,val)
-                    self.cpu_time = self.user_time+self.system_time
-                    self.save()
-                except Exception as e:
-                    print e
-    
+        ":returns: (name,val,help,type)"
+        for field in self.profile_fields:
+            yield field, getattr(self,field), self._meta.get_field(field).help_text, 'na'
+                    
+    def update_from_profile(self):
+        """Updates the resource usage from profile output"""
+        try:
+            p = json.load(file(self.profile_output_path,'r'))
+            for k,v in p.items():
+                setattr(self,k,v)
+        except ValueError:
+            "Probably empty resource usage because command didn't exist"
+            pass
+        
     def createJobTemplate(self,base_template):
         """
         Creates a JobTemplate.
@@ -205,11 +144,6 @@ class JobAttempt(models.Model):
         if dInfo is None:
             self.successful = False
         else:
-#            if 'ru_utime' in dInfo['resourceUsage']:
-#                self.drmaa_utime = math.ceil(float(dInfo['resourceUsage']['ru_utime'])) #is SGE
-#            elif 'start_time' in dInfo['resourceUsage']: #is LSF
-#                self.drmaa_utime = int(dInfo['resourceUsage']['end_time']) - int(dInfo['resourceUsage']['start_time'])
-#            self.drmaa_exitStatus = dInfo['exitStatus']
             self.successful = dInfo['exitStatus'] == 0 and dInfo['wasAborted'] == False
         self.save()
     
@@ -277,18 +211,9 @@ class JobAttempt(models.Model):
             with open(path,'rb') as f:
                 return f.read()
     @property
-    def time_output_path(self):
-        "Read the time output which contains verbose information on resource usage"
-        return os.path.join(self.drmaa_output_dir,str(self.id)+'.time')
-        
-    @property
-    def time_output_txt(self):
-        path = self.time_output_path
-        if path is None:
-            return 'File does not exist.'
-        else:
-            with open(path,'rb') as f:
-                return f.read()
+    def profile_output_path(self):
+        "Read the profile.py output which contains verbose information on resource usage"
+        return os.path.join(self.drmaa_output_dir,str(self.id)+'.profile')
         
     def get_command_shell_script_text(self):
         "Read the command.sh file"
@@ -301,7 +226,7 @@ class JobAttempt(models.Model):
         if drmaa_info is not None:
             self.drmaa_info = drmaa_info._asdict()
         self.update_from_drmaa_info()
-        self.update_from_time()
+        self.update_from_profile()
         
         self.finished_on = timezone.now()
         self.save()
@@ -344,42 +269,46 @@ class JobManager(models.Model):
 #        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):
 #            self.terminate_jobAttempt(jobAttempt)
 #        
-#    def terminate_jobAttempt(self,jobAttempt):
-#        cosmos_session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+    def terminate_jobAttempt(self,jobAttempt):
+        "Terminates a jobAttempt"
+        cosmos_session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
 
-    def __create_command_sh(self,job):
+    def __create_command_sh(self,jobAttempt):
         """Create a sh script that will execute command"""
-        with open(job.command_script_path,'wb') as f:
-            f.write('#!/bin/bash\n')
-            f.write("{time} -o {time_out} -f \"D:%D F:%F I:%I K:%K M:%M O:%O P:%P R:%R S:%S U:%U W:%W X:%X Z:%Z c:%c e:%e k:%k p:%p r:%r s:%s t:%t w:%w x:%x\" \\".format(time=cosmos_session.cosmos_settings.time_path,time_out=job.time_output_path))
+        with open(jobAttempt.command_script_path,'wb') as f:
+            hp = cosmos_session.cosmos_settings.home_path
+            f.write("#!/bin/sh\n")
+            f.write("python {profile} -d {db} -f {profile_out} \\".format(profile = os.path.join(hp,'Cosmos/profile/profile.py'),
+                                              db = jobAttempt.profile_output_path+'.sqlite',
+                                              profile_out = jobAttempt.profile_output_path
+                                              ))
             f.write("\n")
-            f.write(job.command)
-        os.system('chmod 700 {0}'.format(job.command_script_path))
+            f.write(jobAttempt.command)
+        os.system('chmod 700 {0}'.format(jobAttempt.command_script_path))
         
-    def addJobAttempt(self, command, drmaa_output_dir, jobName = "Generic_Job_Name", drmaa_native_specification=''):
+    def add_jobAttempt(self, command, drmaa_output_dir, jobName = "Generic_Job_Name", drmaa_native_specification=''):
         """
         Adds a new JobAttempt
         :param command: The system command to run
-        :param jobName: an optional name for the job 
+        :param jobName: an optional name for the jobAttempt
         :param drmaa_output_dir: the directory to story the stdout and stderr files
         :param drmaa_native_specification: the drmaa_native_specifications tring
         """
-        ##TODO - check that jobName is unique? or maybe append the job primarykey to the jobname to avoid conflicts.  maybe add primary key as a subdirectory of drmaa_output_dir
-        job = JobAttempt(jobManager=self, command = command, jobName = jobName, drmaa_output_dir = drmaa_output_dir, drmaa_native_specification=drmaa_native_specification)
-        cmd_script_file_path = os.path.join(job.drmaa_output_dir,'command.sh')
-        job.command_script_path = cmd_script_file_path
-        job.save()
-        job.createJobTemplate(base_template = cosmos_session.drmaa_session.createJobTemplate())
-        self.__create_command_sh(job)
-        return job
+        jobAttempt = JobAttempt(jobManager=self, command = command, jobName = jobName, drmaa_output_dir = drmaa_output_dir, drmaa_native_specification=drmaa_native_specification)
+        cmd_script_file_path = os.path.join(jobAttempt.drmaa_output_dir,'command.sh')
+        jobAttempt.command_script_path = cmd_script_file_path
+        jobAttempt.save()
+        jobAttempt.createJobTemplate(base_template = cosmos_session.drmaa_session.createJobTemplate())
+        self.__create_command_sh(jobAttempt)
+        return jobAttempt
         
         
-    def getJobs(self):
+    def get_jobs(self):
         """Returns a django query object with all jobs belonging to this JobManager"""
         return JobAttempt.objects.filter(jobManager=self)
             
     
-    def submitJob(self,job):
+    def submit_job(self,job):
         """Submits and runs a job"""
         if job.queue_status != 'not_queued':
             raise JobStatusError('JobAttempt has already been submitted')
@@ -408,36 +337,43 @@ class JobManager(models.Model):
     
     def get_numJobsQueued(self):
         "The number of queued jobs."
-        return self.getJobs().filter(queue_status = 'queued').count()
+        return self.get_jobs().filter(queue_status = 'queued').count()
     
-    def _waitForAnyJob(self):
+    def _check_for_finished_job(self):
         """
         Waits for any job to finish, and returns that JobAttempt.  If there are no jobs left, returns None.
         """
-        if self.get_numJobsQueued() > 0:
-            try:
-                drmaa_info = cosmos_session.drmaa_session.wait(drmaa.Session.JOB_IDS_SESSION_ANY)
-            except drmaa.errors.InvalidJobException: #throws this when there are no jobs to wait on
-                self.workflow.log.error('ddrmaa_session.wait threw invalid job exception.  there are no jobs left?')
+        try:
+            drmaa_info = cosmos_session.drmaa_session.wait(jobId=drmaa.Session.JOB_IDS_SESSION_ANY,timeout=drmaa.Session.TIMEOUT_NO_WAIT)
+        except drmaa.errors.InvalidJobException as e: #throws this when there are no jobs to wait on
+            print e
+            self.workflow.log.error('ddrmaa_session.wait threw invalid job exception.  there are no jobs left?')
+            raise
+        except Exception as msg:
+            if drmaa.errors.ExitTimeoutException: #jobs are queued, but none are done yet
                 return None
-            except Exception as msg:
-                self.workflow.log.error(msg)
-                return None
-                
-            job = JobAttempt.objects.get(drmaa_jobID = drmaa_info.jobId)
-            job.hasFinished(drmaa_info)
-            return job
-        else:
+            #there was a real error
+            self.workflow.log.error(msg)
             return None
-        
-    def yield_All_Queued_Jobs(self):
+            
+        job = JobAttempt.objects.get(drmaa_jobID = drmaa_info.jobId)
+        job.hasFinished(drmaa_info)
+        return job
+    
+    def yield_all_queued_jobs(self):
         "Yield all queued jobs."
-        while True:
-            j = self._waitForAnyJob()
+        i=0
+        while self.get_numJobsQueued() > 0:
+            i+=1
+            sys.stderr.write(spinning_cursor(i))
+            try:
+                j = self._check_for_finished_job()
+                sys.stderr.write('\b')
+            except drmaa.errors.InvalidJobException:
+                break
             if j != None:
                 yield j
-            else:
-                break
+            time.sleep(1)
             
     def delete(self,*args,**kwargs):
         "Deletes this job manager"

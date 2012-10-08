@@ -83,13 +83,12 @@ works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080`
 Terminating a Workflow
 ______________________
 
-Currently, we do not support pressing ctrl+c (coming soon!) to terminate a workflow.  *Avoid pressing ctrl+c while a workflow is running*
-If you do, Cosmos will not be able to properly update the database and things get out of sync.  It will be fine when you restart or resume
-the workflow, but for example, your latest batch will still have the status of "in_progress" instead of "failed".  If you did not terminate
-gracefully, make sure there are no left over Cosmos jobs running before you start the next workflow, which would probably reuslt in file output
-conflicts. 
+To terminate a workflow, simply press ctrl+c.  Cosmos will terminate running jobs, and you can resume from the point in the workflow you left off later.
 
-To terminate a workflow properly, first find it's ID:
+Remotely Terminating a Workflow
+_______________________________
+
+To terminate a workflow from another process via the command line, first find it's ID:
 
 .. code-block:: bash
 
