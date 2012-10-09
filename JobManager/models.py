@@ -112,10 +112,7 @@ class JobAttempt(models.Model):
     num_processes = models.IntegerField(null=True,help_text='Total number of descendant processes that were spawned')
     pids = models.CharField(max_length=255,null=True,help_text='Pids of all the descendant processes')
     exit_status = models.IntegerField(null=True,help_text='Exit status of the primary process being profiled')
-    SC_CLK_TCK = models.IntegerField(null=True,help_text='sysconf(_SC_CLK_TCK) - A operating system variable that is usually equal to 100, or centiseconds')
-    
-    
-    
+    SC_CLK_TCK = models.IntegerField(null=True,help_text='sysconf(_SC_CLK_TCK), an operating system variable that is usually equal to 100, or centiseconds')
     
     
     profile_fields = [('time',[
@@ -130,11 +127,11 @@ class JobAttempt(models.Model):
                                  'avg_data_mem','max_data_mem',
                                  'avg_lib_mem','max_lib_mem',
                                 ]),
-                      ('IO',[
+                      ('i/o',[
                              'voluntary_context_switches', 'nonvoluntary_context_switches','block_io_delays', 
-                                 'avg_fdsize', 'max_fdsize',
+                             'avg_fdsize', 'max_fdsize',
                             ]),
-                      ('Misc', [
+                      ('misc', [
                                 'exit_status','names', 'pids', 'num_polls','num_processes','SC_CLK_TCK',
                                  'avg_num_threads','max_num_threads',
                             ])
