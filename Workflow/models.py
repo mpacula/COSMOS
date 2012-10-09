@@ -14,7 +14,6 @@ active_workflows = [] #set to whichever workflows have been started.  used by ct
 def ctrl_c(signal,frame):
     for wf_id in active_workflows:
         wf = Workflow.objects.get(pk=wf_id)
-        #if not wf._is_terminating():
         wf.remote_terminate()
 try:
     signal.signal(signal.SIGINT, ctrl_c)
@@ -59,44 +58,7 @@ class Workflow(models.Model):
             
         check_and_create_output_dir(self.output_dir)
         
-        self.log, self.log_path = get_workflow_logger(self)
-    
-    def terminate(self):
-        """
-        Terminates this workflow.
-        """
-        self.remote_terminate()
-        self.finished()
-        sys.exit(1)
-        #self.log.warning('Executed {0}'.format(cmd))
-    
-    def remote_terminate(self):
-        """
-        Can be executed by a remote process to terminate this workflow.  Generally executed
-        via the cli.py terminate command line interface.  qdels all jobs and tells the workflow to terminate
-        """
-        self.log.warning("Terminating this workflow...")
-        self._terminating = True
-        self.save()
-        ids = [ str(ja.drmaa_jobID) for ja in self.jobManager.jobAttempts.filter(queue_status='queued') ]
-        #jobIDs = ', '.join(ids)
-        #cmd = 'qdel {0}'.format(jobIDs)
-        for id in ids:
-            cmd = 'qdel {0}'.format(id)
-            os.system(cmd)
-        #self.log.warning('Executed {0}'.format(cmd))
-    
-    def _is_terminating(self):
-        """
-        Helper function to check if this workflow is terminating.  Accessing the Workflow._terminating
-        variable will probably hit a cache and not report the correct value;
-        this function forces a database query.
-        """
-        if Workflow.objects.filter(pk=self.id,_terminating=True).count() > 0: #database can be out of sync
-            self._terminating = True
-            self.save()
-            return True
-        return False
+        self.log, self.log_path = get_workflow_logger(self) 
         
     @property
     def nodes(self):
@@ -262,6 +224,43 @@ class Workflow(models.Model):
         b.order_in_workflow = order_in_workflow
         b.save()
         return b
+
+    def terminate(self):
+        """
+        Terminates this workflow, calls `self.finish()` and quits.
+        """
+        self.remote_terminate()
+        self.finished()
+        sys.exit(1)
+        #self.log.warning('Executed {0}'.format(cmd))
+    
+    def remote_terminate(self):
+        """
+        Can be executed by a remote process to terminate this workflow.  Generally executed
+        via the cli.py terminate command or a ctrl+c event.  qdels all jobs and tells the workflow to terminate
+        """
+        self.log.warning("Terminating this workflow...")
+        self._terminating = True
+        self.save()
+        ids = [ str(ja.drmaa_jobID) for ja in self.jobManager.jobAttempts.filter(queue_status='queued') ]
+        #jobIDs = ', '.join(ids)
+        #cmd = 'qdel {0}'.format(jobIDs)
+        for id in ids:
+            cmd = 'qdel {0}'.format(id)
+            os.system(cmd)
+        #self.log.warning('Executed {0}'.format(cmd))
+    
+    def _is_terminating(self):
+        """
+        Helper function to check if this workflow is terminating.  Accessing the Workflow._terminating
+        variable will probably hit a cache and not report the correct value;
+        this function forces a database query.
+        """
+        if Workflow.objects.filter(pk=self.id,_terminating=True).count() > 0: #database can be out of sync
+            self._terminating = True
+            self.save()
+            return True
+        return False
     
     def get_all_tag_keywords_used(self):
         """Returns a set of all the keyword tags used on any node in this workflow"""
@@ -282,18 +281,11 @@ class Workflow(models.Model):
         for batch in self.batches:
             yield [ n for n in batch.yield_node_resource_usage() ]
             
-                
-#    def _close_session(self):
-#        """Shuts down this workflow's jobmanager"""
-#        self.log.info('Ending session')
-#        self.jobManager._close_session()
-            
     def delete(self, *args, **kwargs):
         """
         Deletes this workflow.
         :param delete_files: Deletes all files associated with this workflow
         """
-#        self._close_session()
         self.jobManager.delete()
         self.save()
         
@@ -301,8 +293,6 @@ class Workflow(models.Model):
         if 'delete_files' in kwargs:
             delete_files = kwargs.pop('delete_files')
         
-        
-        #delete_files=True will delete all output files
         if delete_files:
             self.log.info('Deleting directory {0}'.format(self.output_dir))
             for h in self.log.handlers:
@@ -364,6 +354,9 @@ class Workflow(models.Model):
         return jobAttempt
 
     def run_batch(self,batch):
+        """
+        Runs any unsuccessful nodes of a batch
+        """
         self.log.info('Running batch {0}.'.format(batch))
         
         if batch.successful:
@@ -497,26 +490,12 @@ class Workflow(models.Model):
         self.log.info('Restarting Workflow from here.')
         Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
     
-    def __str__(self):
-        return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
-            
-    def toString(self):
-        s = 'Workflow[{0.id}] {0.name} resume_from_last_failure={0.resume_from_last_failure}\n'.format(self)
-        #s = '{:*^72}\n'.format(s) #center s with stars around it
-        for batch in self.batch_set.all():
-            s = s + batch.toString(tabs=1)
-        return s
-    
-    @models.permalink    
-    def url(self):
-        return ('workflow_view',[str(self.id)])
-    
     def get_nodes_by(self,batch=None,op="and",**kwargs):
         """
-        Returns the list of nodes that are tagged by the keys and vals in **kwargs dictionary
+        Returns the list of nodes that are tagged by the keys and vals in \*\*kwargs dictionary
         
         :param op: Choose either 'and' or 'or' as the logic to filter tags with
-        :param **kwargs: Any keywords you'd like to search for
+        :param \*\*kwargs: Any keywords you'd like to search for
         :returns: a query result of the filtered nodes
         
         >>> node.get_nodes_by(op='or',color='grey',color='orange')
@@ -541,12 +520,12 @@ class Workflow(models.Model):
 
     def get_node_by(self,batch=None,op="and",**kwargs):
         """
-        Returns the list of nodes that are tagged by the keys and vals in **kwargs dictionary.
+        Returns the list of nodes that are tagged by the keys and vals in \*\*kwargs dictionary.
         
         :raises Exception: if more or less than one node is returned
         
         :param op: Choose either 'and' or 'or' as the logic to filter tags with
-        :param **kwargs: Any keywords you'd like to search for
+        :param \*\*kwargs: Any keywords you'd like to search for
         :returns: a query result of the filtered nodes
         
         >>> node.get_node_by(op='or',color='grey',color='orange')
@@ -561,11 +540,25 @@ class Workflow(models.Model):
             raise Exception("No nodes with with tags {0}.".format(kwargs))
         return nodes[0]
     
+    def __str__(self):
+        return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
+            
+    def toString(self):
+        s = 'Workflow[{0.id}] {0.name} resume_from_last_failure={0.resume_from_last_failure}\n'.format(self)
+        #s = '{:*^72}\n'.format(s) #center s with stars around it
+        for batch in self.batch_set.all():
+            s = s + batch.toString(tabs=1)
+        return s
+    
+    @models.permalink    
+    def url(self):
+        return ('workflow_view',[str(self.id)])
+    
 class Batch(models.Model):
     """
     A group of jobs that can be run independently.  See `Embarassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_ .
     
-    .. note:: A Batch should not be directly created.  Use ``workflow.add_batch()`` to create a new batch.
+    .. note:: A Batch should not be directly created.  Use :meth:`Workflow.add_batch()` to create a new batch.
     A Batch is `Embarrassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_.
     """
     name = models.CharField(max_length=200)
@@ -671,7 +664,6 @@ class Batch(models.Model):
         """
         Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
         If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
-        
         
         :param name: (str) The name of the node.  Must be unique within this batch. All spaces are converted to underscores.  Required.
         :param pcmd: (str) The preformatted command to execute. Required.
@@ -784,18 +776,17 @@ class Batch(models.Model):
                 
     def group_nodes_by(self,*args):
         """
-        Yields nodes, grouped by tags in *args.  Groups will be every unique set of possible values of tags.
+        Yields nodes, grouped by tags in \*args.  Groups will be every unique set of possible values of tags.
         For example, if you had nodes tagged by color, and shape, and you ran func:`batch.group_nodes_by`('color','shape'),
-        this function would yield the group of nodes that exist in the various combinations of ``color``s and ``shape``s.
-        So one of the yields may be (({'color':'orange'n'shape':'circle'}), [ orange_circular_nodes ])
+        this function would yield the group of nodes that exist in the various combinations of `colors` and `shapes`.
+        So for example one of the yields might be (({'color':'orange'n'shape':'circle'}), [ orange_circular_nodes ])
         
-        :param *args: Keywords of the tags you want to group by
-        :yields: a tuple of (tags_in_this_group,nodes in group)
+        :param \*args: Keywords of the tags you want to group by.
+        :yields: (a dictionary of this group's unique tags, nodes in this group).
         
-        .. note:: a missing tag is considered as None and thus its own grouped with other similar nodes.  You should generally
-        try to avoid this scenario and have all nodes tagged by the keywords you're grouping by.
+        .. note:: a missing tag is considered as None and thus its own grouped with other similar nodes.  You should generally try to avoid this scenario and have all nodes tagged by the keywords you're grouping by.
         
-        .. note:: any nodes without a single one of the tags in *args are not included.
+        .. note:: any nodes without a single one of the tags in \*args are not included.
         """
         node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=args).values() #get this batch's tags
         #filter out any nodes without all args

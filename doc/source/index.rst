@@ -7,7 +7,7 @@ Welcome to Cosmos's documentation!
 
 .. toctree::
    :numbered:
-   :maxdepth: 3
+   :maxdepth: 2
    
    intro
    install

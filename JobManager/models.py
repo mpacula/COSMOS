@@ -28,10 +28,15 @@ decode_drmaa_state = SortedDict([
 #real_stdout = os.dup(1)
 real_stderr = os.dup(2)
 def disable_stderr():
+    sys.stderr.flush()
     devnull = os.open('/dev/null', os.O_WRONLY)
     os.dup2(devnull,2)
+    sys.stderr.flush()
 def enable_stderr():
+    sys.stderr.flush()
+    os.close(os.dup(2)) #close devnull
     os.dup2(real_stderr,2)
+    sys.stderr.flush()
   
 class JobStatusError(Exception):
     pass
@@ -67,43 +72,74 @@ class JobAttempt(models.Model):
     #drmaa_state = models.CharField(max_length=150, null=True, choices = state_choices) #drmaa state
     drmaa_jobID = models.BigIntegerField(null=True) #drmaa drmaa_jobID, note: not database primary key
     
+    #time
+    system_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in kernel mode, measured in clock ticks (divide by sysconf(_SC_CLK_TCK)')
+    user_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in user mode, measured in clock ticks (divide  by sysconf(_SC_CLK_TCK).   This  includes  guest time,  guest_time  (time  spent  running a virtual CPU, see below), so that applications that are not aware of the guest time field do not lose that time from their calculations')
+    cpu_time = models.IntegerField(null=True,help_text='system_time + user_time')
+    wall_time = models.IntegerField(null=True,help_text='Elapsed real (wall clock) time used by the process.')
+    percent_cpu = models.IntegerField(null=True,help_text='(cpu_time / wall_time) * 100')
     
-    avg_data_mem = models.IntegerField(null=True,help_text='')
-    max_data_mem = models.IntegerField(null=True,help_text='')
-    avg_fdsize_mem = models.IntegerField(null=True,help_text='')
-    avg_lib_mem = models.IntegerField(null=True,help_text='')
-    avg_locked_mem = models.IntegerField(null=True,help_text='')
-    avg_num_threads = models.IntegerField(null=True,help_text='')
-    avg_pte_mem = models.IntegerField(null=True,help_text='')
-    avg_rss_mem = models.IntegerField(null=True,help_text='')
-    avg_virtual_mem = models.IntegerField(null=True,help_text='')
-    block_io_delays = models.IntegerField(null=True,help_text='')
-    cpu_time = models.IntegerField(null=True,help_text='')
-    exit_status = models.IntegerField(null=True,help_text='')
-    major_page_faults = models.IntegerField(null=True,help_text='')
-    max_fdsize_mem = models.IntegerField(null=True,help_text='')
-    max_lib_mem = models.IntegerField(null=True,help_text='')
-    max_locked_mem = models.IntegerField(null=True,help_text='')
-    max_num_threads = models.IntegerField(null=True,help_text='')
-    max_pte_mem = models.IntegerField(null=True,help_text='')
-    max_rss_mem = models.IntegerField(null=True,help_text='')
-    max_virtual_mem = models.IntegerField(null=True,help_text='')
-    minor_page_faults = models.IntegerField(null=True,help_text='')
-    names = models.CharField(max_length=255,null=True,help_text='')
-    nonvoluntary_context_switches = models.IntegerField(null=True,help_text='')
-    num_polls = models.IntegerField(null=True,help_text='')
-    num_processes = models.IntegerField(null=True,help_text='')
-    percent_cpu = models.IntegerField(null=True,help_text='')
-    pids = models.CharField(max_length=255,null=True,help_text='')
-    single_proc_max_peak_rss = models.IntegerField(null=True,help_text='')
-    single_proc_max_peak_virtual_rss = models.IntegerField(null=True,help_text='')
-    system_time = models.IntegerField(null=True,help_text='')
-    user_time = models.IntegerField(null=True,help_text='')
-    voluntary_context_switches = models.IntegerField(null=True,help_text='')
-    wall_time = models.IntegerField(null=True,help_text='')
-    SC_CLK_TCK = models.IntegerField(null=True,help_text='')
+    #memory
+    avg_rss_mem = models.IntegerField(null=True,help_text='Average resident set size (Kb)')
+    max_rss_mem = models.IntegerField(null=True,help_text='Maximum resident set size (Kb)')
+    single_proc_max_peak_rss = models.IntegerField(null=True,help_text='Maximum single process rss used (Kb)')
+    avg_virtual_mem = models.IntegerField(null=True,help_text='Average virtual memory used (Kb)')
+    max_virtual_mem = models.IntegerField(null=True,help_text='Maximum virtual memory used (Kb)')
+    single_proc_max_peak_virtual_mem = models.IntegerField(null=True,help_text='Maximum single process virtual memory used (Kb)')
+    major_page_faults = models.IntegerField(null=True,help_text='The number of major faults the process has made which have required loading a memory page from disk')
+    minor_page_faults = models.IntegerField(null=True,help_text='The number of minor faults the process has made which have not required loading a memory page from disk')
+    avg_data_mem = models.IntegerField(null=True,help_text='Average size of data segments (Kb)')
+    max_data_mem = models.IntegerField(null=True,help_text='Maximum size of data segments (Kb)')
+    avg_lib_mem = models.IntegerField(null=True,help_text='Average library memory size (Kb)')
+    max_lib_mem = models.IntegerField(null=True,help_text='Maximum library memory size (Kb)')
+    avg_locked_mem = models.IntegerField(null=True,help_text='Average locked memory size (Kb)')
+    max_locked_mem = models.IntegerField(null=True,help_text='Maximum locked memory size (Kb)')
+    avg_num_threads = models.IntegerField(null=True,help_text='Average number of threads')
+    max_num_threads = models.IntegerField(null=True,help_text='Maximum number of threads')
+    avg_pte_mem = models.IntegerField(null=True,help_text='Average page table entries size (Kb)')
+    max_pte_mem = models.IntegerField(null=True,help_text='Maximum page table entries size (Kb)')
     
-    profile_fields = ['major_page_faults', 'max_num_threads', 'nonvoluntary_context_switches', 'exit_status', 'single_proc_max_peak_virtual_rss', 'avg_pte_mem', 'max_rss_mem', 'avg_num_threads', 'max_pte_mem', 'names', 'avg_locked_mem', 'pids', 'percent_cpu', 'avg_data_mem', 'wall_time', 'max_virtual_mem', 'num_polls', 'user_time', 'max_lib_mem', 'max_data_mem', 'num_processes', 'system_time', 'avg_fdsize_mem', 'minor_page_faults', 'avg_virtual_mem', 'avg_rss_mem', 'avg_lib_mem', 'single_proc_max_peak_rss', 'cpu_time', 'voluntary_context_switches', 'block_io_delays', 'max_fdsize_mem', 'max_locked_mem', 'SC_CLK_TCK']
+    #io
+    nonvoluntary_context_switches = models.IntegerField(null=True,help_text='Number of non voluntary context switches')
+    voluntary_context_switches = models.IntegerField(null=True,help_text='Number of voluntary context switches')
+    block_io_delays = models.IntegerField(null=True,help_text='Aggregated block I/O delays, measured in clock ticks')
+    avg_fdsize = models.IntegerField(null=True,help_text='Average number of file descriptor slots allocated')
+    max_fdsize = models.IntegerField(null=True,help_text='Maximum number of file descriptor slots allocated')
+    
+    #misc
+    num_polls = models.IntegerField(null=True,help_text='Number of times the resource usage statistics were polled from /proc')
+    names = models.CharField(max_length=255,null=True,help_text='Names of all descendnt processes (there is always a python process for the profile.py script)')
+    num_processes = models.IntegerField(null=True,help_text='Total number of descendant processes that were spawned')
+    pids = models.CharField(max_length=255,null=True,help_text='Pids of all the descendant processes')
+    exit_status = models.IntegerField(null=True,help_text='Exit status of the primary process being profiled')
+    SC_CLK_TCK = models.IntegerField(null=True,help_text='sysconf(_SC_CLK_TCK) - A operating system variable that is usually equal to 100, or centiseconds')
+    
+    
+    
+    
+    
+    profile_fields = [('time',[
+                                'user_time','system_time', 'cpu_time', 'wall_time', 'percent_cpu',
+                             ]),
+                      ('memory',[
+                                 'avg_rss_mem','max_rss_mem','single_proc_max_peak_virtual_mem',
+                                 'avg_virtual_mem','max_virtual_mem','single_proc_max_peak_rss',
+                                 'minor_page_faults','major_page_faults',
+                                 'avg_pte_mem','max_pte_mem',
+                                 'avg_locked_mem','max_locked_mem',
+                                 'avg_data_mem','max_data_mem',
+                                 'avg_lib_mem','max_lib_mem',
+                                ]),
+                      ('IO',[
+                             'voluntary_context_switches', 'nonvoluntary_context_switches','block_io_delays', 
+                                 'avg_fdsize', 'max_fdsize',
+                            ]),
+                      ('Misc', [
+                                'exit_status','names', 'pids', 'num_polls','num_processes','SC_CLK_TCK',
+                                 'avg_num_threads','max_num_threads',
+                            ])
+                      ]
+                         
     
     drmaa_info = PickledObjectField(null=True) #drmaa_info object returned by python-drmaa will be slow to access
     jobTemplate = None 
@@ -117,8 +153,9 @@ class JobAttempt(models.Model):
     @property
     def resource_usage(self):
         ":returns: (name,val,help,type)"
-        for field in self.profile_fields:
-            yield field, getattr(self,field), self._meta.get_field(field).help_text, 'na'
+        for type,fields in self.profile_fields:
+            for field in fields:
+                yield field, getattr(self,field), self._meta.get_field(field).help_text, type
                     
     def update_from_profile(self):
         """Updates the resource usage from profile output"""
@@ -358,17 +395,20 @@ class JobManager(models.Model):
         try:
             disable_stderr() #python drmaa prints whacky messages sometimes
             drmaa_info = cosmos_session.drmaa_session.wait(jobId=drmaa.Session.JOB_IDS_SESSION_ANY,timeout=drmaa.Session.TIMEOUT_NO_WAIT)
+        except drmaa.errors.InvalidJobException as e: #throws this when there are no jobs to wait on.  This should never happen since we should check for num_queued_jobs in yield_all_queued_jobs
             enable_stderr()
-        except drmaa.errors.InvalidJobException as e: #throws this when there are no jobs to wait on
             print e
             self.workflow.log.error('ddrmaa_session.wait threw invalid job exception.  there are no jobs left?')
             raise
         except Exception as e:
+            enable_stderr()
             if type(e) == drmaa.errors.ExitTimeoutException: #jobs are queued, but none are done yet
                 return None
             #there was a real error
             self.workflow.log.error(e)
             return None
+        finally:
+            enable_stderr()
             
         job = JobAttempt.objects.get(drmaa_jobID = drmaa_info.jobId)
         job.hasFinished(drmaa_info)

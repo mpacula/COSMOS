@@ -1,20 +1,20 @@
 Writing Your First Workflow
 ===========================
 
-Workflow Objects
-________________
+Primary Workflow Objects
+________________________
 
 
 #. **Workflow** (:doc:`API </API/Workflow>`)
       .. autoclass:: Workflow.models.Workflow
          :noindex:
-#. **Batch** (:doc:`API </API/Batch>`)
+#. **Batch** (:doc:`API </API/Workflow>`)
       .. autoclass:: Workflow.models.Batch
          :noindex:
-#. **Node** (:doc:`API </API/Node>`)
+#. **Node** (:doc:`API </API/Workflow>`)
       .. autoclass:: Workflow.models.Node
          :noindex:
-#. **JobAttempt** (:doc:`API </API/JobAttempt>`)   
+#. **JobAttempt** (:doc:`API </API/JobManager>`)   
       .. autoclass:: JobManager.models.JobAttempt
          :noindex:
 

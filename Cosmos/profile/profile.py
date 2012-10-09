@@ -168,7 +168,7 @@ class Profile:
             SELECT
                 num_polls,
                 num_processes,
-                MAX(FDSize) as max_fdsize_mem, AVG(FDSize) as avg_fdsize_mem, 
+                MAX(FDSize) as max_fdsize, AVG(FDSize) as avg_fdsize, 
                 MAX(VmSize) as max_virtual_mem, AVG(VmSize) as avg_virtual_mem, 
                 MAX(VmLck) as max_locked_mem, AVG(VmLck) as avg_locked_mem, 
                 MAX(VmRSS) as max_rss_mem, AVG(VmRSS) as avg_rss_mem, 
@@ -206,7 +206,7 @@ class Profile:
                 SUM(stime) as system_time,
                 SUM(majflt) as major_page_faults,
                 SUM(minflt) as minor_page_faults,
-                MAX(VmPeak) as single_proc_max_peak_virtual_rss,
+                MAX(VmPeak) as single_proc_max_peak_virtual_mem,
                 MAX(VmHWM) as single_proc_max_peak_rss,
                 SUM(voluntary_ctxt_switches) as voluntary_context_switches,
                 SUM(nonvoluntary_ctxt_switches) as nonvoluntary_context_switches
@@ -224,7 +224,7 @@ class Profile:
         SC_CLK_TCK = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
         profiled_procs['wall_time'] = round((self.end_time - self.start_time) * SC_CLK_TCK)
         profiled_procs['cpu_time'] = profiled_procs['user_time'] + profiled_procs['system_time']
-        profiled_procs['percent_cpu'] = round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)
+        profiled_procs['percent_cpu'] = int(round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)*100)
         profiled_procs['exit_status'] = self.proc.poll()
         profiled_procs['SC_CLK_TCK'] = SC_CLK_TCK #usually is 100, or centiseconds 
         return profiled_procs

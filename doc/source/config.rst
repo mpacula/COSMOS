@@ -1,8 +1,8 @@
 Configuration
 =============
 
-1. Setup Shell Environment
-__________________________
+1. Setup Your Shell Environment
+_______________________________
 
 These are environment variables that either :term:`DRMAA`, cosmos, or :term:`Django` require.  Often, its nice to put this
 at the end of your ``~/.bashrc`` if you'd like them to be loaded everytime you login.  You must modify the
@@ -36,7 +36,7 @@ You may also need to set (if they're not already) normal :term:`SGE` job submiss
 
 .. code-block:: bash
 
-	SGE_ROOT=/opt/sg
+	SGE_ROOT=/opt/sge6/lib/linux-x64/libdrmaa.so
 	SGE_EXECD_PORT=63232
 	SGE_QMASTER_PORT=63231
    
@@ -47,6 +47,7 @@ LSF specific environment variables
 The following bypasses a bug in :term:`LSF` drmaa v1.04.
 
 .. code-block:: bash
+
    export LSF_DRMAA_CONF=$COSMOS_HOME_PATH/config/lsf_drmaa.conf
    
 
@@ -55,8 +56,7 @@ __________________________
 
 Edit :file:`config/default.py`, and configure it to your liking.  There are only a few variables to set.
 
-.. note:: It is recommended to *not* use an SQL Lite database if the database is stored
-on a network shared drive.
+.. note:: It is recommended to *not* use an SQL Lite database, especially if the database is stored on a network shared drive.
 
 
 3. Create SQL Tables and Load Static Files

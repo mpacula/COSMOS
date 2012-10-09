@@ -28,35 +28,6 @@ def bwa_sampe(output_sam,r1_sai,r2_sai,r1_fq,r2_fq,ID,LIBRARY,SAMPLE_NAME,PLATFO
     """
     return _parse_cmd(s,output_sam=output_sam,r1_sai=r1_sai,r2_sai=r2_sai,r1_fq=r1_fq,r2_fq=r2_fq,ID=ID,LIBRARY=LIBRARY,SAMPLE_NAME=SAMPLE_NAME,PLATFORM=PLATFORM)
 
-def create_bam_list():
-    """bam.list input to queue"""
-    s= r"""
-    java \
-    """
-    return _parse_cmd(s,)
-
-def queue(input_bam_list):
-    s= r"""
-    java \
-    -classpath $CLASSPATH \
-    -Xmx4g \
-    -Djava.io.tmpdir=/nas/erik/tmp \
-    -jar $QUEUE_DIR/QueueLite.jar \
-    -S ~/workspace/Cosmos/my_workflows/gatk/DataProcessingPipeline.scala \
-    -i $INPUT_FILE \
-    -R $BUNDLE_DIR/human_g1k_v37.fasta \
-    -D $BUNDLE_DIR/dbsnp_135.b37.vcf \
-    -outputDir $OUTPUT_DIR/ \
-    -p MGH_BC \
-    -gv $OUTPUT_DIR/graphviz.dot \
-    -gvsg $OUTPUT_DIR/graphviz_scatter_gather.dot \
-    -log $OUTPUT_DIR/queue_output.log \
-    -jobReport $OUTPUT_DIR/job_report.pdf \
-    -retry 5 \
-    -resMemReq 3 \
-    -run
-    """
-    return _parse_cmd(s,)
 
 def CleanSam(input_bam ,output_bam):
     # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
@@ -77,7 +48,6 @@ def SortSam(input_bam,output_bam,sort_order='coordinate'):
     SORT_ORDER={sort_order}
     """
     return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,sort_order=sort_order,Picard_SortSam=get_Picard_cmd('SortSam.jar'))
-    
 
 def ReduceBam(input_bam,output_bam,interval):
     s = r"""

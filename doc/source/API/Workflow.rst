@@ -1,5 +1,5 @@
 Workflow
 ========
 
-.. autoclass:: Workflow.models.Workflow
+.. automodule:: Workflow.models
    :members:

@@ -8,6 +8,4 @@ Cosmos API
    :maxdepth: 3
    
    Workflow
-   Batch
-   Node
-   JobAttempt
+   JobManager
