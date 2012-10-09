@@ -1,0 +1,1 @@
+Documentation available at: `bioseq.info/Cosmos <http://bioseq.info/Cosmos>` or `doc/build`

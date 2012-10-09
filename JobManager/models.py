@@ -23,6 +23,15 @@ decode_drmaa_state = SortedDict([
         (drmaa.JobState.DONE, 'job finished normally'),
         (drmaa.JobState.FAILED, 'job finished, but failed'),
         ]) #this is a sorted dictionary
+
+
+#real_stdout = os.dup(1)
+real_stderr = os.dup(2)
+def disable_stderr():
+    devnull = os.open('/dev/null', os.O_WRONLY)
+    os.dup2(devnull,2)
+def enable_stderr():
+    os.dup2(real_stderr,2)
   
 class JobStatusError(Exception):
     pass
@@ -119,6 +128,9 @@ class JobAttempt(models.Model):
                 setattr(self,k,v)
         except ValueError:
             "Probably empty resource usage because command didn't exist"
+            pass
+        except IOError:
+            "Job probably immediately failed so there's no job data"
             pass
         
     def createJobTemplate(self,base_template):
@@ -344,16 +356,18 @@ class JobManager(models.Model):
         Waits for any job to finish, and returns that JobAttempt.  If there are no jobs left, returns None.
         """
         try:
+            disable_stderr() #python drmaa prints whacky messages sometimes
             drmaa_info = cosmos_session.drmaa_session.wait(jobId=drmaa.Session.JOB_IDS_SESSION_ANY,timeout=drmaa.Session.TIMEOUT_NO_WAIT)
+            enable_stderr()
         except drmaa.errors.InvalidJobException as e: #throws this when there are no jobs to wait on
             print e
             self.workflow.log.error('ddrmaa_session.wait threw invalid job exception.  there are no jobs left?')
             raise
-        except Exception as msg:
-            if drmaa.errors.ExitTimeoutException: #jobs are queued, but none are done yet
+        except Exception as e:
+            if type(e) == drmaa.errors.ExitTimeoutException: #jobs are queued, but none are done yet
                 return None
             #there was a real error
-            self.workflow.log.error(msg)
+            self.workflow.log.error(e)
             return None
             
         job = JobAttempt.objects.get(drmaa_jobID = drmaa_info.jobId)

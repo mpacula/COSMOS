@@ -60,8 +60,6 @@ class Workflow(models.Model):
         check_and_create_output_dir(self.output_dir)
         
         self.log, self.log_path = get_workflow_logger(self)
-
-        
     
     def terminate(self):
         """
@@ -440,7 +438,7 @@ class Workflow(models.Model):
         return nodes 
 
 
-    def wait(self, batch=None, terminate_on_fail=True):
+    def wait(self, batch=None, terminate_on_fail=False):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         If `batch` is omitted or set to None, all running nodes will be waited on.
@@ -451,12 +449,12 @@ class Workflow(models.Model):
         self._check_termination(check_for_leftovers=True) #this is why there's a separate __wait() - so check_for_leftovers can call __wait() and not wait().  Otherwise checking for leftovers would loop forever!
         return nodes
 
-    def run_wait(self,batch):
+    def run_wait(self,batch, terminate_on_fail=False):
         """
         shortcut to run_batch(); wait(batch=batch);
         """
         self.run_batch(batch=batch)
-        return self.wait(batch=batch)
+        return self.wait(batch=batch,terminate_on_fail=terminate_on_fail)
 
     def finished(self,delete_unused_batches=False):
         """

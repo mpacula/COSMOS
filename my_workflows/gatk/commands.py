@@ -184,7 +184,7 @@ def UnifiedGenotyper(input_bams,output_bam,interval,glm):
     -R {settings.reference_fasta_path} \
     --dbsnp {settings.dbsnp_path} \
     -glm {glm} \
-    -I {input_bams} \
+    {input_bams} \
     -o {output_bam} \
     -A DepthOfCoverage \
     -A HaplotypeScore \

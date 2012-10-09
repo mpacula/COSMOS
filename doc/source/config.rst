@@ -23,6 +23,7 @@ first two lines.
 	export PYTHONPATH=$COSMOS_HOME_PATH:$PYTHONPATH
 	export PATH=$COSMOS_HOME_PATH/bin:$PATH
 	export DJANGO_SETTINGS_MODULE=Cosmos.settings
+   source $COSMOS_HOME_PATH/venv/bin/activate # automatically enable virtuale environment
 
 ``COSMOS_SETTING_MODULE`` is optional.  By default, cosmos will look for its configuration in ``config/default.py``,
 but if you set ``COSMOS_SETTING_MODULE=config.development`` it will load ``config/development.py`` instead.

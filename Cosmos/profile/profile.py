@@ -135,7 +135,7 @@ class Profile:
                 self.c.execute(q,vals)
                 
             except IOError:
-                pass # process finished between before file could be read
+                pass # process finished before file could be read
                  
         
     def read_proc_stat(self,pid):
