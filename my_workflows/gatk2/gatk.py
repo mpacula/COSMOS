@@ -43,6 +43,11 @@ if not B_bwa_aln.successful:
                 mem_req=3500)
     WF.run_wait(B_bwa_aln) 
 
-
+steps.step.workflow = WF
+bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=B_bwa_aln,group_by=['sample','lane','fq_partNumber'])
+#bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=B_bwa_aln,group_by=['sample','lane','fq_partNumber'])
+#bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=B_bwa_aln,group_by=['sample','lane','fq_partNumber'])
+#bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=B_bwa_aln,group_by=['sample','lane','fq_partNumber'])
+    
     
 WF.finished(delete_unused_batches=True)

@@ -226,14 +226,14 @@ class Workflow(models.Model):
         b.save()
         return b
 
-    def terminate(self):
-        """
-        Terminates this workflow, calls `self.finish()` and quits.
-        """
-        self.remote_terminate()
-        self.finished()
-        sys.exit(1)
-        #self.log.warning('Executed {0}'.format(cmd))
+#    def terminate(self):
+#        """
+#        Terminates this workflow, calls `self.finished()` and quits.
+#        """
+#        self.remote_terminate()
+#        self.finished()
+#        sys.exit(1)
+#        #self.log.warning('Executed {0}'.format(cmd))
     
     def remote_terminate(self):
         """

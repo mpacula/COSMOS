@@ -1,8 +1,10 @@
 from django.core.exceptions import ValidationError
-from Cosmos.addons.step import Step
+from Cosmos.addons import step
 from Cosmos.helpers import parse_cmd
 import settings
 from settings import get_Picard_cmd
+
+step.settings = settings
 
 def bwa_aln(fastq,output_sai):
     def _parse_cmd(s,**kwargs):
@@ -14,136 +16,188 @@ def bwa_aln(fastq,output_sai):
     """
     return _parse_cmd(s,fastq=fastq,output_sai=output_sai)
 
-def bwa_sampe(output_sam,r1_sai,r2_sai,r1_fq,r2_fq,ID,LIBRARY,SAMPLE_NAME,PLATFORM='ILLUMINA'):
-    s = r"""
-    {settings.bwa_path} sampe \
-    -f {output_sam} \
-    -r "@RG\tID:{ID}\tLB:{LIBRARY}\tSM:{SAMPLE_NAME}\tPL:{PLATFORM}" \
-    {settings.bwa_reference_fasta_path} \
-    {r1_sai} \
-    {r2_sai} \
-    {r1_fq} \
-    {r2_fq}
-    """
-    return _parse_cmd(s,output_sam=output_sam,r1_sai=r1_sai,r2_sai=r2_sai,r1_fq=r1_fq,r2_fq=r2_fq,ID=ID,LIBRARY=LIBRARY,SAMPLE_NAME=SAMPLE_NAME,PLATFORM=PLATFORM)
-
-
-def CleanSam(input_bam ,output_bam):
-    # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
-    s = r"""
-    {Picard_CleanSam} \
-    I={input_bam} \
-    O={output_bam}
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,Picard_CleanSam=get_Picard_cmd('CleanSam.jar'))
+class BWA_Sampe(step.Step):
+    outputs = {'sam':'raw.sam'}
+    mem_req=5000
     
+    def many2one_cmd(self,input_nodes,tags):
+        node_r1 = input_nodes[0]
+        node_r2 = input_nodes[1]
+        return (
+            r"""
+                {settings.bwa_path} sampe \
+                -f  {{output_dir}}/{{outputs[sam]}} \
+                -r "@RG\tID:{node_r1.tags[RG_ID]}\tLB:{node_r1.tags[RG_LIB]}\tSM:{node_r1.tags[sample]}\tPL:{node_r1.tags[RG_PLATFORM]}" \
+                {settings.bwa_reference_fasta_path} \
+                {node_r1.output_paths[sai]} \
+                {node_r2.output_paths[sai]} \
+                {node_r1.tags[fq_path]} \
+                {node_r2.tags[fq_path]}
+            """,
+            {'node_r1': node_r1,
+             'node_r2': node_r1 }
+        )
 
-def SortSam(input_bam,output_bam,sort_order='coordinate'):
-    # remove alignments off the end of a contig (bwa concatenates all the reference contigs together)
-    s = r"""
-    {Picard_SortSam} \
-    I={input_bam} \
-    O={output_bam} \
-    SORT_ORDER={sort_order}
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,sort_order=sort_order,Picard_SortSam=get_Picard_cmd('SortSam.jar'))
+class CleanSam(step.Step):
+    outputs = {'bam':'cleaned.bam'}
+    mem_req = 3500
+    
+    def one2one_cmd(self,input_node,input_type='bam'):
+        return (
+            r"""
+                {Picard_CleanSam} \
+                I= \
+                O={{output_dir}}/{{outputs[bam]}}
+            """,
+            {'Picard_CleanSam':get_Picard_cmd('CleanSam.jar'),
+             'input':input_node.output_paths[input_type]}
+        )
 
-def ReduceBam(input_bam,output_bam,interval):
-    s = r"""
-    {settings.GATK_cmd} \
-    -R {settings.reference_fasta_path} \
-    -T ReduceReads \
-    -I {input_bam} \
-    -o {output_bam} \
-    -L {interval}
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,interval=interval)
+#class SortSam(step.Step):
+#    outputs = {'bam':'sorted.bam'}
+#    mem_req = 3500
+#    
+#    def one2one_cmd(self,input_node):
+#        return (
+#            r"""
+#                {Picard_SortSam} \
+#                I={input_node.output_paths[bam]} \
+#                O={{output_dir}}/{{outputs[bam]}} \
+#                SORT_ORDER=coordinate
+#            """,
+#            {'Picard_SortSam':get_Picard_cmd('SortSam.jar')}
+#        )
 
-#i want input_bams to be a list so its not a command line argument right now
-def MergeSamFiles(input_bams,output_bam,assume_sorted=True):
-    INPUTs = " \\\n".join(["INPUT={0}".format(b) for b in input_bams])
-    s = r"""
-    {Picard_MergeSamFiles} \
-    {INPUTs} \
-    OUTPUT={output_bam} \
-    SORT_ORDER=coordinate \
-    MERGE_SEQUENCE_DICTIONARIES=True \
-    ASSUME_SORTED={assume_sorted}
-    """
-    return _parse_cmd(s,INPUTs=INPUTs,output_bam=output_bam,assume_sorted=assume_sorted,Picard_MergeSamFiles=get_Picard_cmd('MergeSamFiles.jar'))
+class MergeSamFiles(step.Step):
+    "Merges and Sorts"
+    outputs = {'bam':'merged.bam'}
+    mem_req = 5000
+    
+    def many2one_cmd(self,input_nodes,tags,assume_sorted=True):
+        INPUTs = " \\\n".join(["INPUT={0}".format(b) for b in input_bams])
+        return (
+            r"""
+                {Picard_MergeSamFiles} \
+                {INPUTs} \
+                OUTPUT={{output_dir}}/{{outputs[bam]}} \
+                SORT_ORDER=coordinate \
+                MERGE_SEQUENCE_DICTIONARIES=True \
+                ASSUME_SORTED={assume_sorted}
+            """,
+            {'Picard_MergeSamFiles':get_Picard_cmd('MergeSamFiles.jar'),
+             'INPUTs':INPUTs,
+             'assume_sorted':assume_sorted
+             }
+        )
 
-def BuildBamIndex(input_bam,output_bai):
-    s = r"""
-    {Picard_BuildBamIndex} \
-    INPUT={input_bam} \
-    OUTPUT={output_bai}
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_bai=output_bai,Picard_BuildBamIndex=get_Picard_cmd('BuildBamIndex.jar'))
+class BuildBamIndex(step.Step):
+    mem_req = 3500
+    
+    def one2one_cmd(self,input_node):
+        return (
+            r"""
+                {Picard_BuildBamIndex} \
+                INPUT={input_bam} \
+                OUTPUT={output_bai}
+                O={input_node.outputs[bam]}
+            """,
+            {'Picard_BuildBamIndex':get_Picard_cmd('BuildBamIndex.jar')}
+        )
 
+class RealignerTargetCreator(step.Step):
+    outputs = {'intervals':'target.intervals'}
+    mem_req = 2000
+    
+    def one2one_cmd(self,input_node):
+        return (
+            r"""
+                {settings.GATK_cmd} \
+                -T RealignerTargetCreator \
+                -R {settings.reference_fasta_path} \
+                -I {input_node.output_paths[bam]} \
+                -o {{output_dir}}/{{outputs[intervals]}} \
+                --known {settings.indels_1000g_phase1_path} \
+                --known {settings.mills_path}
+            """,
+            {}
+        )
 
-def RealignerTargetCreator(input_bam,output_recal_intervals):
-    s = r"""
-    {settings.GATK_cmd} \
-    -T RealignerTargetCreator \
-    -R {settings.reference_fasta_path} \
-    -I {input_bam} \
-    -o {output_recal_intervals} \
-    --known {settings.indels_1000g_phase1_path} \
-    --known {settings.mills_path}
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_recal_intervals=output_recal_intervals)
+class IndelRealigner(step.Step):
+    outputs = {'bam':'realigned.bam'}
+    mem_req = 2000
+    
+    def one2one_cmd(self,input_node,realignerTargetCreator_node,model='USE_READS'):
+        return (
+            r"""
+                {settings.GATK_cmd} \
+                -T IndelRealigner \
+                -R {settings.reference_fasta_path} \
+                -I {input_node.output_paths[bam]} \
+                -targetIntervals {targetIntervals} \
+                -o {{output_dir}}/{{outputs[intervals]}} \
+                -known {settings.indels_1000g_phase1_path} \
+                -known {settings.mills_path} \
+                -model {model}
+            """,
+            {'model':model}
+        )
 
-def IndelRealigner(input_bam,targetIntervals,output_bam,model='USE_READS'):
-    """
-    :param model: USE_READS or KNOWNS_ONLY or USE_SW
-    """
-    #TODO use SW?
-    s = r"""
-    {settings.GATK_cmd} \
-    -T IndelRealigner \
-    -R {settings.reference_fasta_path} \
-    -I {input_bam} \
-    -targetIntervals {targetIntervals} \
-    -o {output_bam} \
-    -known {settings.indels_1000g_phase1_path} \
-    -known {settings.mills_path} \
-    -model {model}
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,targetIntervals=targetIntervals,model=model)
+class BaseQualityScoreRecalibration(step.Step):
+    outputs = {'recal':'bqsr.recal'}
+    mem_req = 2000
+    
+    def one2one_cmd(self,input_node):
+        return (
+            r"""
+                {settings.GATK_cmd} \
+                -T BaseRecalibrator \
+                -R {settings.reference_fasta_path} \
+                -I {input_node.output_paths[bam]} \
+                -o {{output_dir}}/{{outputs[recal_report]}} \
+                -knownSites {settings.indels_1000g_phase1_path} \
+                -knownSites {settings.mills_path} \
+                --disable_indel_quals \
+                -cov ReadGroupCovariate \
+                -cov QualityScoreCovariate \
+                -cov CycleCovariate \
+                -cov ContextCovariate
+            """,
+            {}
+        )
 
-def BaseQualityScoreRecalibration(input_bam,output_recal_report):
-    #TODO use SW?
-    #--disable_indel_quals required by gatk2 lite
-    s = r"""
-    {settings.GATK_cmd} \
-    -T BaseRecalibrator \
-    -R {settings.reference_fasta_path} \
-    -I {input_bam} \
-    -o {output_recal_report} \
-    -knownSites {settings.indels_1000g_phase1_path} \
-    -knownSites {settings.mills_path} \
-    --disable_indel_quals \
-    -cov ReadGroupCovariate \
-    -cov QualityScoreCovariate \
-    -cov CycleCovariate \
-    -cov ContextCovariate
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_recal_report=output_recal_report)
+class PrintReads(step.Step):
+    outputs = {'bam':'recalibrated.bam'}
+    mem_req = 2000
+    
+    def one2one_cmd(self,input_node,bqsr_node):
+        return (
+            r"""
+                {settings.GATK_cmd} \
+                -T PrintReads \
+                -R {settings.reference_fasta_path} \
+                -I {input_node.output_paths[bam]} \
+                -o {{output_dir}}/{{outputs[bam]}}  \
+                -BQSR {{bqsr_node[recal]}}
+            """,
+            {}
+        )
 
-def PrintReads(input_bam,output_bam,input_recal_report):
-    #TODO use SW?
-    s = r"""
-    {settings.GATK_cmd} \
-    -T PrintReads \
-    -R {settings.reference_fasta_path} \
-    -I {input_bam} \
-    -o {output_bam} \
-    -BQSR {input_recal_report}
-    """
-    return _parse_cmd(s,input_bam=input_bam,output_bam=output_bam,input_recal_report=input_recal_report)
-
-def HaplotypeCaller(input_bam,output_bam,interval,glm):
-    pass
+class PrintReads(step.Step):
+    outputs = {'bam':'recalibrated.bam'}
+    mem_req = 2000
+    
+    def one2many_cmd(self,input_node,contigs):
+        return (
+            r"""
+                {settings.GATK_cmd} \
+                -T PrintReads \
+                -R {settings.reference_fasta_path} \
+                -I {input_node.output_paths[bam]} \
+                -o {{output_dir}}/{{outputs[bam]}}  \
+                -BQSR {{bqsr_node[recal]}}
+            """,
+            {}
+        )
 
 def UnifiedGenotyper(input_bams,output_bam,interval,glm):
     input_bams = ' '.join([ '-I {0}'.format(ib) for ib in input_bams ])

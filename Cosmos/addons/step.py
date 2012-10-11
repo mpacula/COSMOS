@@ -1,14 +1,17 @@
 from Cosmos.helpers import parse_cmd
 
 workflow = None
+settings = {}
 
 def merge_dicts(x,y):
     for k,v in y.items(): x[k]=v
     return x
 
 def parse_cmd2(string,dictnry,**kwargs):
-    'shortcut to combine with dict with kwargs'
-    return parse_cmd(string,**merge_dicts(kwargs,dictnry))
+    'shortcut to combine with dict with kwargs and extra_parse_cmd_dict'
+    d = merge_dicts(kwargs,dictnry)
+    d['settings'] = settings
+    return parse_cmd(string,**d)
 
 def dict2str(d):
     return ' '.join([ '{0}-{1}'.format(k,v) for k,v in d.items() ])
@@ -16,7 +19,7 @@ def dict2str(d):
 class Step():
     outputs = {}
     
-    def __init__(self,name=None,**kwargs):
+    def __init__(self,name=None,hard_reset=False,**kwargs):
         """
         :param \*\*kwargs:  
         """
@@ -24,7 +27,7 @@ class Step():
             name = type(self)
         self.name = name 
         
-        self.batch = workflow.add_batch(self.name)
+        self.batch = workflow.add_batch(self.name,hard_reset=hard_reset)
         
     def _parse_command_string(self):
         pass
@@ -63,7 +66,7 @@ class Step():
     def many2one(self,input_batch,group_by,*args,**kwargs):
         """ :param group_by: a list of tag keywords with which to parallelize input by"""
         for tags,input_nodes in input_batch.group_nodes_by(*group_by):
-            cmd, cmd_dict = self.many2one_cmd(input_nodes=input_nodes)
+            cmd, cmd_dict = self.many2one_cmd(input_nodes=input_nodes,tags=tags)
             self.batch.add_node(name = dict2str(tags),
                                 pcmd = parse_cmd2(cmd,cmd_dict,tags=tags),
                                 tags = tags,
@@ -77,7 +80,7 @@ class Step():
         "The command to run"
         raise NotImplementedError()
     
-    def many2one_cmd(self,input_node,*args,**kwargs):
+    def many2one_cmd(self,input_nodes,tags,*args,**kwargs):
         "The command to run"
         raise NotImplementedError()
     

@@ -136,7 +136,6 @@ class JobAttempt(models.Model):
                                  'avg_num_threads','max_num_threads',
                             ])
                       ]
-                         
     
     drmaa_info = PickledObjectField(null=True) #drmaa_info object returned by python-drmaa will be slow to access
     jobTemplate = None 
@@ -172,10 +171,20 @@ class JobAttempt(models.Model):
         Creates a JobTemplate.
         ``base_template`` must be passed down by the JobManager
         """
+        
+        cmd = "python {profile} -d {db} -f {profile_out} {command_script_path}".format(
+                                                                                           profile = os.path.join(cosmos_session.cosmos_settings.home_path,'Cosmos/profile/profile.py'),
+                                                                                           db = self.profile_output_path+'.sqlite',
+                                                                                           profile_out = self.profile_output_path,
+                                                                                           command_script_path = self.command_script_path
+                                                                                           )
+        
         self.jobTemplate = base_template
         self.jobTemplate.workingDirectory = os.getcwd()
-        self.jobTemplate.remoteCommand = self.command_script_path #TODO create a bash script that this this command_script_text
+        #self.jobTemplate.remoteCommand = self.command_script_path
         #self.jobTemplate.args = self.command_script_text.split(' ')[1:]
+        self.jobTemplate.remoteCommand = cmd.split(' ')[0]
+        self.jobTemplate.args = cmd.split(' ')[1:]
         self.jobTemplate.jobName = 'ja-'+self.jobName
         self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stdout'.format(self.id))
         self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stderr'.format(self.id))
@@ -322,13 +331,7 @@ class JobManager(models.Model):
     def __create_command_sh(self,jobAttempt):
         """Create a sh script that will execute command"""
         with open(jobAttempt.command_script_path,'wb') as f:
-            hp = cosmos_session.cosmos_settings.home_path
             f.write("#!/bin/sh\n")
-            f.write("python {profile} -d {db} -f {profile_out} \\".format(profile = os.path.join(hp,'Cosmos/profile/profile.py'),
-                                              db = jobAttempt.profile_output_path+'.sqlite',
-                                              profile_out = jobAttempt.profile_output_path
-                                              ))
-            f.write("\n")
             f.write(jobAttempt.command)
         os.system('chmod 700 {0}'.format(jobAttempt.command_script_path))
         
@@ -390,19 +393,16 @@ class JobManager(models.Model):
         Waits for any job to finish, and returns that JobAttempt.  If there are no jobs left, returns None.
         """
         try:
-            disable_stderr() #python drmaa prints whacky messages sometimes
+            disable_stderr() #python drmaa prints whacky messages sometimes.  if the script just quits without printing anything, something really bad happend while stderr is disabled
             drmaa_info = cosmos_session.drmaa_session.wait(jobId=drmaa.Session.JOB_IDS_SESSION_ANY,timeout=drmaa.Session.TIMEOUT_NO_WAIT)
+            enable_stderr()
         except drmaa.errors.InvalidJobException as e: #throws this when there are no jobs to wait on.  This should never happen since we should check for num_queued_jobs in yield_all_queued_jobs
             enable_stderr()
-            print e
-            self.workflow.log.error('ddrmaa_session.wait threw invalid job exception.  there are no jobs left?')
+            self.workflow.log.error('drmaa_session.wait threw invalid job exception.  there are no jobs left.  make sure jobs are queued before calling _check_for_finished_job.')
             raise
-        except Exception as e:
+        except drmaa.errors.ExitTimeoutException:
+            #jobs are queued, but none are done yet
             enable_stderr()
-            if type(e) == drmaa.errors.ExitTimeoutException: #jobs are queued, but none are done yet
-                return None
-            #there was a real error
-            self.workflow.log.error(e)
             return None
         finally:
             enable_stderr()
@@ -422,9 +422,11 @@ class JobManager(models.Model):
                 sys.stderr.write('\b')
             except drmaa.errors.InvalidJobException:
                 break
+            
             if j != None:
                 yield j
-            time.sleep(1)
+            else:
+                time.sleep(1) #dont sleep if a job just returned
             
     def delete(self,*args,**kwargs):
         "Deletes this job manager"

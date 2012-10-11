@@ -1,3 +1,6 @@
+import time
+start_time = time.time()
+
 import subprocess,time,sys,re,os,sqlite3,json,signal
 import read_man_proc
 import logging
@@ -100,7 +103,6 @@ class Profile:
     def run(self):
         """
         Runs a process and records the memory usage of it and all of its descendants"""
-        self.start_time = time.time()
         self.proc = subprocess.Popen(self.command,shell=True)
         while True:
             self.poll_all_procs(pids=self.all_pids)
@@ -161,6 +163,7 @@ class Profile:
     def analyze_records(self):
         """
         Summarizes and aggregates all the resource usage of self.all_pids
+        :returns: a dictionary of profiled statistics
         """
         #aggregate and summarize all the polls
         self.c.execute("""
@@ -222,16 +225,21 @@ class Profile:
         
         profiled_procs = dict(profiled_inserts + profiled_updates)
         SC_CLK_TCK = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
-        profiled_procs['wall_time'] = round((self.end_time - self.start_time) * SC_CLK_TCK)
+        
+        for time_var in ['user_time','system_time','block_io_delays']: #convert to seconds
+            profiled_procs[time_var] = int(profiled_procs[time_var] / SC_CLK_TCK)
+        
         profiled_procs['cpu_time'] = profiled_procs['user_time'] + profiled_procs['system_time']
-        profiled_procs['percent_cpu'] = int(round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)*100)
         profiled_procs['exit_status'] = self.proc.poll()
-        profiled_procs['SC_CLK_TCK'] = SC_CLK_TCK #usually is 100, or centiseconds 
+        #profiled_procs['SC_CLK_TCK'] = SC_CLK_TCK #usually is 100, or centiseconds 
+        
+        end_time = time.time() #waiting till last second
+        profiled_procs['wall_time'] = round(end_time - start_time)
+        profiled_procs['percent_cpu'] = int(round(float(profiled_procs['cpu_time'])/float(profiled_procs['wall_time']),2)*100)
         return profiled_procs
     
     def finish(self):
         """Executed when self.proc has finished"""
-        self.end_time = time.time()
         result = self.analyze_records()
         if self.output_file != None:
             self.output_file.write(json.dumps(result,indent=4,sort_keys=True))
