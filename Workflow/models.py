@@ -190,7 +190,8 @@ class Workflow(models.Model):
         
     def add_batch(self,name, hard_reset=False):
         """
-        Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists, return the existing one.
+        Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists,
+        and it hasn't been added in this session yet, return the existing one.
         
         :parameter name: The name of the batch, must be unique within this Workflow. Required.
         :parameter hard_reset: Delete any batch with this name including all of its nodes, and return a new one. Optional.

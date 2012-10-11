@@ -67,7 +67,7 @@ def get_drmaa_ns(DRM,mem_req,time_limit=None):
 def validate_name(txt,field_name=''):
     """
     Validates that txt is alphanumeric and underscores, decimals, or hyphens only
-    """
+    """ 
     if re.match('^[a-zA-Z0-9_\.\s-]+$',txt) == None:
         raise ValidationError('Field {} must be alphanumeric and underscores, periods, spaces, or hyphens only.  Text that failed: {}'.format(field_name,txt))
     

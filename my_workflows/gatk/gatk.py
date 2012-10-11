@@ -4,9 +4,8 @@ import commands
 from sample import Sample,Fastq
 import os
 
-
 ##make samples dictionary
-input_dir='/nas/erik/48exomes'
+input_dir='/scratch/esg21/projects/48exomes'
 samples=[]
 
 for pool_dir in os.listdir(input_dir):
