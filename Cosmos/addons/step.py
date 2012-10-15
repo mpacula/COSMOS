@@ -44,7 +44,21 @@ class Step():
                                     tags = n.tags,
                                     outputs = self.outputs,
                                     mem_req = self.get_mem_req())
-        workflow.run_wait(self.batch)
+            workflow.run_wait(self.batch)
+        return self.batch
+    
+    def many2one(self,input_batch,group_by,*args,**kwargs):
+        """ :param group_by: a list of tag keywords with which to parallelize input by"""
+        #TODO make sure there are no name conflicts in kwargs and 'input_batch' and 'group_by'
+        if not self.batch.successful:
+            for tags,input_nodes in input_batch.group_nodes_by(*group_by):
+                cmd, cmd_dict = self.many2one_cmd(input_nodes=input_nodes,tags=tags,*args,**kwargs)
+                self.batch.add_node(name = dict2str(tags),
+                                    pcmd = parse_cmd2(cmd,cmd_dict,tags=tags),
+                                    tags = tags,
+                                    outputs = self.outputs,
+                                    mem_req = self.get_mem_req())
+            workflow.run_wait(self.batch)
         return self.batch
     
     def one2many(self,input_batch,*args,**kwargs):
@@ -60,32 +74,55 @@ class Step():
                                         tags = new_tags,
                                         outputs = self.outputs,
                                         mem_req = self.get_mem_req())
-        workflow.run_wait(self.batch)
+            workflow.run_wait(self.batch)
         return self.batch
     
-    def many2one(self,input_batch,group_by,*args,**kwargs):
-        """ :param group_by: a list of tag keywords with which to parallelize input by"""
-        for tags,input_nodes in input_batch.group_nodes_by(*group_by):
-            cmd, cmd_dict = self.many2one_cmd(input_nodes=input_nodes,tags=tags)
-            self.batch.add_node(name = dict2str(tags),
-                                pcmd = parse_cmd2(cmd,cmd_dict,tags=tags),
-                                tags = tags,
-                                outputs = self.outputs,
-                                mem_req = self.get_mem_req())
-        workflow.run_wait(self.batch)
+    def many2many(self,input_batch,*args,**kwargs):
+        """
+        Used when the parallelization is complex enough that the command should specify it.  The func:`self.many2many_cmd` will be passed
+        the entire input_batch rather than any nodes.
+        """
+        if not self.batch.successful:
+            for cmd,cmd_dict,new_tags in self.many2many_cmd(input_batch=input_batch,*args,**kwargs):
+                self.batch.add_node(name = dict2str(new_tags),
+                                    pcmd = parse_cmd2(cmd,cmd_dict,input_batch=input_batch,tags=new_tags),
+                                    tags = new_tags,
+                                    outputs = self.outputs,
+                                    mem_req = self.get_mem_req())
+            workflow.run_wait(self.batch)
         return self.batch
     
     
     def one2one_cmd(self,input_node,*args,**kwargs):
-        "The command to run"
+        """
+        The command to run
+        
+        :returns: (pcmd, pcmd_format_dictionary)
+        """
         raise NotImplementedError()
     
     def many2one_cmd(self,input_nodes,tags,*args,**kwargs):
-        "The command to run"
+        """"
+        The command to run
+        
+        :returns: (pcmd, pcmd_format_dictionary)
+        """
         raise NotImplementedError()
     
     def one2many_cmd(self,input_node,*args,**kwargs):
-        "The command to run"
+        """
+        The command to run
+        
+        :yields: [(pcmd, pcmd_format_dictionary, add_tags)]
+        """
+        raise NotImplementedError()
+    
+    def many2many_cmd(self,input_batch,*args,**kwargs):
+        """
+        The command to run
+        
+        :yields: [(pcmd, pcmd_format_dictionary, new_tags).  new_tags cannot be empty.]
+        """
         raise NotImplementedError()
     
     

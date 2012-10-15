@@ -8,6 +8,11 @@ from JobManager.models import JobAttempt
 register = template.Library()
 
 @register.filter
+def aslist(o):
+    return [o]
+
+
+@register.filter
 def underscore2space(s):
     return re.sub('_',' ',s)
 
@@ -46,12 +51,21 @@ def format_resource_usage(in_field_name,val):
 #                pass
     return val
             
-        
+
+@register.filter
+def format_memory(kb):
+    """converts kb to human readible"""
+    if kb is None: return '-'
+    mb = kb/1024
+    gb = mb/1024
+    if gb > 1:
+        return "%s GB" % round(gb,2)
+    else:
+        return "%s MB" % round(mb,2)
 
 @register.filter
 def format_time(seconds):
-    if not seconds:
-        seconds =0
+    if not seconds: return '-'
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     d, h = divmod(h, 24)

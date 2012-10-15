@@ -1,0 +1,41 @@
+{% load extras %}
+
+<table class="table table-condensed table-hover">
+    <tbody>
+    <tr><th>Step</th><th>Batch</th><th></th><th>Progress</th><th>Nodes</th><th>Max Job Time</th><th>Total Job Time</th>
+        
+        <th>Average RSS</th>
+        <th>Average Virtual Ram</th>
+        
+        {% if details %}
+        <th>Created</th>
+        <th>Finished</th>
+        {% endif %}
+    </tr>
+    {% for batch in batches %}
+        <tr onclick="window.location.href = '{{batch.url}}';" style="cursor:pointer">
+            <td>{{batch.order_in_workflow}}.</td>
+            <td>[{{batch.id}}] <strong>{{batch.name|underscore2space}}</strong></td>
+            <td>
+                {%with status=batch.status %}
+                    {%if status == "successful"%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
+                    {%if status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
+                    {%if status == "in_progress"%}<i class="icon-refresh" rel="tooltip" title="In Progress"></i>{%endif%}
+                {%endwith%}
+                </td>
+            <td><div style="padding:0px;margin:0px" class="progress progress-{% status2csstype batch.status %} progress-striped" rel="tooltip" title="{{batch.percent_done}}% Completed" data-placement="right">
+                    <div class="bar" style="opacity:.75;width:{{batch.percent_done}}%"%></div>
+                </div></td>
+            <td>{{batch.num_nodes_successful}}/{{batch.num_nodes}}</td>
+            <td>{{batch.max_job_time|format_time}}</td>
+            <td>{{batch.total_job_time|format_time}}</td>
+            <td>{{batch.avg_job_rss|format_memory}}</td>
+            <td>{{batch.avg_job_virtual|format_memory}}</td>
+            {% if details %}
+               <td>{{batch.created_on|date:"SHORT_DATETIME_FORMAT"}}</td>
+               <td>{{batch.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
+            {% endif %}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

@@ -27,16 +27,13 @@ decode_drmaa_state = SortedDict([
 
 #real_stdout = os.dup(1)
 real_stderr = os.dup(2)
+devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
 def disable_stderr():
     sys.stderr.flush()
-    devnull = os.open('/dev/null', os.O_WRONLY)
     os.dup2(devnull,2)
-    sys.stderr.flush()
 def enable_stderr():
     sys.stderr.flush()
-    os.close(os.dup(2)) #close devnull
     os.dup2(real_stderr,2)
-    sys.stderr.flush()
   
 class JobStatusError(Exception):
     pass
@@ -73,8 +70,8 @@ class JobAttempt(models.Model):
     drmaa_jobID = models.BigIntegerField(null=True) #drmaa drmaa_jobID, note: not database primary key
     
     #time
-    system_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in kernel mode, measured in clock ticks (divide by sysconf(_SC_CLK_TCK)')
-    user_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in user mode, measured in clock ticks (divide  by sysconf(_SC_CLK_TCK).   This  includes  guest time,  guest_time  (time  spent  running a virtual CPU, see below), so that applications that are not aware of the guest time field do not lose that time from their calculations')
+    system_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in kernel mode')
+    user_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in user mode.   This  includes  guest time,  guest_time  (time  spent  running a virtual CPU, see below), so that applications that are not aware of the guest time field do not lose that time from their calculations')
     cpu_time = models.IntegerField(null=True,help_text='system_time + user_time')
     wall_time = models.IntegerField(null=True,help_text='Elapsed real (wall clock) time used by the process.')
     percent_cpu = models.IntegerField(null=True,help_text='(cpu_time / wall_time) * 100')
@@ -102,7 +99,7 @@ class JobAttempt(models.Model):
     #io
     nonvoluntary_context_switches = models.IntegerField(null=True,help_text='Number of non voluntary context switches')
     voluntary_context_switches = models.IntegerField(null=True,help_text='Number of voluntary context switches')
-    block_io_delays = models.IntegerField(null=True,help_text='Aggregated block I/O delays, measured in clock ticks')
+    block_io_delays = models.IntegerField(null=True,help_text='Aggregated block I/O delays')
     avg_fdsize = models.IntegerField(null=True,help_text='Average number of file descriptor slots allocated')
     max_fdsize = models.IntegerField(null=True,help_text='Maximum number of file descriptor slots allocated')
     
@@ -145,13 +142,25 @@ class JobAttempt(models.Model):
     def node(self):
         "This job's node"
         return self.node_set.get()
+
+    @staticmethod
+    def profile_fields_as_list():
+        ':returns: [profile_fields], a simple list of profile_field names, without their type information'
+        return reduce(lambda x,y: x+y,[tf[1] for tf in JobAttempt.profile_fields])
+        
             
     @property
     def resource_usage(self):
-        ":returns: (name,val,help,type)"
+        ":returns: (name,value,help,type)"
         for type,fields in self.profile_fields:
             for field in fields:
                 yield field, getattr(self,field), self._meta.get_field(field).help_text, type
+        
+    @property
+    def resource_usage_short(self):
+        ":returns: (name,value)"
+        for field in JobAttempt.profile_fields_as_list():
+            yield field, getattr(self,field)
                     
     def update_from_profile(self):
         """Updates the resource usage from profile output"""
@@ -172,12 +181,11 @@ class JobAttempt(models.Model):
         ``base_template`` must be passed down by the JobManager
         """
         
-        cmd = "python {profile} -d {db} -f {profile_out} {command_script_path}".format(
-                                                                                           profile = os.path.join(cosmos_session.cosmos_settings.home_path,'Cosmos/profile/profile.py'),
-                                                                                           db = self.profile_output_path+'.sqlite',
-                                                                                           profile_out = self.profile_output_path,
-                                                                                           command_script_path = self.command_script_path
-                                                                                           )
+        cmd = "python {profile} -d {db} -f {profile_out} {command_script_path}".format(profile = os.path.join(cosmos_session.cosmos_settings.home_path,'Cosmos/profile/profile.py'),
+                                                                                       db = self.profile_output_path+'.sqlite',
+                                                                                       profile_out = self.profile_output_path,
+                                                                                       command_script_path = self.command_script_path
+                                                                                       )
         
         self.jobTemplate = base_template
         self.jobTemplate.workingDirectory = os.getcwd()
@@ -404,6 +412,9 @@ class JobManager(models.Model):
             #jobs are queued, but none are done yet
             enable_stderr()
             return None
+        except Exception as e:
+            enable_stderr()
+            print e
         finally:
             enable_stderr()
             

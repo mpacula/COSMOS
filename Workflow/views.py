@@ -86,27 +86,27 @@ def view_log(request,pid):
 
 @never_cache
 def analysis(request,pid):
-    from rpy2.robjects import r as R
-    from django.conf import settings
+    #from rpy2.robjects import r as R
+    from django.conf import settings as django_settings
+    from cosmos_session import cosmos_settings
     
-    R("""renderer <- function(filename, title, units) {
-    dat <- rnorm(1000)
-    png(file=filename, width=720, height=480)
-    hist(dat, main=title, xlab=units)
-    dev.off()
-    }""")
     
     wf = Workflow.objects.get(pk=pid)
     
-    units ='test'
-    siteName='sitename'
     resultsDir = 'Workflow/plots'
     resultsFile = "{0}.png".format(wf.id)
-    resultsFile_path = os.path.join(settings.MEDIA_ROOT,resultsDir,resultsFile) 
-    plot_url = os.path.join(settings.MEDIA_URL,resultsDir,resultsFile)
+    resultsFile_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,resultsFile) 
+    plot_url = os.path.join(django_settings.MEDIA_URL,resultsDir,resultsFile)
+    plot_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,resultsFile)
     
-    R.renderer(resultsFile_path, "Random data for site %s (%s)" % (siteName, units), units)
-    return render_to_response('Workflow/analysis.html', { 'request':request,'plot_url':plot_url}, context_instance=RequestContext(request))
+    workflow = Workflow.objects.get(pk=pid)
+    ru_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,'resource_usage.csv')
+    ru_url = os.path.join(django_settings.MEDIA_URL,resultsDir,'resource_usage.csv')
+    plot_rscript_path = os.path.join(cosmos_settings.home_path,'Cosmos/profile/plot.R')
+    workflow.save_resource_usage_as_csv(ru_path)
+    cmd = 'Rscript {0} {1} {2}'.format(plot_rscript_path,ru_path, plot_path)
+    os.system(cmd)
+    return render_to_response('Workflow/analysis.html', { 'request':request,'plot_url':plot_url,'resource_usage_url':ru_url}, context_instance=RequestContext(request))
 
 
 

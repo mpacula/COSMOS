@@ -109,6 +109,10 @@ class Workflow(models.Model):
             wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir)
         
         active_workflows.append(wf.id) #used by ctrl+c signal to terminate
+        
+        #remove stale objects
+        wf._delete_stale_objects()
+        
         return wf
         
     
@@ -226,14 +230,12 @@ class Workflow(models.Model):
         b.save()
         return b
 
-#    def terminate(self):
-#        """
-#        Terminates this workflow, calls `self.finished()` and quits.
-#        """
-#        self.remote_terminate()
-#        self.finished()
-#        sys.exit(1)
-#        #self.log.warning('Executed {0}'.format(cmd))
+    def _delete_stale_objects(self):
+        """Deletes objects that are stale from the database.  This should only happens when the program exists ungracefully.
+        """
+        #TODO implement a catch all exception so that this never happens.  i think i can only do this if scripts are not run directly
+        for ja in JobAttempt.objects.filter(node_set=None): ja.delete()
+        
     
     def remote_terminate(self):
         """
@@ -270,7 +272,8 @@ class Workflow(models.Model):
     def save_resource_usage_as_csv(self,filename):
         """Save resource usage to filename"""
         import csv
-        keys = list(self.get_all_tag_keywords_used()) + ['batch','memory','time']
+        profile_fields = JobAttempt.profile_fields_as_list()
+        keys = ['batch'] + list(self.get_all_tag_keywords_used()) + profile_fields
         f = open(filename, 'wb')
         dict_writer = csv.DictWriter(f, keys)
         dict_writer.writer.writerow(keys)
@@ -280,7 +283,9 @@ class Workflow(models.Model):
     def yield_batch_resource_usage(self):
         "Yield's every batch's list of node's resource usage"
         for batch in self.batches:
-            yield [ n for n in batch.yield_node_resource_usage() ]
+            dicts = [ dict(nru) for nru in batch.yield_node_resource_usage() ]
+            for d in dicts: d['batch'] = re.sub('_',' ',batch.name)
+            yield dicts
             
     def delete(self, *args, **kwargs):
         """
@@ -301,11 +306,11 @@ class Workflow(models.Model):
             if os.path.exists(self.output_dir):
                 os.system('rm -rf {0}'.format(self.output_dir))
                 
-        self.batches.delete()
+        for b in self.batches: b.delete()
         super(Workflow, self).delete(*args, **kwargs)
                 
 
-    def _check_termination(self,check_for_leftovers = True):
+    def _check_termination(self):
         """
         Checks if the current workflow is terminating.  If it is terminating, it will
         initiate the termination sequence.
@@ -313,10 +318,7 @@ class Workflow(models.Model):
         if self._is_terminating():
             #make sure all jobs get returned
             self.log.warning("Termination sequence initiated.")
-            if check_for_leftovers:
-                self._check_and_wait_for_leftover_nodes()
-            self._clean_up()
-            
+            self.finished()
             self.log.warning("Workflow was terminated, exiting with exit code 2.")
             self._terminating=False
             self.save()
@@ -417,7 +419,7 @@ class Workflow(models.Model):
                     node._has_finished(jobAttempt) #job has failed and out of reattempts
                     if not self._is_terminating() and terminate_on_fail:
                         self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
-                        self.terminate()
+                        self.remote_terminate()
             
             if node.batch._are_all_nodes_done():
                 node.batch._has_finished()
@@ -440,10 +442,10 @@ class Workflow(models.Model):
         :param terminate_on_fail: If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
         """
         nodes = self.__wait(batch=batch,terminate_on_fail=terminate_on_fail)
-        self._check_termination(check_for_leftovers=True) #this is why there's a separate __wait() - so check_for_leftovers can call __wait() and not wait().  Otherwise checking for leftovers would loop forever!
+        self._check_termination() #this is why there's a separate __wait() - so check_for_leftovers can call __wait() and not wait().  Otherwise checking for leftovers would loop forever!
         return nodes
 
-    def run_wait(self,batch, terminate_on_fail=False):
+    def run_wait(self,batch, terminate_on_fail=True):
         """
         shortcut to run_batch(); wait(batch=batch);
         """
@@ -460,7 +462,11 @@ class Workflow(models.Model):
         
         """
         self._check_and_wait_for_leftover_nodes()
-        self._clean_up(delete_unused_batches=delete_unused_batches)
+        
+        self.log.debug("Cleaning up workflow")
+        if delete_unused_batches:
+            for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete() #these batches weren't used again after a __restart
+            
         self.finished_on = timezone.now()
         self.save()
         self.log.info('Finished.')
@@ -471,36 +477,25 @@ class Workflow(models.Model):
             self.log.warning("There are left over nodes in the queue, waiting for them to finish")
             self.__wait()
         
-    def _clean_up(self,delete_unused_batches=False):
-        """
-        Should be executed at the end of a workflow.
-        """
-        self.log.debug("Cleaning up workflow")
-        if delete_unused_batches:
-            Batch.objects.filter(workflow=self,order_in_workflow=None).delete() #these batches weren't used again after a __restart
                
-#        if self._is_terminating():
-#            for batch in self.batch_set.filter(status='in_progress').all():
-#                batch.status = 'failed'
-#                batch.save()
     
     def restart_from_here(self):
         """
         Deletes any batches in the history that haven't been added yet
         """
         self.log.info('Restarting Workflow from here.')
-        Batch.objects.filter(workflow=self,order_in_workflow=None).delete()
+        for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete()
     
-    def get_nodes_by(self,batch=None,op="and",**kwargs):
+    def get_nodes_by(self,batch=None,op="and",tags={}):
         """
-        Returns the list of nodes that are tagged by the keys and vals in \*\*kwargs dictionary
+        Returns the list of nodes that are tagged by the keys and vals in tags dictionary
         
-        :param op: Choose either 'and' or 'or' as the logic to filter tags with
-        :param \*\*kwargs: Any keywords you'd like to search for
+        :param op: either 'and' or 'or' as the logic to filter tags with
+        :param tags: tags to filter for
         :returns: a query result of the filtered nodes
         
-        >>> node.get_nodes_by(op='or',color='grey',color='orange')
-        >>> node.get_nodes_by(op='and',color='grey',shape='square')
+        >>> node.get_nodes_by(op='or',tags={'color':'grey','color':'orange')
+        >>> node.get_nodes_by(op='and',tags={'color':'grey','shape':'square')
         """
         
         if op == 'or':
@@ -513,27 +508,27 @@ class Workflow(models.Model):
             
         alltags = NodeTag.objects.filter(node__in=nodes)
             
-        for k,v in kwargs.items():
+        for k,v in tags.items():
             nodes = nodes.filter(nodetag__in=alltags.filter(key=k,value=v))
             
         return nodes
 
 
-    def get_node_by(self,batch=None,op="and",**kwargs):
+    def get_node_by(self,batch=None,op="and",tags={}):
         """
-        Returns the list of nodes that are tagged by the keys and vals in \*\*kwargs dictionary.
+        Returns the list of nodes that are tagged by the keys and vals in tags dictionary.
         
         :raises Exception: if more or less than one node is returned
         
         :param op: Choose either 'and' or 'or' as the logic to filter tags with
-        :param \*\*kwargs: Any keywords you'd like to search for
+        :param tags: A dictionary of tags you'd like to filter for
         :returns: a query result of the filtered nodes
         
-        >>> node.get_node_by(op='or',color='grey',color='orange')
-        >>> node.get_node_by(op='and',color='grey',shape='square')
+        >>> node.get_node_by(op='or',tags = {'color':'grey','color':'orange'})
+        >>> node.get_node_by(op='and','color':'grey','shape':'square')
         """
     
-        nodes = self.get_nodes_by(batch=batch,op=op,**kwargs)
+        nodes = self.get_nodes_by(batch=batch,op=op,tags=tags) #there's just one group of nodes with this tag combination
         n = nodes.count()
         if n>1:
             raise Exception("More than one node with tags {0}".format(kwargs))
@@ -597,25 +592,29 @@ class Batch(models.Model):
             if status == 'in_progress' or status == 'failed':
                 return 1
             return 0
-        r = round(100 * float(done) / float(total))
+        r = int(100 * float(done) / float(total))
         return r if r > 1 else 1
     
     @property
     def max_job_time(self):
         "Max job time of all jobs in this batch"
-        m = JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Max('cpu_time'))['cpu_time__max']
-        if m is None:
-            return None
-        return m
+        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Max('cpu_time'))['cpu_time__max']
+    
+    @property
+    def avg_job_rss(self):
+        "Average resident set size for jobs in this batch"
+        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Avg('avg_rss_mem'))['avg_rss_mem__avg']
+
+    @property
+    def avg_job_virtual(self):
+        "Average virtual memory for jobs in this batch"
+        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Avg('avg_virtual_mem'))['avg_virtual_mem__avg']
     
     @property
     def total_job_time(self):
         "Total job time of all jobs in this batch"
-        t = JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('cpu_time'))['cpu_time__sum']
-        if t is None:
-            return None
-        return t
-    
+        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('cpu_time'))['cpu_time__sum']
+        
     @property
     def file_size(self):
         "Size of the batch's output_dir"
@@ -636,6 +635,10 @@ class Batch(models.Model):
         "The number of nodes in this batch"
         return Node.objects.filter(batch=self).count()
     
+    @property
+    def num_nodes_successful(self):
+        return Node.objects.filter(batch=self,successful=True).count()
+    
     def get_all_tag_keywords_used(self):
         """Returns a set of all the keyword tags used on any node in this batch"""
         return set([ d['key'] for d in NodeTag.objects.filter(node__in=self.nodes).values('key') ])
@@ -647,19 +650,8 @@ class Batch(models.Model):
         #TODO rework with time fields
         for node in self.nodes: 
             sja = node.get_successful_jobAttempt()
-            memory = '0'
-            cpu_time = 0
-            if sja and sja._drmaa_info: #TODO missing this  stuff is caused by errors.  fix those errors and delete this
-                    if sja.drmaa_utime: utime = sja.drmaa_utime 
-                    try:
-                        memory = sja._drmaa_info['resourceUsage']['mem']
-                    except KeyError:
-                        pass
-            #fs = helpers.folder_size(node.output_dir,human_readable=False) #TODO make obj.file_size a fxn not a property
-            info = { 'batch':self.name, 'memory':memory,'time':time }
-            for k,v in node.tags.items():
-                info[k] = v
-            yield info
+            if sja: 
+                yield [jru for jru in sja.resource_usage_short] + node.tags.items() #add in tags to resource usage tuples
         
     def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, mem_req=0, time_limit=None):
         """
@@ -717,7 +709,7 @@ class Batch(models.Model):
                 batch.successful = False
                 batch.save()
         
-        #this error should never occur    
+        #this error should never occur?
         elif not created and not self.successful:
             if self.workflow.resume_from_last_failure and node.successful:
                 self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history.".format(node,node.batch))
@@ -746,7 +738,7 @@ class Batch(models.Model):
         All it does is sets status as either failed or successful
         """
         num_nodes = Node.objects.filter(batch=self).count()
-        num_nodes_successful = Node.objects.filter(batch=self,successful=True).count()
+        num_nodes_successful = self.num_nodes_successful
         num_nodes_failed = Node.objects.filter(batch=self,status='failed').count()
         if num_nodes_successful == num_nodes:
             self.successful = True
@@ -755,6 +747,9 @@ class Batch(models.Model):
         elif num_nodes_failed + num_nodes_successful == num_nodes:
             self.status='failed'
             self.log.warning('Batch {0} failed!'.format(self))
+        else:
+            #jobs are not done so this shouldn't happen
+            raise Exception('Batch._has_finished() called, but not all nodes are completed.')
         
         self.finished_on = timezone.now()
         self.save()
@@ -767,13 +762,13 @@ class Batch(models.Model):
         """
         return self.workflow.get_nodes_by(batch=self, op=op, **kwargs)
     
-    def get_node_by(self,op='and',**kwargs):
+    def get_node_by(self,op='and',tags={}):
         """
         An alias for :func:`Workflow.get_node_by` with batch=self
         
         :returns: a queryset of filtered nodes
         """
-        return self.workflow.get_node_by(batch=self, op=op, **kwargs)
+        return self.workflow.get_node_by(batch=self, op=op, tags=tags)
                 
     def group_nodes_by(self,*args):
         """
@@ -806,7 +801,7 @@ class Batch(models.Model):
         Deletes this batch and all files associated with it.
         """
         self.log.debug('Deleting Batch {0}'.format(self.name))
-        self.nodes.delete()
+        for n in self.nodes: n.delete()
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         super(Batch, self).delete(*args, **kwargs)
@@ -984,7 +979,7 @@ class Node(models.Model):
         """
         self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
         #todo delete stuff in output_paths that may be extra files
-        self._jobAttempts.all().delete()
+        for ja in self._jobAttempts.all(): ja.delete()
         self.nodetags.delete()
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
