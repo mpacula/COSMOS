@@ -34,10 +34,9 @@
 <dt>Drmaa native_specification</dt>  <dd>{{jobAttempt.drmaa_native_specification}}</dd>
 <dt>Drmaa info</dt>  <dd>{{jobAttempt.drmaa_info}}</dd>
 </dl>
-
-<h4>Resource Usage
-	 <i class="icon icon-resize-full" data-toggle="collapse" data-target="#demo" style="cursor:pointer"></i>
-</h4>
+<p>
+<button class="btn btn-medium btn-inverse" data-toggle="collapse" data-target="#demo" >Resource Usage <i class="icon icon-resize-full icon-white"></i></button>
+</p>
 <div id="demo" class="collapse">
 <table class="table table-condensed">
 	<thead>
@@ -47,12 +46,12 @@
 	{%for name,val,help,type in jobAttempt.resource_usage %}
 		<tr>
 			<td style="vertical-align:middle"><em>{{name|underscore2space}}</em></td>
-			<td style="padding:0 35px; vertical-align:middle">{% format_resource_usage name val %}</td>
+			<td style="padding:0 35px; vertical-align:middle">{% format_resource_usage name val help %}</td>
 			<td style="padding:0 35px; vertical-align:middle">{{type}}</td>
 			<td><small>{{help}}</small></td>
 		</tr>
 		{% empty %}
-		<tr><td>No Resource Usage Data</td></tr>
+		<tr><td colspan="4">No Resource Usage Data.</td></tr>
 	{%endfor%}
 	</tbody>
 </table>

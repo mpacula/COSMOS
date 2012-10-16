@@ -21,7 +21,7 @@ batch_echo.add_node(name='3', pcmd='echo "don\'t reverse me" > {output_dir}/{out
 workflow.run_wait(batch_echo)
 
 batch_reverse = workflow.add_batch("Reverse the Echo")
-for node in batch_echo.get_nodes_by(reverse="yes"):
+for node in batch_echo.get_nodes_by({'reverse':"yes"}):
     input_path = node.output_paths['out']
     batch_reverse.add_node(name=node.name, pcmd='rev %s > {output_dir}/{outputs[out]}'%input_path, outputs = {'out':'rev.out'})
 workflow.run_wait(batch_reverse)

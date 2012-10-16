@@ -1,51 +1,32 @@
 import cosmos_session
 from Workflow.models import Workflow
+from Cosmos.addons import step
 import steps
 from sample import Sample,Fastq
 import os
 
 
 WF = Workflow.start(name='GPP 48Exomes GATK2',restart=False)
-steps.step.workflow = WF
+step.workflow = WF
 assert isinstance(WF, Workflow)
 
 ##make samples dictionary
-input_dir='/nas/erik/test_data'
 samples=[]
 
-#for pool_dir in os.listdir(input_dir):
-#    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(os.path.join(input_dir,pool_dir))):
-#        samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
+input_dir='/nas/erik/test_data'
+#input_dir='/scratch/esg21/test_data'
 for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
     samples.append(Sample.createFromPath(os.path.join(input_dir,sample_dir)))
 
+#input_dir='/scratch/esg21/projects/48exomes/'
+#for pool_dir in os.listdir(input_dir):
+#    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(os.path.join(input_dir,pool_dir))):
+#        samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
 
-contigs = [str(x) for x in range(1,23)+['X','Y']] #list of chroms: [1,2,3,..X,Y]
 
 ### Alignment
-
-bwa_aln = WF.add_batch("BWA Align")
-if not bwa_aln.successful:
-    for sample in samples:
-        for fqp in sample.yield_fastq_pairs():
-            for fq in fqp:
-                bwa_aln.add_node(name = fq.filename,
-                    pcmd = steps.bwa_aln(fastq=fq.path,
-                                            output_sai='{output_dir}/{outputs[sai]}'),
-                    outputs = {'sai':'align.sai'},
-                    tags = {
-                    'sample':sample.name,
-                    'lane': fq.lane,
-                    'fq_partNumber': fq.partNumber,
-                    'fq_path': fq.path,
-                    'RG_ID':'%s.L%s' % (sample.flowcell,fq.lane),
-                    'RG_LIB':'LIB-%s' % sample.name,
-                    'RG_PLATFORM':'ILLUMINA',
-                },
-                mem_req=3500)
-    WF.run_wait(bwa_aln)
-
-bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=bwa_aln,group_by=['sample','lane','fq_partNumber'])
+bwa_aln = steps.BWA_Align("BWA Align").many2many(input_batch=None,samples=samples)
+bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=bwa_aln,group_by=['sample','lane','fq_chunk'])
 clean_bams = steps.CleanSam("Clean Bams").one2one(input_batch=bwa_sampe,input_type='sam')
 
 ### Cleaning
@@ -78,10 +59,18 @@ sample_bams = steps.MergeSamFiles("Merge Bams by Sample").many2one(input_batch=r
 deduped_samples = steps.MarkDuplicates("Mark Duplicates in Samples").one2one(input_batch=sample_bams)
 index_samples = steps.BuildBamIndex("Index Deduped Samples").one2one(input_batch=deduped_samples)
 rtc_samples = steps.RealignerTargetCreator("RealignerTargetCreator Samples").one2one(input_batch=deduped_samples)
-realigned_samples = steps.IndelRealigner("IndelRealigner Samples").one2one(input_batch=deduped_lane,rtc_batch=rtc_samples,model='USE_READS')
+realigned_samples = steps.IndelRealigner("IndelRealigner Samples").one2one(input_batch=deduped_samples,rtc_batch=rtc_samples,model='USE_READS')
 
 # Variant Calling
-
-    
+contigs = [str(x) for x in range(1,23)+['X','Y']] #list of chroms: [1,2,3,..X,Y]
+ug = steps.UnifiedGenotyper("Unified Genotyper").many2many(input_batch=realigned_samples,intervals=contigs)
+cv1 = steps.CombineVariants("Combine Variants",hard_reset=True).many2one(input_batch=ug,group_by=['glm'])
+if len(samples) > 19:
+    inbreeding_coeff = True
+else:
+    inbreeding_coeff = False
+vqr = steps.VariantQualityRecalibration("Variant Quality Recalibration").one2one(cv1,exome_or_wgs='exome',inbreeding_coeff=inbreeding_coeff)
+ar = steps.ApplyRecalibration("Apply Recalibration").one2one(input_batch=cv1,vqr_batch=vqr)
+cv2 = steps.CombineVariants("Combine Variants2").many2one(input_batch=ar,group_by=[])
     
 WF.finished(delete_unused_batches=True)

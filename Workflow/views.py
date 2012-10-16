@@ -44,7 +44,7 @@ def batch_view(request,pid):
         tag_filters = all_filters.copy()
         for k,v in tag_filters.items():
             if v=='' or v==None or k =='f_status': del tag_filters[k] #filter tag_filters
-        nodes_list = batch.get_nodes_by(**tag_filters) 
+        nodes_list = batch.get_nodes_by(tag_filters) 
         fs = request.GET.get('f_status')
         if fs != None and fs != '': #might be none or ''
             nodes_list = nodes_list.filter(status=request.GET['f_status'])

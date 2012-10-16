@@ -465,6 +465,7 @@ class Workflow(models.Model):
         
         self.log.debug("Cleaning up workflow")
         if delete_unused_batches:
+            self.log.info("Deleting unused batches")
             for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete() #these batches weren't used again after a __restart
             
         self.finished_on = timezone.now()
@@ -486,7 +487,7 @@ class Workflow(models.Model):
         self.log.info('Restarting Workflow from here.')
         for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete()
     
-    def get_nodes_by(self,batch=None,op="and",tags={}):
+    def get_nodes_by(self,batch=None,tags={},op="and"):
         """
         Returns the list of nodes that are tagged by the keys and vals in tags dictionary
         
@@ -507,11 +508,10 @@ class Workflow(models.Model):
             nodes = self.nodes
             
         alltags = NodeTag.objects.filter(node__in=nodes)
+        Qs = map(lambda x: Q(key=x[0],value=x[1]),tags.items())    
+        tagsleft = alltags.filter(reduce(lambda x,y: x | y, Qs))
             
-        for k,v in tags.items():
-            nodes = nodes.filter(nodetag__in=alltags.filter(key=k,value=v))
-            
-        return nodes
+        return nodes.filter(nodetag__in=tagsleft)
 
 
     def get_node_by(self,batch=None,op="and",tags={}):
@@ -599,6 +599,16 @@ class Batch(models.Model):
     def max_job_time(self):
         "Max job time of all jobs in this batch"
         return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Max('cpu_time'))['cpu_time__max']
+     
+    @property
+    def avg_job_time(self):
+        "Average job time of all jobs in this batch"
+        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Avg('cpu_time'))['cpu_time__avg']    
+    
+    @property
+    def total_job_time(self):
+        "Total job time of all jobs in this batch"
+        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('cpu_time'))['cpu_time__sum']
     
     @property
     def avg_job_rss(self):
@@ -609,12 +619,7 @@ class Batch(models.Model):
     def avg_job_virtual(self):
         "Average virtual memory for jobs in this batch"
         return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Avg('avg_virtual_mem'))['avg_virtual_mem__avg']
-    
-    @property
-    def total_job_time(self):
-        "Total job time of all jobs in this batch"
-        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('cpu_time'))['cpu_time__sum']
-        
+
     @property
     def file_size(self):
         "Size of the batch's output_dir"
@@ -754,13 +759,13 @@ class Batch(models.Model):
         self.finished_on = timezone.now()
         self.save()
     
-    def get_nodes_by(self,op='and',**kwargs):
+    def get_nodes_by(self,tags={},op='and'):
         """
         An alias for :func:`Workflow.get_nodes_by` with batch=self
         
         :returns: a queryset of filtered nodes
         """
-        return self.workflow.get_nodes_by(batch=self, op=op, **kwargs)
+        return self.workflow.get_nodes_by(batch=self, tags=tags, op=op)
     
     def get_node_by(self,op='and',tags={}):
         """
@@ -770,31 +775,32 @@ class Batch(models.Model):
         """
         return self.workflow.get_node_by(batch=self, op=op, tags=tags)
                 
-    def group_nodes_by(self,*args):
+    def group_nodes_by(self,keys=[]):
         """
-        Yields nodes, grouped by tags in \*args.  Groups will be every unique set of possible values of tags.
-        For example, if you had nodes tagged by color, and shape, and you ran func:`batch.group_nodes_by`('color','shape'),
+        Yields nodes, grouped by tags in keys.  Groups will be every unique set of possible values of tags.
+        For example, if you had nodes tagged by color, and shape, and you ran func:`batch.group_nodes_by`(['color','shape']),
         this function would yield the group of nodes that exist in the various combinations of `colors` and `shapes`.
         So for example one of the yields might be (({'color':'orange'n'shape':'circle'}), [ orange_circular_nodes ])
         
-        :param \*args: Keywords of the tags you want to group by.
+        :param keys: The keys of the tags you want to group by.
         :yields: (a dictionary of this group's unique tags, nodes in this group).
         
-        .. note:: a missing tag is considered as None and thus its own grouped with other similar nodes.  You should generally try to avoid this scenario and have all nodes tagged by the keywords you're grouping by.
-        
-        .. note:: any nodes without a single one of the tags in \*args are not included.
+        .. note:: a missing tag is considered as None and thus placed into a 'None' group with other untagged nodes.  You should generally try to avoid this scenario and have all nodes tagged by the keywords you're grouping by.
         """
-        node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=args).values() #get this batch's tags
-        #filter out any nodes without all args
-        
-        node_id2tags = {}
-        for node_id, ntv in helpers.groupby(node_tag_values,lambda x: x['node_id']):
-            node_tags = dict([ (n['key'],n['value']) for n in ntv ])
-            node_id2tags[node_id] = node_tags
-        
-        for tags,node_id_and_tags_tuple in helpers.groupby(node_id2tags.items(),lambda x: x[1]):
-            node_ids = [ x[0] for x in node_id_and_tags_tuple ]
-            yield tags, Node.objects.filter(pk__in=node_ids)
+        if keys == []:
+            yield {},self.nodes
+        else:
+            node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=keys).values() #get this batch's tags
+            #filter out any nodes without all keys
+            
+            node_id2tags = {}
+            for node_id, ntv in helpers.groupby(node_tag_values,lambda x: x['node_id']):
+                node_tags = dict([ (n['key'],n['value']) for n in ntv ])
+                node_id2tags[node_id] = node_tags
+            
+            for tags,node_id_and_tags_tuple in helpers.groupby(node_id2tags.items(),lambda x: x[1]):
+                node_ids = [ x[0] for x in node_id_and_tags_tuple ]
+                yield tags, Node.objects.filter(pk__in=node_ids)
     
     def delete(self, *args, **kwargs):
         """

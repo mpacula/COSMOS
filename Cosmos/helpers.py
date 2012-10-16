@@ -69,7 +69,7 @@ def validate_name(txt,field_name=''):
     Validates that txt is alphanumeric and underscores, decimals, or hyphens only
     """ 
     if re.match('^[a-zA-Z0-9_\.\s-]+$',txt) == None:
-        raise ValidationError('Field {} must be alphanumeric and underscores, periods, spaces, or hyphens only.  Text that failed: {}'.format(field_name,txt))
+        raise ValidationError('Field {0} must be alphanumeric and underscores, periods, spaces, or hyphens only.  Text that failed: {1}'.format(field_name,txt))
     
 def validate_not_null(field):
     if field == None:
@@ -92,7 +92,7 @@ def addExt(file_path,new_extension,remove_dir_path=True):
     """
     if remove_dir_path:
         dir,file_path = os.path.split(file_path)
-    return re.sub(r'^(.*)(\..+)$', r'\1.{}\2'.format(new_extension), file_path)
+    return re.sub(r'^(.*)(\..+)$', r'\1.{0}\2'.format(new_extension), file_path)
 
 def sizeof_fmt(num):
     for x in ['bytes','KB','MB','GB']:

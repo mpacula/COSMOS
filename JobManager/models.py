@@ -27,7 +27,8 @@ decode_drmaa_state = SortedDict([
 
 #real_stdout = os.dup(1)
 real_stderr = os.dup(2)
-devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
+#devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
+devnull = os.open('/dev/null', os.O_WRONLY)
 def disable_stderr():
     sys.stderr.flush()
     os.dup2(devnull,2)
@@ -154,7 +155,8 @@ class JobAttempt(models.Model):
         ":returns: (name,value,help,type)"
         for type,fields in self.profile_fields:
             for field in fields:
-                yield field, getattr(self,field), self._meta.get_field(field).help_text, type
+                val = getattr(self,field)
+                if val: yield field, val, self._meta.get_field(field).help_text,type
         
     @property
     def resource_usage_short(self):

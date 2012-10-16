@@ -2,7 +2,14 @@
 
 <table class="table table-condensed table-hover">
     <tbody>
-    <tr><th>Step</th><th>Batch</th><th></th><th>Progress</th><th>Nodes</th><th>Max Job Time</th><th>Total Job Time</th>
+    <tr><th>Step</th>
+        <th>Batch</th>
+        <th></th>
+        <th>Progress</th>
+        <th>Nodes</th>
+        <th>Avg Job Time</th>
+        <th>Max Job Time</th>
+        <th>Total Job Time</th>
         
         <th>Average RSS</th>
         <th>Average Virtual Ram</th>
@@ -27,6 +34,7 @@
                     <div class="bar" style="opacity:.75;width:{{batch.percent_done}}%"%></div>
                 </div></td>
             <td>{{batch.num_nodes_successful}}/{{batch.num_nodes}}</td>
+            <td>{{batch.avg_job_time|format_time}}</td>
             <td>{{batch.max_job_time|format_time}}</td>
             <td>{{batch.total_job_time|format_time}}</td>
             <td>{{batch.avg_job_rss|format_memory}}</td>

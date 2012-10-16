@@ -42,22 +42,36 @@ def mult(value, arg):
     return int(value) * int(arg)
 
 @register.simple_tag
-def format_resource_usage(in_field_name,val):
-#    for units,field_names in JobAttempt.time_field_units.items():
-#        if in_field_name in field_names:
-#            if units == 'seconds':
-#                return format_time(val)
-#            elif units == 'kilobytes':
-#                pass
-    return val
+def format_resource_usage(field_name,val,help_txt):
+    if re.search(r"\(Kb\)",help_txt):
+        if val == 0: return '0'
+        return "{0} ({1})".format(val,format_memory(val))
+    elif re.search(r"time",field_name):
+        return "{1}".format(val,format_time(val))
+    elif field_name=='percent_cpu':
+        return "{0}%".format(val)
+    elif type(val) in [int,long]:
+        return intWithCommas(val)
+    return str(val)
+
+def intWithCommas(x):
+    if type(x) not in [type(0), type(0L)]:
+        raise TypeError("Parameter must be an integer.")
+    if x < 0:
+        return '-' + intWithCommas(-x)
+    result = ''
+    while x >= 1000:
+        x, r = divmod(x, 1000)
+        result = ",%03d%s" % (r, result)
+    return "%d%s" % (x, result)
             
 
 @register.filter
 def format_memory(kb):
     """converts kb to human readible"""
     if kb is None: return '-'
-    mb = kb/1024
-    gb = mb/1024
+    mb = kb/1024.0
+    gb = mb/1024.0
     if gb > 1:
         return "%s GB" % round(gb,2)
     else:
