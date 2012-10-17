@@ -344,7 +344,7 @@ class Workflow(models.Model):
         jobAttempt = self.jobManager.add_jobAttempt(command=node.exec_command,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
-                                     drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement))
+                                     drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement, node.cpu_requirement))
         
         node._jobAttempts.add(jobAttempt)
         if self.dry_run:
@@ -658,7 +658,7 @@ class Batch(models.Model):
             if sja: 
                 yield [jru for jru in sja.resource_usage_short] + node.tags.items() #add in tags to resource usage tuples
         
-    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, mem_req=0, time_limit=None):
+    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, mem_req=0, cpu_req=1, time_limit=None):
         """
         Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
         If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
@@ -668,7 +668,8 @@ class Batch(models.Model):
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
         :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
         :param tags: (dict) any other keyword arguments will add a :class:`NodeTag` to the node. Optional.
-        :param mem_req: (int) Optional setting to tell the DRM how much memory to reserve in MB. Optional.
+        :param mem_req: (int) How much memory to reserve for this node in MB. Optional.
+        :param cpu_req: (int) How many CPUs to reserve for this node. Optional.
         :param time_limit: (datetime.time) any other keyword arguments will add `tag`s to the node. Optional.
         """
         #TODO need a dict for special outputs?
@@ -696,7 +697,7 @@ class Batch(models.Model):
             self.log.info("Node was unsuccessful last time, deleting old one and trying again {0}".format(node))
             node.delete()
                
-        node,created = Node.objects.get_or_create(batch=self,name=name,defaults={'pre_command':pcmd,'outputs':outputs,'memory_requirement':mem_req,'time_limit':time_limit})
+        node,created = Node.objects.get_or_create(batch=self,name=name,defaults={'pre_command':pcmd,'outputs':outputs,'memory_requirement':mem_req, 'cpu_requirement': cpu_req, 'time_limit':time_limit})
         
         #validation
         if (not created) and node.successful:  
@@ -849,7 +850,8 @@ class Node(models.Model):
     pre_command = models.TextField(help_text='preformatted command.  almost always will contain the special string {output} which will later be replaced by the proper output path')
     exec_command = models.TextField(help_text='the actual command that was executed',null=True)
     name = models.CharField(max_length=255,null=True)
-    memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=None,null=True)
+    memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=0,null=True)
+    cpu_requirement = models.SmallIntegerField(help_text="Number of CPUs to reserve for this job",default=1)
     time_limit = models.TimeField(help_text="Maximum time for a job to run",default=None,null=True)
     batch = models.ForeignKey(Batch,null=True)
     successful = models.BooleanField(null=False)

@@ -41,24 +41,14 @@ def spinning_cursor(i):
     while 1:
         return cursor[i % len(cursor)]
 
-def get_drmaa_ns(DRM,mem_req,time_limit=None):
+def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,time_limit=None):
     """Returns the DRM specific resource usage flags for the drmaa_native_specification
-    :param time_limit: as datetime.time object
+    :param time_limit: as datetime.time object. not implemented
     :param mem_req: memory required in MB
+    :param cpu_req: number of cpus required
     """
-    if DRM == 'LSF':
-        if mem_req == '' or not mem_req:
-            rusage_mem_req = ''
-        else:
-            rusage_mem_req = 'mem={0}'.format(mem_req)  
-#        if time_limit:
-#            min_limit = time_limit.hour * 60 + time_limit.minute
-#            if min_limit >0:
-#                duration = ':duration={0}'.format(min_limit)
-#        else:
-#            duration = ''
-#        return '-R "rusage[{0}{1}]"'.format(rusage_mem_req,duration)
-        return '-R "rusage[{0}]"'.format(rusage_mem_req)
+    if DRM == 'LSF':  
+        return '-R "rusage[mem={0}]" -n {1}'.format(mem_req,cpu_req)
 #    elif DRM == 'GE':
 #        return '-l h_vmem={0},virtual_free={0}'.format(mem_req)
     else:

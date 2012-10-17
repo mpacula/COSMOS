@@ -25,7 +25,7 @@ for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
 
 
 ### Alignment
-bwa_aln = steps.BWA_Align("BWA Align").many2many(input_batch=None,samples=samples)
+bwa_aln = steps.BWA_Align("BWA Align",hard_reset=True).many2many(input_batch=None,samples=samples)
 bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=bwa_aln,group_by=['sample','lane','fq_chunk'])
 clean_bams = steps.CleanSam("Clean Bams").one2one(input_batch=bwa_sampe,input_type='sam')
 
