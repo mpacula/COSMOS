@@ -79,7 +79,7 @@ def format_memory(kb):
 
 @register.filter
 def format_time(seconds):
-    if not seconds: return '-'
+    if not seconds: return ''
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     d, h = divmod(h, 24)

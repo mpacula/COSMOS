@@ -9,6 +9,7 @@ step.settings = settings
 class BWA_Align(step.Step):
     outputs = {'sai':'aln.sai'}
     mem_req = 3500
+    cpu_req = 2
     
     def many2many_cmd(self,input_batch,samples):
         """
@@ -19,7 +20,7 @@ class BWA_Align(step.Step):
                 for i,fq in enumerate(fqp):
                     yield {
                             'pcmd':r"""
-                                       {settings.bwa_path} aln {settings.bwa_reference_fasta_path} {fastq_path} > {{output_dir}}/{{outputs[sai]}}
+                                       {settings.bwa_path} aln -t {self.cpu_req} {settings.bwa_reference_fasta_path} {fastq_path} > {{output_dir}}/{{outputs[sai]}}
                                     """,
                             'pcmd_dict': {'fastq_path':fq.path },
                             'new_tags': {'sample':sample.name,

@@ -7,12 +7,6 @@ def merge_dicts(x,y):
     for k,v in y.items(): x[k]=v
     return x
 
-def parse_cmd2(string,dictnry,**kwargs):
-    'shortcut to combine with dict with kwargs and extra_parse_cmd_dict'
-    d = merge_dicts(kwargs,dictnry)
-    d['settings'] = settings
-    return parse_cmd(string,**d)
-
 def dict2node_name(d):
     s = ' '.join([ '{0}-{1}'.format(k,v) for k,v in d.items() ])
     if s == '': return 'node'
@@ -20,6 +14,8 @@ def dict2node_name(d):
     
 class Step():
     outputs = {}
+    mem_req = 0
+    cpu_req = 1
     
     def __init__(self,name=None,hard_reset=False,**kwargs):
         """
@@ -33,12 +29,15 @@ class Step():
         self.name = name 
         
         self.batch = workflow.add_batch(self.name,hard_reset=hard_reset)
-        
-    def _parse_command_string(self):
-        pass
-    
-    def get_mem_req(self):
-        return self.mem_req if hasattr(self,'mem_req') else None
+
+
+    def _parse_cmd2(self,string,dictnry,**kwargs):
+        'shortcut to combine with dict with kwargs and extra_parse_cmd_dict'
+        #TODO throw an error if there are key conflicts
+        d = merge_dicts(kwargs,dictnry)
+        d['settings'] = settings
+        d['self'] = self
+        return parse_cmd(string,**d)
     
     def one2one(self,input_batch,*args,**kwargs):
         if not self.batch.successful:
@@ -46,10 +45,11 @@ class Step():
                 r = self.one2one_cmd(input_node=n,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
                 self.batch.add_node(name = n.name,
-                                    pcmd = parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
+                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
                                     tags = n.tags,
                                     outputs = self.outputs,
-                                    mem_req = self.get_mem_req())
+                                    mem_req = self.mem_req,
+                                    cpu_req = self.cpu_req)
             workflow.run_wait(self.batch)
         return self.batch
     
@@ -65,10 +65,11 @@ class Step():
                 r = self.many2one_cmd(input_nodes=input_nodes,tags=tags,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
                 self.batch.add_node(name = dict2node_name(tags),
-                                    pcmd = parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
+                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
                                     tags = tags,
                                     outputs = self.outputs,
-                                    mem_req = self.get_mem_req())
+                                    mem_req = self.mem_req,
+                                    cpu_req = self.cpu_req)
             workflow.run_wait(self.batch)
         return self.batch
     
@@ -83,10 +84,11 @@ class Step():
                     pcmd_dict = r.setdefault('pcmd_dict',{})
                     new_tags = merge_dicts(n.tags, add_tags)
                     self.batch.add_node(name = dict2node_name(new_tags),
-                                        pcmd = parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
+                                        pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
                                         tags = new_tags,
                                         outputs = self.outputs,
-                                        mem_req = self.get_mem_req())
+                                        mem_req = self.mem_req,
+                                        cpu_req = self.cpu_req)
             workflow.run_wait(self.batch)
         return self.batch
     
@@ -102,10 +104,11 @@ class Step():
                 new_tags = r.setdefault('new_tags',{})
                 name = r.setdefault('name',dict2node_name(r['new_tags']))
                 self.batch.add_node(name = name,
-                                    pcmd = parse_cmd2(r['pcmd'],pcmd_dict,input_batch=input_batch,tags=new_tags),
+                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_batch=input_batch,tags=new_tags),
                                     tags = new_tags,
                                     outputs = self.outputs,
-                                    mem_req = self.get_mem_req())
+                                    mem_req = self.mem_req,
+                                    cpu_req = self.cpu_req)
             workflow.run_wait(self.batch)
         return self.batch
     

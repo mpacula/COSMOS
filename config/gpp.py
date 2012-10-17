@@ -7,9 +7,9 @@ DRM = 'LSF' #LSF, or GE
 tmp_dir = '/nas/erik/tmp'
 
 # Web interface settings
-show_batch_file_sizes = True # on some systems, file i/o slows down a lot when running a lot of jobs making this feature very slow
-show_jobAttempt_file_sizes = True
-show_node_file_sizes = True
+show_batch_file_sizes = False # on some systems, file i/o slows down a lot when running a lot of jobs making this feature very slow
+show_jobAttempt_file_sizes = False
+show_node_file_sizes = False
 
 DATABASE = {
     'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
