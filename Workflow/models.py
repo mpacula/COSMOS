@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from JobManager.models import JobAttempt,JobManager
-import os,sys,re,logging,signal
+import os,sys,re,signal
 from Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from Cosmos import helpers
 from django.core.exceptions import ValidationError
@@ -322,7 +322,7 @@ class Workflow(models.Model):
             self.log.warning("Workflow was terminated, exiting with exit code 2.")
             self._terminating=False
             self.save()
-            import sys; sys.exit(2)
+            sys.exit(2)
 
     def _run_node(self,node):
         """
@@ -430,7 +430,6 @@ class Workflow(models.Model):
         else:
             self.log.info('All nodes for this wait on {0} completed!'.format(batch))
         
-        waiting_on_workflow = None
         return nodes 
 
 
@@ -495,8 +494,8 @@ class Workflow(models.Model):
         :param tags: tags to filter for
         :returns: a query result of the filtered nodes
         
-        >>> node.get_nodes_by(op='or',tags={'color':'grey','color':'orange')
-        >>> node.get_nodes_by(op='and',tags={'color':'grey','shape':'square')
+        >>> node.get_nodes_by(op='or',tags={'color':'grey','color':'orange'})
+        >>> node.get_nodes_by(op='and',tags={'color':'grey','shape':'square'})
         """
         
         if op == 'or':
@@ -531,9 +530,9 @@ class Workflow(models.Model):
         nodes = self.get_nodes_by(batch=batch,op=op,tags=tags) #there's just one group of nodes with this tag combination
         n = nodes.count()
         if n>1:
-            raise Exception("More than one node with tags {0}".format(kwargs))
+            raise Exception("More than one node with tags {0}".format(tags))
         elif n == 0:
-            raise Exception("No nodes with with tags {0}.".format(kwargs))
+            raise Exception("No nodes with with tags {0}.".format(tags))
         return nodes[0]
     
     def __str__(self):
@@ -554,8 +553,7 @@ class Batch(models.Model):
     """
     A group of jobs that can be run independently.  See `Embarassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_ .
     
-    .. note:: A Batch should not be directly created.  Use :meth:`Workflow.add_batch()` to create a new batch.
-    A Batch is `Embarrassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_.
+    .. note:: A Batch should not be directly instantiated, use :py:func:`Workflow.models.Workflow.add_batch` to create a new batch.
     """
     name = models.CharField(max_length=200)
     workflow = models.ForeignKey(Workflow)
@@ -664,15 +662,14 @@ class Batch(models.Model):
         If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
         
         :param name: (str) The name of the node.  Must be unique within this batch. All spaces are converted to underscores.  Required.
-        :param pcmd: (str) The preformatted command to execute. Required.
+        :param pcmd: (str) The preformatted command to execute.  Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
         :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
-        :param tags: (dict) any other keyword arguments will add a :class:`NodeTag` to the node. Optional.
+        :param tags: (dict) A dictionary keys and values to tag the node with.  These tags can later be used by methods such as :py:meth:`~Workflow.models.Batch.group_nodes_by` and :py:meth:`~Workflow.models.Batch.get_nodes_by` Optional.
         :param mem_req: (int) How much memory to reserve for this node in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this node. Optional.
-        :param time_limit: (datetime.time) any other keyword arguments will add `tag`s to the node. Optional.
+        :param time_limit: (datetime.time) Not implemented.
         """
-        #TODO need a dict for special outputs?
         #validation
         
         name = re.sub("\s","_",name) #user convenience

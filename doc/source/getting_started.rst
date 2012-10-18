@@ -71,9 +71,9 @@ You can use the web interface to explore the history and debug all workflows.  T
    cosmos adm runweb -p 8080
   
 
-.. note:: Currently the system you're running the web interface on must be the same you're running the workflow on.
+.. note:: Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the system you're running the workflow on.
    
-Visit http://your-ip:8080 to access it.  If you can't access the website, its likely firewalled off.  Fortunately, the Cosmos website
+Visit http://your-ip:8080 to access it.  If you can't access the website, its likely firewalled off; fortunately, the Cosmos website
 works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080` 
 
 .. figure:: imgs/webinterface.png
@@ -85,10 +85,7 @@ ______________________
 
 To terminate a workflow, simply press ctrl+c.  Cosmos will terminate running jobs, and you can resume from the point in the workflow you left off later.
 
-Remotely Terminating a Workflow
-_______________________________
-
-To terminate a workflow from another process via the command line, first find it's ID:
+To terminate a workflow from another process using the :doc:`cli`, first find it's ID:
 
 .. code-block:: bash
 

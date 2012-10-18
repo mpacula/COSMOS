@@ -19,11 +19,12 @@ The following will:
    pip install -r pip_requirements.txt
    
    
-Other than that, DRMAA must be installed on the system
+The only other requirement is that :term:`DRMAA` is installed on the system.
 
-Optionally, if you want the graphic capabilities, install R and the package ggplot2:
+Optionally, if you want the graphing capabilities, R and R package ggplot2 are required:
 
 .. code-block:: bash
+
    sudo apt-get install r # or whatever works on your OS
    sudo R
    > install.packages("ggplot2")

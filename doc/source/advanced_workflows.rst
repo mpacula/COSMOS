@@ -1,17 +1,19 @@
 Advanced Workflows
 ==================
 
-.. note:: Under construction.
-
 Tracking Outputs
 ________________
 
 You should actually avoid using STDOUT to store the output of your jobs, and redirect it to a file.  Cosmos helps you keep track
-of these output files using a dictionary you pass to :function:`Batch.add_node()` using the output parameter.  Time to really dig into the add_node() api:
+of these output files using a dictionary you pass to :py:meth:`Batch.add_node()` using the output parameter.  Time to really dig into the add_node() api:
 
-.. automethod:: Workflow.models.Batch.add_node()
+.. automethod:: Workflow.models.Batch.add_node
    :noindex:
 
+Understanding the add_node parameters are vital.  The two most complicated parameters are *pcmd* and *outputs*.  Cosmos automatically creates and output directory
+tree for each Workflow, Batch, and Node.  You can access this system output_path by using *'{output_dir}'* in your pcmd.  Cosmos will also keep track of output directories for you.  Use the
+*outputs* parameter to pass in a dictionary of output files.  You can then access the outputs directionary later by using :py:data:`Workflow.models.Node.outputs`, or access the full path to those output files
+using :py:data:`Workflow.models.Node.output_paths`
 
 
 .. code-block:: python
@@ -23,14 +25,22 @@ of these output files using a dictionary you pass to :function:`Batch.add_node()
    
    WF = Workflow.start('My Advanced Workflow')
    
-   B_one = WF.add_batch('echo')
-   first_node = B_one.add_node(name='My First Node', pcmd='echo "Hello World"')
-   WF.run_and_wait(first_batch)
+   Echo = WF.add_batch('Wcho')
+   Echo.add_node(name='echo1', pcmd='echo "Hello World" > {output_dir}/{outputs[txt]}',outputs={'txt':'echo_out.txt'})
+   Echo.add_node(name='echo2', pcmd='echo "Hello World2" > {output_dir}/{outputs[txt]}',outputs={'txt':'echo_out.txt'})
+   Echo.add_node(name='echo3', pcmd='echo "Hello World3" > {output_dir}/{outputs[txt]}',outputs={'txt':'echo_out.txt'})
+   WF.run_and_wait(Echo)
    
-   B_two = WF.add_batch('My Second Batch')
-   for i in range(1,5):
-       node1 = B_one.add_node(name='node %i'%i, pcmd='echo "Hello World #%s" % i')
-   WF.run_and_wait(B_two)
+   Rev = WF.add_batch('Rev')
+   for n in Echo.nodes:
+       Rev.add_node(name='rev %s' % n.name,
+                    pcmd='rev {1} > {{output_dir}}/{{outputs[rev_txt]}}'.format(n.output_paths['txt']), # Double braces escapes the .format() call
+                    outputs={'rev_txt','reversed.txt'}) 
+   WF.run_and_wait(Rev)
    
-   # Finish the workflow; every workflow ends with this command
-   WF.finished()  
+   WF.finished()
+   
+Steps
+_____
+
+See ``my_workflows/gatk*`` for examples on using the step addon for creating workflows.

@@ -20,8 +20,3 @@ DATABASE = {
     'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
 }
 
-
-###LSF
-os.environ['LSF_DRMAA_CONF']='/home/ch158749/lsf_drmaa.conf'
-os.environ['DRMAA_LIBRARY_PATH']='/opt/lsf/7.0/linux2.6-glibc2.3-x86_64/lib/libdrmaa.so'
-

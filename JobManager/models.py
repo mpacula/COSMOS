@@ -216,7 +216,6 @@ class JobAttempt(models.Model):
         """Returns the path to the STDOUT file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            #filename = filter(lambda x:re.search('(\.o{0}|{0}\.out)'.format(self.drmaa_jobID),x), files)[0]
             filename = filter(lambda x:re.search('id_{0}+\.stdout'.format(self.id),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
@@ -226,7 +225,6 @@ class JobAttempt(models.Model):
         """Returns the path to the STDERR file"""
         files = os.listdir(self.drmaa_output_dir)
         try:
-            #filename = filter(lambda x:re.search('(\.e{0})|({0}\.err)'.format(self.drmaa_jobID),x), files)[0]
             filename = filter(lambda x:re.search('id_{0}\.stderr'.format(self.id),x), files)[0]
             return os.path.join(self.drmaa_output_dir,filename)
         except IndexError:
