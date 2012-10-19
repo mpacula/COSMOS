@@ -4,6 +4,7 @@ import time
 from django.core.validators import ValidationError
 import re
 from JobManager.models import JobAttempt
+import sys 
 
 register = template.Library()
 
@@ -11,6 +12,20 @@ register = template.Library()
 def aslist(o):
     return [o]
 
+
+@register.simple_tag
+def get_sjob_stat(batch,field,statistic,pipe=None):
+    r = batch.get_sjob_stat(field,statistic)
+    return getattr(sys.modules[__name__],pipe)(r) if pipe else r
+
+@register.simple_tag
+def get_node_stat(batch,field,statistic,pipe=None):
+    r =  batch.get_node_stat(field,statistic)
+    return getattr(sys.modules[__name__],pipe)(r) if pipe else r
+
+@register.simple_tag
+def convert2int(x):
+    return int(x)
 
 @register.filter
 def underscore2space(s):
@@ -45,7 +60,7 @@ def mult(value, arg):
 def format_resource_usage(field_name,val,help_txt):
     if re.search(r"\(Kb\)",help_txt):
         if val == 0: return '0'
-        return "{0} ({1})".format(val,format_memory(val))
+        return "{0} ({1})".format(val,format_memory_kb(val))
     elif re.search(r"time",field_name):
         return "{1}".format(val,format_time(val))
     elif field_name=='percent_cpu':
@@ -67,19 +82,23 @@ def intWithCommas(x):
             
 
 @register.filter
-def format_memory(kb):
+def format_memory_kb(kb):
     """converts kb to human readible"""
     if kb is None: return '-'
     mb = kb/1024.0
     gb = mb/1024.0
     if gb > 1:
-        return "%s GB" % round(gb,2)
+        return "%s GB" % round(gb,1)
     else:
-        return "%s MB" % round(mb,2)
+        return "%s MB" % round(mb,1)
+@register.filter
+def format_memory_mb(mb):
+    """converts mb to human readible"""
+    return format_memory_kb(mb*1024.0)
 
 @register.filter
 def format_time(seconds):
-    if not seconds: return ''
+    if seconds == None: return ''
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     d, h = divmod(h, 24)

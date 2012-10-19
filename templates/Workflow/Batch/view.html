@@ -95,7 +95,7 @@
         <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong>
         (status: {{node.status}}, 
         file_size: {%if settings.show_node_file_sizes%}{{node.file_size}}{%else%}off{%endif%}, 
-        time_to_run: {{node.time_to_run|format_time}}, 
+        wall_time: {{node.wall_time|format_time}}, 
         successful: {{node.successful}})
         <ul>
         {% for j in node.jobAttempts %}

@@ -506,14 +506,15 @@ class Workflow(models.Model):
         else:
             nodes = self.nodes
             
-        alltags = NodeTag.objects.filter(node__in=nodes)
-        Qs = map(lambda x: Q(key=x[0],value=x[1]),tags.items())    
-        tagsleft = alltags.filter(reduce(lambda x,y: x | y, Qs))
-            
-        return nodes.filter(nodetag__in=tagsleft)
+        if tags == {}:
+            return nodes    
+        else:    
+            for k,v in tags.items():
+                nodes = nodes.filter(nodetag__key=k, nodetag__value=v)
+                
+            return nodes
 
-
-    def get_node_by(self,batch=None,op="and",tags={}):
+    def get_node_by(self,tags={},batch=None,op="and"):
         """
         Returns the list of nodes that are tagged by the keys and vals in tags dictionary.
         
@@ -592,31 +593,38 @@ class Batch(models.Model):
             return 0
         r = int(100 * float(done) / float(total))
         return r if r > 1 else 1
-    
-    @property
-    def max_job_time(self):
-        "Max job time of all jobs in this batch"
-        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Max('cpu_time'))['cpu_time__max']
-     
-    @property
-    def avg_job_time(self):
-        "Average job time of all jobs in this batch"
-        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Avg('cpu_time'))['cpu_time__avg']    
-    
-    @property
-    def total_job_time(self):
-        "Total job time of all jobs in this batch"
-        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Sum('cpu_time'))['cpu_time__sum']
-    
-    @property
-    def avg_job_rss(self):
-        "Average resident set size for jobs in this batch"
-        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Avg('avg_rss_mem'))['avg_rss_mem__avg']
 
-    @property
-    def avg_job_virtual(self):
-        "Average virtual memory for jobs in this batch"
-        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(models.Avg('avg_virtual_mem'))['avg_virtual_mem__avg']
+    def get_sjob_stat(self,field,statistic):
+        """
+        Aggregates a node successful job's field using a statistic
+        :param field: name of a nodes's field.  ex: wall_time or avg_rss_mem
+        :param statistic: choose from ['Avg','Sum','Max','Min','Count']
+        
+        >>> batch.get_stat('wall_time','Avg')
+        120
+        """
+        if statistic not in ['Avg','Sum','Max','Min','Count']:
+            raise ValidationError('Statistic {0} not supported'.format(statistic))
+        aggr_fxn = getattr(models, statistic)
+        aggr_field = '{0}__{1}'.format(field,statistic.lower())
+        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(aggr_fxn(field))[aggr_field]
+    
+    def get_node_stat(self,field,statistic):
+        """
+        Aggregates a node's field using a statistic
+        :param field: name of a nodes's field.  ex: cpu_req, mem_req
+        :param statistic: choose from ['Avg','Sum','Max','Min','Count']
+        
+        >>> batch.get_stat('cpu_requirement','Avg')
+        120
+        """
+        if statistic not in ['Avg','Sum','Max','Min','Count']:
+            raise ValidationError('Statistic {0} not supported'.format(statistic))
+        aggr_fxn = getattr(models, statistic)
+        aggr_field = '{0}__{1}'.format(field,statistic.lower())
+        return int(Node.objects.filter(batch=self).aggregate(aggr_fxn(field))[aggr_field])
+        
+        
 
     @property
     def file_size(self):
@@ -765,7 +773,7 @@ class Batch(models.Model):
         """
         return self.workflow.get_nodes_by(batch=self, tags=tags, op=op)
     
-    def get_node_by(self,op='and',tags={}):
+    def get_node_by(self,tags={},op='and'):
         """
         An alias for :func:`Workflow.get_node_by` with batch=self
         
@@ -837,7 +845,7 @@ class NodeTag(models.Model):
     
     
     def __str__(self):
-        return "Tag({0}) - {0}: {0}".format(self.node, self.key, self.value)
+        return "NodeTag[self.id] {self.key}: {self.value} for Node[{node.id}]".format(self=self,node=self.node)
 
 class Node(models.Model):
     """
@@ -913,9 +921,9 @@ class Node(models.Model):
         return self._jobAttempts.all().order_by('id')
     
     @property
-    def time_to_run(self):
-        "Time it took this node to run."
-        return self.get_successful_jobAttempt().cpu_time if self.successful else None
+    def wall_time(self):
+        "Node's wall_time"
+        return self.get_successful_jobAttempt().wall_time if self.successful else None
     
     def numAttempts(self):
         "This node's number of job attempts."
@@ -953,7 +961,7 @@ class Node(models.Model):
         
     def tag(self,**kwargs):
         """
-        Tag this node with key value pairs.  If the key already exists, it will be overwritten.
+        Tag this node with key value pairs.  If the key already exists, its value will be overwritten.
         
         >>> node.tag(color="blue",shape="circle")
         """
