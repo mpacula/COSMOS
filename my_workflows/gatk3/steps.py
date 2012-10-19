@@ -9,7 +9,7 @@ step.settings = settings
 class BWA_Align(step.Step):
     outputs = {'sai':'aln.sai'}
     mem_req = 3.5*1024
-    cpu_req = 4
+    cpu_req = 1 #4
     
     def many2many_cmd(self,input_batch,samples):
         """
@@ -39,7 +39,7 @@ class BWA_Align(step.Step):
 class BWA_Sampe(step.Step):
     outputs = {'sam':'raw.sam'}
     mem_req = 3*1024
-    cpu_req = 4
+    cpu_req = 1 #4
     
     def many2one_cmd(self,input_nodes,tags):
         node_r1 = input_nodes[0]
@@ -274,6 +274,7 @@ class PrintReads(step.Step):
 class UnifiedGenotyper(step.Step):
     outputs = {'vcf':'raw.vcf'}
     mem_req = 3*1024
+    cpu_req = 4
     
     def many2many_cmd(self,input_batch,intervals):
         """
@@ -297,7 +298,8 @@ class UnifiedGenotyper(step.Step):
                                 -A HaplotypeScore \
                                 -A InbreedingCoeff \
                                 -baq CALCULATE_AS_NECESSARY \
-                                -L {interval}
+                                -L {interval} \
+                                -nt {self.cpu_req}
                             """,
                     'pcmd_dict': {'input_bams':input_bams,
                                   'interval':interval,
