@@ -14,7 +14,7 @@ assert isinstance(WF, Workflow)
 samples=[]
 
 input_dir='/nas/erik/test_data'
-#input_dir='/scratch/esg21/test_data'
+input_dir='/scratch/esg21/test_data'
 for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
     samples.append(Sample.createFromPath(os.path.join(input_dir,sample_dir)))
 

@@ -25,7 +25,9 @@ def get_node_stat(batch,field,statistic,pipe=None):
 
 @register.simple_tag
 def convert2int(x):
-    return int(x)
+    if x:
+        return int(x)
+    else: return x
 
 @register.filter
 def underscore2space(s):
