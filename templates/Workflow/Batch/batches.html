@@ -7,10 +7,13 @@
         <th></th>
         <th>Progress</th>
         <th>Nodes</th>
-        <th>Avg Job Time</th>
-        <th>Max Job Time</th>
-        <th>Total Job Time</th>
+        <th>Avg CPU Req</th>
+        <th>Avg % CPU</th>
+        <th>Avg Wall Time</th>
+        <th>Max Wall Time</th>
+        <th>Total Wall Time</th>
         
+        <th>Avg Mem_req</th>
         <th>Average RSS</th>
         <th>Average Virtual Ram</th>
         
@@ -34,11 +37,14 @@
                     <div class="bar" style="opacity:.75;width:{{batch.percent_done}}%"%></div>
                 </div></td>
             <td>{{batch.num_nodes_successful}}/{{batch.num_nodes}}</td>
-            <td>{{batch.avg_job_time|format_time}}</td>
-            <td>{{batch.max_job_time|format_time}}</td>
-            <td>{{batch.total_job_time|format_time}}</td>
-            <td>{{batch.avg_job_rss|format_memory}}</td>
-            <td>{{batch.avg_job_virtual|format_memory}}</td>
+            <td>{% get_node_stat batch "cpu_requirement" "Avg"%}</td>
+            <td>{% get_sjob_stat batch "percent_cpu" "Avg" "convert2int"%}%</td>
+            <td>{% get_sjob_stat batch "wall_time" "Avg" "format_time"%}</td>
+            <td>{% get_sjob_stat batch "wall_time" "Max" "format_time"%}</td>
+            <td>{% get_sjob_stat batch "wall_time" "Sum" "format_time"%}</td>
+            <td>{% get_node_stat batch "memory_requirement" "Avg" "format_memory_mb"%}</td>
+            <td>{% get_sjob_stat batch "avg_rss_mem" "Avg" "format_memory_kb"%}</td>
+            <td>{% get_sjob_stat batch "avg_virtual_mem" "Avg" "format_memory_kb"%}</td>
             {% if details %}
                <td>{{batch.created_on|date:"SHORT_DATETIME_FORMAT"}}</td>
                <td>{{batch.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
