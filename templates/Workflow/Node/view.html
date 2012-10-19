@@ -9,15 +9,12 @@
   <li class="active">{{node}}</li>
 </ul>
 
-<div class="alert alert-warning">
+<div class="alert {%if node.successful%}alert-success{%endif%}">
     <h1>
         {%if node.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
         {%if node.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
         {{node}}
     </h1>
-
-<p>
-</p>
 </div>
 
 <dl class="dl-horizontal">

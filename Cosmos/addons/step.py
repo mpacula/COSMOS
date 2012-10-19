@@ -11,7 +11,16 @@ def dict2node_name(d):
     s = ' '.join([ '{0}-{1}'.format(k,v) for k,v in d.items() ])
     if s == '': return 'node'
     return s
-    
+
+class StepError(Exception):
+    pass
+
+def validate_dict_has_keys(d,keys):
+    """makes sure keys are defined in dict"""
+    for k in keys:
+        if not k in d:
+            raise StepError('The dictionary returned does not have the required keyword {0} defined'.format(k))
+
 class Step():
     outputs = {}
     mem_req = 0
@@ -80,9 +89,9 @@ class Step():
         if not self.batch.successful:
             for n in input_batch.nodes:
                 for r in self.one2many_cmd(input_node=n,*args,**kwargs):
-                    add_tags = r.setdefault('add_tags',{})
+                    validate_dict_has_keys(r,['pcmd','add_tags'])
                     pcmd_dict = r.setdefault('pcmd_dict',{})
-                    new_tags = merge_dicts(n.tags, add_tags)
+                    new_tags = merge_dicts(n.tags, r['add_tags'])
                     self.batch.add_node(name = dict2node_name(new_tags),
                                         pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
                                         tags = new_tags,
@@ -100,12 +109,12 @@ class Step():
         if not self.batch.successful:
             for r in self.many2many_cmd(input_batch=input_batch,*args,**kwargs):
                 #Set defaults
+                validate_dict_has_keys(r,['pcmd','new_tags'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                new_tags = r.setdefault('new_tags',{})
                 name = r.setdefault('name',dict2node_name(r['new_tags']))
                 self.batch.add_node(name = name,
-                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_batch=input_batch,tags=new_tags),
-                                    tags = new_tags,
+                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_batch=input_batch,tags=r['new_tags']),
+                                    tags = r['new_tags'],
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
@@ -133,7 +142,7 @@ class Step():
         """
         The command to run
         
-        :yields: {pcmd, pcmd_format_dictionary, add_tags}.  pcmd is required.
+        :yields: {pcmd, pcmd_format_dictionary, add_tags}.  pcmd, add_tags is required.
         """
         raise NotImplementedError()
     
@@ -141,7 +150,7 @@ class Step():
         """
         The command to run
         
-        :yields: {pcmd, pcmd_format_dictionary, new_tags, name}.  pcmd is required.
+        :yields: {pcmd, pcmd_format_dictionary, new_tags, name}.  pcmd and new_tags is required.
         """
         raise NotImplementedError()
     

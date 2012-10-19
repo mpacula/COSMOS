@@ -4,15 +4,14 @@ import os
 import logging
 import subprocess
 import itertools
-
+import pprint 
 def formatError(txt,dict):
     logging.warning('*'*76)
     logging.warning("format() error occurred here:")
-    logging.warning('txt is:')
-    logging.warning(txt)
+    logging.warning('txt is:\n'+txt)
     logging.warning('-'*76)
-    logging.warning('keys available are:')
-    logging.warning(dict.keys())
+    logging.warning('dict available is:\n'+pprint.pformat(dict,indent=4))
+    
     logging.warning('*'*76)
     raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
     

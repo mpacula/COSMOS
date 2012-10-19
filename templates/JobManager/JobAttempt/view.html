@@ -11,7 +11,24 @@
   <li><a href="{{jobAttempt.node.url }}">{{jobAttempt.node}}</a><span class="divider">/</span></li>
   <li class="active">{{jobAttempt}}</li>
 </ul>
-<h1>{{jobAttempt}}</h1>
+<div class="alert {% with qs=jobAttempt.queue_status %}
+            {%if jobAttempt.successful%}alert-success{%else%}
+            {%if qs == "completed"%}alert-error{%endif%}{%endif%}
+        {% endwith%}">
+    <h1>
+        {% with qs=jobAttempt.queue_status %}
+            {%if jobAttempt.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
+            {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
+            {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
+                {%with ds=jobAttempt.get_drmaa_status %}
+                    {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
+                    {%if ds == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
+                {% endwith%}
+            {%endif%}
+        {% endwith%}
+        {{jobAttempt}}
+    </h1>
+</div>
 
 <dl class="dl-horizontal">
 <dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.get_command_shell_script_text}}</pre></dd>

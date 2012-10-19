@@ -9,7 +9,7 @@ step.settings = settings
 class BWA_Align(step.Step):
     outputs = {'sai':'aln.sai'}
     mem_req = 3500
-    cpu_req = 2
+    cpu_req = 4
     
     def many2many_cmd(self,input_batch,samples):
         """
@@ -39,6 +39,7 @@ class BWA_Align(step.Step):
 class BWA_Sampe(step.Step):
     outputs = {'sam':'raw.sam'}
     mem_req = 4000
+    cpu_req = 4
     
     def many2one_cmd(self,input_nodes,tags):
         node_r1 = input_nodes[0]
@@ -47,6 +48,7 @@ class BWA_Sampe(step.Step):
             'pcmd': r"""
                     {settings.bwa_path} sampe \
                     -f  {{output_dir}}/{{outputs[sam]}} \
+                    -t {self.cpu_req} \
                     -r "@RG\tID:{node_r1.tags[RG_ID]}\tLB:{node_r1.tags[RG_LIB]}\tSM:{node_r1.tags[sample]}\tPL:{node_r1.tags[RG_PLATFORM]}" \
                     {settings.bwa_reference_fasta_path} \
                     {node_r1.output_paths[sai]} \
@@ -130,6 +132,7 @@ class BuildBamIndex(step.Step):
 class RealignerTargetCreator(step.Step):
     outputs = {'targetIntervals':'target.intervals'}
     mem_req = 3000
+    cpu_req = 4
     
     def many2many_cmd(self,input_batch):
         """
@@ -138,11 +141,13 @@ class RealignerTargetCreator(step.Step):
         yield {
             'pcmd':r"""
                         {settings.GATK_cmd} \
+                        -nt {self.cpu_req} \
                         -T RealignerTargetCreator \
                         -R {settings.reference_fasta_path} \
                         -o {{output_dir}}/{{outputs[targetIntervals]}} \
                         --known {settings.indels_1000g_phase1_path} \
-                        --known {settings.mills_path}
+                        --known {settings.mills_path} \
+                        -nt {self.cpu_req}
                     """,
             'pcmd_dict': {},
             'new_tags': {'mode':'KNOWNS_ONLY'}
@@ -153,13 +158,15 @@ class RealignerTargetCreator(step.Step):
             yield {
                 'pcmd': r"""
                         {settings.GATK_cmd} \
+                        -nt {self.cpu_req} \
                         -T RealignerTargetCreator \
                         -R {settings.reference_fasta_path} \
                         -I {input_node.output_paths[bam]} \
                         -o {{output_dir}}/{{outputs[targetIntervals]}} \
                         --known {settings.indels_1000g_phase1_path} \
                         --known {settings.mills_path} \
-                        -L {interval}
+                        -L {interval} \
+                        -nt {self.cpu_req}
                     """,
                 'pcmd_dict':{'interval':interval},
                 'add_tags':{'interval':interval}
@@ -168,7 +175,7 @@ class RealignerTargetCreator(step.Step):
 class IndelRealigner(step.Step):
     outputs = {'bam':'realigned.bam'}
     mem_req = 2000
-    cpu_req = 4
+    cpu_req = 1 #-nt is not supported by this tool
     
     def one2many_cmd(self,input_node,rtc_batch,intervals,model='USE_READS'):
         """
@@ -199,18 +206,18 @@ class IndelRealigner(step.Step):
                             -known {settings.indels_1000g_phase1_path} \
                             -known {settings.mills_path} \
                             -model {model} \
-                            -L {interval} \
-                            -nt {self.cpu_req}
+                            -L {interval}
                         """,
                 'pcmd_dict':{'model':model,
-                             'targetIntervals':targetIntervals},
-                'new_tags': {'interval':interval}
+                             'targetIntervals':targetIntervals,
+                             'interval':interval},
+                'add_tags': {'interval':interval}
             }
 
 class BaseQualityScoreRecalibration(step.Step):
     outputs = {'recal':'bqsr.recal'}
     mem_req = 2000
-    cpu_req = 4
+    cpu_req = 1 #>1 results in ##### ERROR MESSAGE: We have temporarily disabled the ability to run BaseRecalibrator multi-threaded for performance reasons.  We hope to have this fixed for the next GATK release (2.2) and apologize for the inconvenience.
     
     pcmd = r"""
         {settings.GATK_cmd} \
@@ -250,10 +257,11 @@ class PrintReads(step.Step):
     
     def many2one_cmd(self,input_nodes,tags,bqsr_batch):
         INPUTs = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_nodes ])
+        bqsr_node = bqsr_batch.get_node_by(tags)
         return {
             'pcmd': self.pcmd,
             'pcmd_dict': {'INPUTs':INPUTs,
-                          'recal_file': bqsr_batch.get_node_by(tags=input_node.tags).output_paths['recal']}
+                          'recal_file': bqsr_batch.get_node_by(tags=bqsr_node.tags).output_paths['recal']}
         }
     
     def one2one_cmd(self,input_node,bqsr_batch):
