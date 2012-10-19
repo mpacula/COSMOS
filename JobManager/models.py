@@ -156,7 +156,7 @@ class JobAttempt(models.Model):
         for type,fields in self.profile_fields:
             for field in fields:
                 val = getattr(self,field)
-                if val: yield field, val, self._meta.get_field(field).help_text,type
+                yield field, val, self._meta.get_field(field).help_text,type
         
     @property
     def resource_usage_short(self):

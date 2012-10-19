@@ -94,11 +94,11 @@ def format_memory_kb(kb):
 @register.filter
 def format_memory_mb(mb):
     """converts mb to human readible"""
-    return format_memory_kb(mb*1024)
+    return format_memory_kb(mb*1024.0)
 
 @register.filter
 def format_time(seconds):
-    if not seconds: return ''
+    if seconds == None: return ''
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     d, h = divmod(h, 24)

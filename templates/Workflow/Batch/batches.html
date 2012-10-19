@@ -12,8 +12,9 @@
         <th>Avg Wall Time</th>
         <th>Max Wall Time</th>
         <th>Total Wall Time</th>
+        <th>Avg Blocked I/O Time</th>
         
-        <th>Avg Mem_req</th>
+        <th>Avg Mem Req</th>
         <th>Average RSS</th>
         <th>Average Virtual Ram</th>
         
@@ -42,6 +43,8 @@
             <td>{% get_sjob_stat batch "wall_time" "Avg" "format_time"%}</td>
             <td>{% get_sjob_stat batch "wall_time" "Max" "format_time"%}</td>
             <td>{% get_sjob_stat batch "wall_time" "Sum" "format_time"%}</td>
+            <td>{% get_sjob_stat batch "block_io_delays" "Avg" "format_time"%}</td>
+            
             <td>{% get_node_stat batch "memory_requirement" "Avg" "format_memory_mb"%}</td>
             <td>{% get_sjob_stat batch "avg_rss_mem" "Avg" "format_memory_kb"%}</td>
             <td>{% get_sjob_stat batch "avg_virtual_mem" "Avg" "format_memory_kb"%}</td>
