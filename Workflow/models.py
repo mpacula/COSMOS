@@ -775,13 +775,18 @@ class Batch(models.Model):
     
     def delete(self, *args, **kwargs):
         """
-        Deletes this batch and all files associated with it.
+        Bulk deletes this batch and all files associated with it.
         """
-        self.log.debug('Deleting Batch {0}'.format(self.name))
-        for n in self.nodes: n.delete()
+        self.log.info('Deleting Batch {0}.'.format(self.name))
+        self.log.info('Deleting directory {0}...'.format(self.output_dir))
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
+        self.log.info('Bulk deleting JobAttempts...')
+        self.nodes._jobAttempts.all().delete()
+        self.log.info('Bulk deleting nodes...')
+        self.nodes.delete()
         super(Batch, self).delete(*args, **kwargs)
+        self.log.info('Batch {0} Deleted.').format(self.name)
     
     @models.permalink    
     def url(self):
