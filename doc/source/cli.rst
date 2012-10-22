@@ -17,12 +17,6 @@ List workflows:
 .. code-block:: bash
 
    $ cosmos wf list
-   
-Terminate workflow with id 1
-
-.. code-block:: bash
-
-   $ cosmos wf terminate 1
 
 
 List the DRMAA specific jobids of the queued jobs in workflow with id 1:
