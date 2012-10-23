@@ -3,16 +3,6 @@ import cosmos_session
 from Workflow.models import Workflow
 import os
 
-@arg('id',type=str, help='id for workflow to terminate')
-def terminate(args):
-    if args.id is None:
-        raise CommandError('please choose a name OR an id')
-    wf = Workflow.objects.get(pk=args.id)
-    print "Telling {0} to terminate".format(wf)
-    wf.remote_terminate()
-
-    #lsf qdel all: bjobs|cut -d " " -f 1 -|sed 1d|xargs -t -L 1 qdel
-
 @arg('-p','--port',help='port to serve on',default='8080')
 def runweb(args):
     """
@@ -56,7 +46,7 @@ def list(args):
     
 parser = ArghParser()
 parser.add_commands([runweb,shell,syncdb,resetentiredb],namespace='adm',title='Admin')
-parser.add_commands([terminate,list,jobs],namespace='wf',title='Workflow')
+parser.add_commands([list,jobs],namespace='wf',title='Workflow')
 
 if __name__=='__main__':
     parser.dispatch()

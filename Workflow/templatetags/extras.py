@@ -25,6 +25,7 @@ def get_node_stat(batch,field,statistic,pipe=None):
 
 @register.simple_tag
 def convert2int(x):
+    if x == None: return ''
     if x:
         return int(x)
     else: return x
@@ -60,7 +61,8 @@ def mult(value, arg):
 
 @register.simple_tag
 def format_resource_usage(field_name,val,help_txt):
-    if re.search(r"\(Kb\)",help_txt):
+    if val == None: return ''
+    elif re.search(r"\(Kb\)",help_txt):
         if val == 0: return '0'
         return "{0} ({1})".format(val,format_memory_kb(val))
     elif re.search(r"time",field_name):
@@ -72,6 +74,7 @@ def format_resource_usage(field_name,val,help_txt):
     return str(val)
 
 def intWithCommas(x):
+    if x == None: return ''
     if type(x) not in [type(0), type(0L)]:
         raise TypeError("Parameter must be an integer.")
     if x < 0:
@@ -86,7 +89,7 @@ def intWithCommas(x):
 @register.filter
 def format_memory_kb(kb):
     """converts kb to human readible"""
-    if kb is None: return '-'
+    if kb == None: return ''
     mb = kb/1024.0
     gb = mb/1024.0
     if gb > 1:
@@ -100,7 +103,7 @@ def format_memory_mb(mb):
 
 @register.filter
 def format_time(seconds):
-    if seconds == None: return ''
+    if seconds == None or seconds == '': return ''
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     d, h = divmod(h, 24)

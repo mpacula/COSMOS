@@ -9,16 +9,6 @@ from picklefield.fields import PickledObjectField
 from cosmos_session import cosmos_settings
 from django.utils import timezone
 
-active_workflows = [] #set to whichever workflows have been started.  used by ctrl_c to know which workflow to terminate
-
-def ctrl_c(signal,frame):
-    for wf_id in active_workflows:
-        wf = Workflow.objects.get(pk=wf_id)
-        wf.remote_terminate()
-try:
-    signal.signal(signal.SIGINT, ctrl_c)
-except ValueError: #signal only works in main thread
-    pass
 
 status_choices=(
                 ('successful','Successful'),
@@ -90,9 +80,6 @@ class Workflow(models.Model):
         :param dry_run: Don't actually execute jobs. Optional.
         :param root_output_dir: Replaces the directory used in settings as the workflow output directory. Optional.
         """
-
-        if name is None:
-            raise ValidationError('Name of a workflow cannot be None')
         
         name = re.sub("\s","_",name)
         
@@ -107,11 +94,20 @@ class Workflow(models.Model):
                 wf = Workflow.__resume(name=name, dry_run=dry_run)
         else:
             wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir)
-        
-        active_workflows.append(wf.id) #used by ctrl+c signal to terminate
+
+        if name is None:
+            raise ValidationError('Name of a workflow cannot be None')
         
         #remove stale objects
         wf._delete_stale_objects()
+        
+        #termination support via ctrl+c
+        def ctrl_c(signal,frame):
+                wf.terminate()
+        try:
+            signal.signal(signal.SIGINT, ctrl_c)
+        except ValueError: #signal only works in main thread
+            pass
         
         return wf
         
@@ -237,33 +233,35 @@ class Workflow(models.Model):
         for ja in JobAttempt.objects.filter(node_set=None): ja.delete()
         
     
-    def remote_terminate(self):
+    def terminate(self):
         """
-        Can be executed by a remote process to terminate this workflow.  Generally executed
-        via the cli.py terminate command or a ctrl+c event.  qdels all jobs and tells the workflow to terminate
+        Terminates this workflow and Exits
         """
         self.log.warning("Terminating this workflow...")
-        self._terminating = True
         self.save()
-        ids = [ str(ja.drmaa_jobID) for ja in self.jobManager.jobAttempts.filter(queue_status='queued') ]
+        jobAttempts = self.jobManager.jobAttempts.filter(queue_status='queued')
+        jids = [ ja.id for ja in jobAttempts ]
+        drmaa_jids = [ ja.drmaa_jobID for ja in jobAttempts ]
         #jobIDs = ', '.join(ids)
         #cmd = 'qdel {0}'.format(jobIDs)
-        for id in ids:
-            cmd = 'qdel {0}'.format(id)
+        for jid in drmaa_jids:
+            cmd = 'qdel {0}'.format(jid)
             os.system(cmd)
-        #self.log.warning('Executed {0}'.format(cmd))
-    
-    def _is_terminating(self):
-        """
-        Helper function to check if this workflow is terminating.  Accessing the Workflow._terminating
-        variable will probably hit a cache and not report the correct value;
-        this function forces a database query.
-        """
-        if Workflow.objects.filter(pk=self.id,_terminating=True).count() > 0: #database can be out of sync
-            self._terminating = True
-            self.save()
-            return True
-        return False
+        
+        #this basically a bulk node._has_finished and jobattempt.hasFinished
+        self.log.info("Marking all terminated JobAttempts as failed.")
+        jobAttempts.update(queue_status='completed',finished_on = timezone.now())
+        nodes = Node.objects.filter(_jobAttempts__in=jids)
+
+        self.log.info("Marking all terminated Nodes as failed %s.")
+        nodes.update(status = 'failed',finished_on = timezone.now())
+        
+        self.log.info("Marking all terminated Batches as failed.")
+        batches = Batch.objects.filter(pk__in=nodes.values('batch').distinct())
+        batches.update(status = 'failed',finished_on = timezone.now())
+        
+        self.log.info("Exiting.")
+        sys.exit(1)
     
     def get_all_tag_keywords_used(self):
         """Returns a set of all the keyword tags used on any node in this workflow"""
@@ -310,25 +308,11 @@ class Workflow(models.Model):
         super(Workflow, self).delete(*args, **kwargs)
                 
 
-    def _check_termination(self):
-        """
-        Checks if the current workflow is terminating.  If it is terminating, it will
-        initiate the termination sequence.
-        """
-        if self._is_terminating():
-            #make sure all jobs get returned
-            self.log.warning("Termination sequence initiated.")
-            self.finished()
-            self.log.warning("Workflow was terminated, exiting with exit code 2.")
-            self._terminating=False
-            self.save()
-            sys.exit(2)
 
     def _run_node(self,node):
         """
         Executes a node and returns a jobAttempt
         """
-        self._check_termination()
         
         node.batch.status = 'in_progress'
         node.batch.save()
@@ -380,12 +364,7 @@ class Workflow(models.Model):
         """
         numAttempts = node.jobAttempts.count()
         if not node.successful: #ReRun jobAttempt
-            if self._is_terminating():
-                self.log.info("Skipping reattempt since workflow is terminating".format(failed_jobAttempt, node,numAttempts))
-                self.status = 'failed'
-                self.save()
-                return False
-            elif numAttempts < self.max_reattempts:
+            if numAttempts < self.max_reattempts:
                 self.log.warning("JobAttempt {0} of node {1} failed, on attempt # {2}, so deleting failed output files and retrying".format(failed_jobAttempt, node,numAttempts))
                 os.system('rm -rf {0}/*'.format(node.job_output_dir))
                 self._run_node(node)
@@ -396,10 +375,12 @@ class Workflow(models.Model):
                 self.save()
                 return False
     
-    def __wait(self,batch=None,terminate_on_fail=False):
+    def wait(self,batch=None,terminate_on_fail=False):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         if batch is omitted or set to None, all running nodes will be waited on
+        
+        :param terminate_on_fail: If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
         """
         nodes = []
         if batch is None:
@@ -417,32 +398,17 @@ class Workflow(models.Model):
                 submitted_another_job = self._reattempt_node(node,jobAttempt)
                 if not submitted_another_job:
                     node._has_finished(jobAttempt) #job has failed and out of reattempts
-                    if not self._is_terminating() and terminate_on_fail:
+                    if terminate_on_fail:
                         self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
-                        self.remote_terminate()
+                        self.terminate()
             
-            if node.batch._are_all_nodes_done():
-                node.batch._has_finished()
-                break
                     
         if batch is None: #no waiting on a batch
             self.log.info('All nodes for this wait have completed!')
         else:
-            self.log.info('All nodes for this wait on {0} completed!'.format(batch))
+            self.log.info('All nodes for the wait on {0} completed!'.format(batch))
         
         return nodes 
-
-
-    def wait(self, batch=None, terminate_on_fail=False):
-        """
-        Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
-        If `batch` is omitted or set to None, all running nodes will be waited on.
-        
-        :param terminate_on_fail: If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
-        """
-        nodes = self.__wait(batch=batch,terminate_on_fail=terminate_on_fail)
-        self._check_termination() #this is why there's a separate __wait() - so check_for_leftovers can call __wait() and not wait().  Otherwise checking for leftovers would loop forever!
-        return nodes
 
     def run_wait(self,batch, terminate_on_fail=True):
         """
@@ -475,8 +441,7 @@ class Workflow(models.Model):
         """Checks and waits for any leftover nodes"""
         if self.nodes.filter(status='in_progress').count()>0:
             self.log.warning("There are left over nodes in the queue, waiting for them to finish")
-            self.__wait()
-        
+            self.wait()
                
     
     def restart_from_here(self):
@@ -810,13 +775,18 @@ class Batch(models.Model):
     
     def delete(self, *args, **kwargs):
         """
-        Deletes this batch and all files associated with it.
+        Bulk deletes this batch and all files associated with it.
         """
-        self.log.debug('Deleting Batch {0}'.format(self.name))
-        for n in self.nodes: n.delete()
+        self.log.info('Deleting Batch {0}.'.format(self.name))
+        self.log.info('Deleting directory {0}...'.format(self.output_dir))
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
+        self.log.info('Bulk deleting JobAttempts...')
+        self.nodes._jobAttempts.all().delete()
+        self.log.info('Bulk deleting nodes...')
+        self.nodes.delete()
         super(Batch, self).delete(*args, **kwargs)
+        self.log.info('Batch {0} Deleted.').format(self.name)
     
     @models.permalink    
     def url(self):
@@ -947,6 +917,9 @@ class Node(models.Model):
     def _has_finished(self,jobAttempt):
         """
         Executed whenever this node finishes by the workflow.
+        
+        Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
+        Will also run self.batch._has_finished() if all nodes in the batch are done.
         """
         if self._jobAttempts.filter(successful=True).count():
             self.status = 'successful'
@@ -957,6 +930,8 @@ class Node(models.Model):
             self.log.info("{0} Failed!".format(self,jobAttempt))
             
         self.finished_on = timezone.now()
+        if self.batch._are_all_nodes_done():
+            self.batch._has_finished()
         self.save()
         
     def tag(self,**kwargs):

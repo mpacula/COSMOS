@@ -83,28 +83,6 @@ works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080`
 Terminating a Workflow
 ______________________
 
-To terminate a workflow, simply press ctrl+c.  Cosmos will terminate running jobs, and you can resume from the point in the workflow you left off later.
-
-To terminate a workflow from another process using the :doc:`cli`, first find it's ID:
-
-.. code-block:: bash
-
-   #Get the ID of the workflow
-   $ cosmos wf listcosmos wf list
-   Workflow[3] Terminate Me
-   Workflow[5] My other Workflow
-   ...
-   
-Then, use the workflow's id to terminate it:
-
-.. code-block:: bash
-
-   $ cosmos wf terminate 1
-   Telling Workflow[3] Terminate Me to terminate
-   WARNING: 2012-09-27 17:01:14: Terminating this workflow...
-   Request <14182> is being terminated
-   ...
-   
-   
-
+To terminate a workflow, simply press ctrl+c (or send the process a SIGINT signal).  Cosmos will terminate running jobs and mark them as failed.  You can resume from the point
+in the workflow you left off later.
 
