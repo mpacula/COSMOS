@@ -20,7 +20,7 @@ status_choices=(
 
 class Workflow(models.Model):
     """   
-    This is the master object.  It contains a list of **Batches** which represent a pool of jobs that have no dependencies on each other
+    This is the master object.  It contains a list of :class:`Batch` which represent a pool of jobs that have no dependencies on each other
     and can be executed at the same time. 
     """
     name = models.CharField(max_length=250,unique=True)
@@ -29,7 +29,6 @@ class Workflow(models.Model):
     resume_from_last_failure = models.BooleanField(default=False,help_text='resumes from last failed node')
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
-    _terminating = models.BooleanField(default=False,help_text='this workflow is terminating')
     
     created_on = models.DateTimeField(default=timezone.now())
     finished_on = models.DateTimeField(null=True)
@@ -128,7 +127,6 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=name).count() == 0:
             raise ValidationError('Workflow {0} does not exist, cannot resume it'.format(name))
         wf = Workflow.objects.get(name=name)
-        wf._terminating=False
         wf.resume_from_last_failure=True
         wf.dry_run=dry_run
         
