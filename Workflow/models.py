@@ -20,7 +20,7 @@ status_choices=(
 
 class Workflow(models.Model):
     """   
-    This is the master object.  It contains a list of **Batches** which represent a pool of jobs that have no dependencies on each other
+    This is the master object.  It contains a list of :class:`Batch` which represent a pool of jobs that have no dependencies on each other
     and can be executed at the same time. 
     """
     name = models.CharField(max_length=250,unique=True)
@@ -29,7 +29,6 @@ class Workflow(models.Model):
     resume_from_last_failure = models.BooleanField(default=False,help_text='resumes from last failed node')
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
-    _terminating = models.BooleanField(default=False,help_text='this workflow is terminating')
     
     created_on = models.DateTimeField(default=timezone.now())
     finished_on = models.DateTimeField(null=True)
@@ -75,10 +74,10 @@ class Workflow(models.Model):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
         
-        :param name: A unique name for this workflow. All spaces are converted to underscores. Required.
-        :param restart: Restart the workflow by deleting it and creating a new one. Optional.
-        :param dry_run: Don't actually execute jobs. Optional.
-        :param root_output_dir: Replaces the directory used in settings as the workflow output directory. Optional.
+        :param name: (str) A unique name for this workflow. All spaces are converted to underscores. Required.
+        :param restart: (bool) Restart the workflow by deleting it and creating a new one. Optional.
+        :param dry_run: (bool) Don't actually execute jobs. Optional.
+        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. Optional.
         """
         
         name = re.sub("\s","_",name)
@@ -101,7 +100,7 @@ class Workflow(models.Model):
         #remove stale objects
         wf._delete_stale_objects()
         
-        #termination support via ctrl+c
+        #terminate on ctrl+c
         def ctrl_c(signal,frame):
                 wf.terminate()
         try:
@@ -117,18 +116,14 @@ class Workflow(models.Model):
         """
         Resumes a workflow from the last failed node.
         
-        :param name: A unique name for this workflow
-        :type name: str
-        :param dry_run: This workflow is a dry run.  No jobs will actually be executed
-        :type dry_run: bool
-        :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
-        :type root_output_dir: str
+        :param name: (str) A unique name for this workflow
+        :param dry_run: (bool) This workflow is a dry run.  No jobs will actually be executed
+        :param root_output_dir: (str) Optional override of the root_output_dir contains in the configuration file
         """
 
         if Workflow.objects.filter(name=name).count() == 0:
             raise ValidationError('Workflow {0} does not exist, cannot resume it'.format(name))
         wf = Workflow.objects.get(name=name)
-        wf._terminating=False
         wf.resume_from_last_failure=True
         wf.dry_run=dry_run
         
@@ -144,12 +139,9 @@ class Workflow(models.Model):
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
         
-        :param name: A unique name for this workflow. All spaces are converted to underscores.  
-        :type name: str
-        :param dry_run: This workflow is a dry run.  No jobs will actually be executed
-        :type dry_run: bool
-        :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
-        :type root_output_dir: str
+        :param name: (name) A unique name for this workflow. All spaces are converted to underscores. 
+        :param dry_run: (bool) This workflow is a dry run.  No jobs will actually be executed
+        :param root_output_dir: (str) Optional override of the root_output_dir contains in the configuration file
         """
         old_wf_exists = Workflow.objects.filter(name=name).count() > 0
             
@@ -171,12 +163,9 @@ class Workflow(models.Model):
         """
         Creates a new workflow
         
-        :param name: A unique name for this workflow
-        :type name: str
-        :param dry_run: This workflow is a dry run.  No jobs will actually be executed
-        :type dry_run: bool
-        :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
-        :type root_output_dir: str
+        :param name: (str) A unique name for this workflow
+        :param dry_run: (bool) This workflow is a dry run.  No jobs will actually be executed
+        :param root_output_dir: (str) Optional override of the root_output_dir contains in the configuration file
         """
         
         check_and_create_output_dir(root_output_dir)
@@ -188,13 +177,13 @@ class Workflow(models.Model):
         return wf
             
         
-    def add_batch(self,name, hard_reset=False):
+    def add_batch(self, name, hard_reset=False):
         """
         Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists,
         and it hasn't been added in this session yet, return the existing one.
         
-        :parameter name: The name of the batch, must be unique within this Workflow. Required.
-        :parameter hard_reset: Delete any batch with this name including all of its nodes, and return a new one. Optional.
+        :parameter name: (str) The name of the batch, must be unique within this Workflow. Required.
+        :parameter hard_reset: (bool) Delete any batch with this name including all of its nodes, and return a new one. Optional.
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
@@ -227,7 +216,8 @@ class Workflow(models.Model):
         return b
 
     def _delete_stale_objects(self):
-        """Deletes objects that are stale from the database.  This should only happens when the program exists ungracefully.
+        """
+        Deletes objects that are stale from the database.  This should only happens when the program exists ungracefully.
         """
         #TODO implement a catch all exception so that this never happens.  i think i can only do this if scripts are not run directly
         for ja in JobAttempt.objects.filter(node_set=None): ja.delete()
@@ -260,6 +250,8 @@ class Workflow(models.Model):
         batches = Batch.objects.filter(pk__in=nodes.values('batch').distinct())
         batches.update(status = 'failed',finished_on = timezone.now())
         
+        self.finished()
+        
         self.log.info("Exiting.")
         sys.exit(1)
     
@@ -279,7 +271,9 @@ class Workflow(models.Model):
             dict_writer.writerows(batch_resources)
 
     def yield_batch_resource_usage(self):
-        "Yield's every batch's list of node's resource usage"
+        """
+        :yields: A dict of all resource usage, tags, and the name of the batch of every node
+        """
         for batch in self.batches:
             dicts = [ dict(nru) for nru in batch.yield_node_resource_usage() ]
             for d in dicts: d['batch'] = re.sub('_',' ',batch.name)
@@ -311,7 +305,9 @@ class Workflow(models.Model):
 
     def _run_node(self,node):
         """
-        Executes a node and returns a jobAttempt
+        Creates and submits and JobAttempt.
+        
+        :param node: the node to submit a JobAttempt for
         """
         
         node.batch.status = 'in_progress'
@@ -359,8 +355,11 @@ class Workflow(models.Model):
 
     def _reattempt_node(self,node,failed_jobAttempt):
         """
-        Returns True if another jobAttempt was submitted
-        Returns False if the max jobAttempts has already been reached
+        Reattempt running a node.
+        
+        :param node: the node to reattempt
+        :param failed_jobAttempt: the previously failed jobAttempt of the node
+        :returns:  True if another jobAttempt was submitted, False if the max jobAttempts has already been reached
         """
         numAttempts = node.jobAttempts.count()
         if not node.successful: #ReRun jobAttempt
@@ -378,8 +377,9 @@ class Workflow(models.Model):
     def wait(self,batch=None,terminate_on_fail=False):
         """
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
-        if batch is omitted or set to None, all running nodes will be waited on
+        if batch is omitted or set to None, all running nodes will be waited on.
         
+        :param batch: wait for all of a batch's nodes to finish
         :param terminate_on_fail: If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
         """
         nodes = []
@@ -410,9 +410,9 @@ class Workflow(models.Model):
         
         return nodes 
 
-    def run_wait(self,batch, terminate_on_fail=True):
+    def run_wait(self, batch, terminate_on_fail=True):
         """
-        shortcut to run_batch(); wait(batch=batch);
+        Shortcut to run_batch(); wait(batch=batch,terminate_on_fail=terminate_on_fail);
         """
         self.run_batch(batch=batch)
         return self.wait(batch=batch,terminate_on_fail=terminate_on_fail)
@@ -613,6 +613,7 @@ class Batch(models.Model):
     
     @property
     def num_nodes_successful(self):
+        "Number of successful nodes in this batch"
         return Node.objects.filter(batch=self,successful=True).count()
     
     def get_all_tag_keywords_used(self):
@@ -621,7 +622,7 @@ class Batch(models.Model):
         
     def yield_node_resource_usage(self):
         """
-        Yield Resource Usage as a dictionary of resources and tags per node
+        :yields: tuples of resource usage and tags of all nodes
         """
         #TODO rework with time fields
         for node in self.nodes: 
