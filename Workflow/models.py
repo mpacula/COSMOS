@@ -74,10 +74,10 @@ class Workflow(models.Model):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
         
-        :param name: A unique name for this workflow. All spaces are converted to underscores. Required.
-        :param restart: Restart the workflow by deleting it and creating a new one. Optional.
-        :param dry_run: Don't actually execute jobs. Optional.
-        :param root_output_dir: Replaces the directory used in settings as the workflow output directory. Optional.
+        :param name: (str) A unique name for this workflow. All spaces are converted to underscores. Required.
+        :param restart: (bool) Restart the workflow by deleting it and creating a new one. Optional.
+        :param dry_run: (bool) Don't actually execute jobs. Optional.
+        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. Optional.
         """
         
         name = re.sub("\s","_",name)
@@ -100,7 +100,7 @@ class Workflow(models.Model):
         #remove stale objects
         wf._delete_stale_objects()
         
-        #termination support via ctrl+c
+        #terminate on ctrl+c
         def ctrl_c(signal,frame):
                 wf.terminate()
         try:
@@ -169,12 +169,9 @@ class Workflow(models.Model):
         """
         Creates a new workflow
         
-        :param name: A unique name for this workflow
-        :type name: str
-        :param dry_run: This workflow is a dry run.  No jobs will actually be executed
-        :type dry_run: bool
-        :param root_output_dir: Optional override of the root_output_dir contains in the configuration file
-        :type root_output_dir: str
+        :param name: (str) A unique name for this workflow
+        :param dry_run: (bool) This workflow is a dry run.  No jobs will actually be executed
+        :param root_output_dir: (str) Optional override of the root_output_dir contains in the configuration file
         """
         
         check_and_create_output_dir(root_output_dir)
@@ -186,13 +183,13 @@ class Workflow(models.Model):
         return wf
             
         
-    def add_batch(self,name, hard_reset=False):
+    def add_batch(self, name, hard_reset=False):
         """
         Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists,
         and it hasn't been added in this session yet, return the existing one.
         
-        :parameter name: The name of the batch, must be unique within this Workflow. Required.
-        :parameter hard_reset: Delete any batch with this name including all of its nodes, and return a new one. Optional.
+        :parameter name: (str) The name of the batch, must be unique within this Workflow. Required.
+        :parameter hard_reset: (bool) Delete any batch with this name including all of its nodes, and return a new one. Optional.
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
