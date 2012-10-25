@@ -152,9 +152,12 @@ class Workflow(models.Model):
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
-        old_wf = Workflow.objects.get(name=name)
-        wf_id = old_wf.id
-        old_wf.delete(delete_files=True)
+        if Workflow.objects.filter(name=name):
+            old_wf = Workflow.objects.get(name=name)
+            wf_id = old_wf.id
+            old_wf.delete(delete_files=True)
+        else:
+            wf_id = None
         
         new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
         
@@ -248,7 +251,7 @@ class Workflow(models.Model):
         jobAttempts.update(queue_status='completed',finished_on = timezone.now())
         nodes = Node.objects.filter(_jobAttempts__in=jids)
 
-        self.log.info("Marking all terminated Nodes as failed %s.")
+        self.log.info("Marking all terminated Nodes as failed..")
         nodes.update(status = 'failed',finished_on = timezone.now())
         
         self.log.info("Marking all terminated Batches as failed.")

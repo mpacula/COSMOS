@@ -28,7 +28,7 @@
     {% for batch in batches %}
         <tr onclick="window.location.href = '{{batch.url}}';" style="cursor:pointer">
             <td>{{batch.order_in_workflow}}.</td>
-            <td>[{{batch.id}}] <strong>{{batch.name|underscore2space}}</strong></td>
+            <td>[{{batch.id}}] <a href="{{batch.url}}">>{{batch.name|underscore2space}}</a></td>
             <td>
                 {%with status=batch.status %}
                     {%if status == "successful"%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
@@ -42,7 +42,7 @@
             <td>{{batch.num_nodes_successful}}/{{batch.num_nodes}}</td>
             <td>{{batch.wall_time}}</td>
             <td>{% get_node_stat batch "cpu_requirement" "Avg"%}</td>
-            <td>{% get_sjob_stat batch "percent_cpu" "Avg" "convert2int"%}</td>
+            <td>{% get_sjob_stat batch "percent_cpu" "Avg" "format_percent"%}</td>
             <td>{% get_sjob_stat batch "wall_time" "Avg" "format_time"%}</td>
             <td>{% get_sjob_stat batch "wall_time" "Max" "format_time"%}</td>
             <td>{% get_sjob_stat batch "wall_time" "Sum" "format_time"%}</td>

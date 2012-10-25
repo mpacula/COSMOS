@@ -23,13 +23,12 @@ def get_node_stat(batch,field,statistic,pipe=None):
     r =  batch.get_node_stat(field,statistic)
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
-@register.simple_tag
-def convert2int(x):
-    if x == None: return ''
-    if x:
-        return int(x)
-    else: return x
 
+@register.simple_tag
+def format_percent(x):
+    if x == None: return ''
+    return '{0}%'.format(int(x))
+    
 @register.filter
 def underscore2space(s):
     return re.sub('_',' ',s)
