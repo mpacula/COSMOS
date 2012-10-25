@@ -16,6 +16,7 @@
         
         <th>Avg Mem Req</th>
         <th>Average RSS</th>
+        <th>Max RSS</th>
         <th>Average Virtual Ram</th>
         
         {% if details %}
@@ -47,6 +48,7 @@
             
             <td>{% get_node_stat batch "memory_requirement" "Avg" "format_memory_mb"%}</td>
             <td>{% get_sjob_stat batch "avg_rss_mem" "Avg" "format_memory_kb"%}</td>
+            <td>{% get_sjob_stat batch "max_rss_mem" "Max" "format_memory_kb"%}</td>
             <td>{% get_sjob_stat batch "avg_virtual_mem" "Avg" "format_memory_kb"%}</td>
             {% if details %}
                <td>{{batch.created_on|date:"SHORT_DATETIME_FORMAT"}}</td>

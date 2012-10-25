@@ -357,9 +357,9 @@ class Workflow(models.Model):
         """
         Reattempt running a node.
         
-        :param node: the node to reattempt
-        :param failed_jobAttempt: the previously failed jobAttempt of the node
-        :returns:  True if another jobAttempt was submitted, False if the max jobAttempts has already been reached
+        :param node: (Node) the node to reattempt
+        :param failed_jobAttempt: (bool) the previously failed jobAttempt of the node
+        :returns: (bool) True if another jobAttempt was submitted, False if the max jobAttempts has already been reached
         """
         numAttempts = node.jobAttempts.count()
         if not node.successful: #ReRun jobAttempt
@@ -379,8 +379,8 @@ class Workflow(models.Model):
         Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
         if batch is omitted or set to None, all running nodes will be waited on.
         
-        :param batch: wait for all of a batch's nodes to finish
-        :param terminate_on_fail: If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
+        :param batch: (Batch) wait for all of a batch's nodes to finish
+        :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
         """
         nodes = []
         if batch is None:
@@ -423,7 +423,7 @@ class Workflow(models.Model):
         If there any left over jobs that have not been collected,
         It will wait for all of them them
         
-        :param delete_unused_batches: Any batches and their output_dir from previous workflows that weren't loaded since the last create, __resume, or __restart, using add_batch() are deleted.
+        :param delete_unused_batches: (bool) Any batches and their output_dir from previous workflows that weren't loaded since the last create, __resume, or __restart, using add_batch() are deleted.
         
         """
         self._check_and_wait_for_leftover_nodes()
@@ -455,9 +455,9 @@ class Workflow(models.Model):
         """
         Returns the list of nodes that are tagged by the keys and vals in tags dictionary
         
-        :param op: either 'and' or 'or' as the logic to filter tags with
-        :param tags: tags to filter for
-        :returns: a query result of the filtered nodes
+        :param op: (str) either 'and' or 'or' as the logic to filter tags with
+        :param tags: (dict) tags to filter for
+        :returns: (queryset) a queryset of the filtered nodes
         
         >>> node.get_nodes_by(op='or',tags={'color':'grey','color':'orange'})
         >>> node.get_nodes_by(op='and',tags={'color':'grey','shape':'square'})
@@ -485,12 +485,12 @@ class Workflow(models.Model):
         
         :raises Exception: if more or less than one node is returned
         
-        :param op: Choose either 'and' or 'or' as the logic to filter tags with
-        :param tags: A dictionary of tags you'd like to filter for
-        :returns: a query result of the filtered nodes
+        :param op: (str) Choose either 'and' or 'or' as the logic to filter tags with
+        :param tags: (dict) A dictionary of tags you'd like to filter for
+        :returns: (queryset) a queryset of the filtered nodes
         
-        >>> node.get_node_by(op='or',tags = {'color':'grey','color':'orange'})
-        >>> node.get_node_by(op='and','color':'grey','shape':'square')
+        >>> node.get_node_by(op='or',tags={'color':'grey','color':'orange'})
+        >>> node.get_node_by(op='and',tags={'color':'grey','color':'orange'})
         """
     
         nodes = self.get_nodes_by(batch=batch,op=op,tags=tags) #there's just one group of nodes with this tag combination
@@ -562,8 +562,8 @@ class Batch(models.Model):
     def get_sjob_stat(self,field,statistic):
         """
         Aggregates a node successful job's field using a statistic
-        :param field: name of a nodes's field.  ex: wall_time or avg_rss_mem
-        :param statistic: choose from ['Avg','Sum','Max','Min','Count']
+        :param field: (str) name of a nodes's field.  ex: wall_time or avg_rss_mem
+        :param statistic: (str) choose from ['Avg','Sum','Max','Min','Count']
         
         >>> batch.get_stat('wall_time','Avg')
         120
@@ -577,8 +577,8 @@ class Batch(models.Model):
     def get_node_stat(self,field,statistic):
         """
         Aggregates a node's field using a statistic
-        :param field: name of a nodes's field.  ex: cpu_req, mem_req
-        :param statistic: choose from ['Avg','Sum','Max','Min','Count']
+        :param field: (str) name of a nodes's field.  ex: cpu_req, mem_req
+        :param statistic: (str) choose from ['Avg','Sum','Max','Min','Count']
         
         >>> batch.get_stat('cpu_requirement','Avg')
         120
@@ -622,7 +622,7 @@ class Batch(models.Model):
         
     def yield_node_resource_usage(self):
         """
-        :yields: tuples of resource usage and tags of all nodes
+        :yields: (list of tuples) tuples contain resource usage and tags of all nodes.  The first element is the name, the second is the value.
         """
         #TODO rework with time fields
         for node in self.nodes: 

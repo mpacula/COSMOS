@@ -13,16 +13,19 @@ assert isinstance(WF, Workflow)
 ##make samples dictionary
 samples=[]
 
-input_dir='/nas/erik/test_data'
-input_dir='/scratch/esg21/test_data'
-for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
-    samples.append(Sample.createFromPath(os.path.join(input_dir,sample_dir)))
-
-#input_dir='/scratch/esg21/projects/48exomes/'
-#for pool_dir in os.listdir(input_dir):
-#    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(os.path.join(input_dir,pool_dir))):
-#        samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
-
+if os.environ['COSMOS_SETTINGS_MODULE'] == 'gpp':
+    input_dir='/nas/erik/test_data'
+    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
+        samples.append(Sample.createFromPath(os.path.join(input_dir,sample_dir)))
+    #input_dir='/scratch/esg21/projects/48exomes/'
+    #for pool_dir in os.listdir(input_dir):
+    #    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(os.path.join(input_dir,pool_dir))):
+    #       samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
+    #     
+elif os.environ['COSMOS_SETTINGS_MODULE'] == 'orch':
+    input_dir='/scratch/esg21/test_data'
+    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
+        samples.append(Sample.createFromPath(os.path.join(input_dir,sample_dir)))
 
 ### Alignment
 bwa_aln = steps.BWA_Align("BWA Align").many2many(input_batch=None,samples=samples)
@@ -48,14 +51,10 @@ realigned_by_sample_chr = steps.IndelRealigner("IndelRealigner by Sample Chr").o
 bqsr_by_sample = steps.BaseQualityScoreRecalibration("Base Quality Score Recalibration by Sample").many2one(input_batch=realigned_by_sample_chr,group_by=['sample'])
 recalibrated_samples = steps.PrintReads("Apply BQSR").many2one(input_batch=realigned_by_sample_chr,bqsr_batch=bqsr_by_sample,group_by=['sample'])
 
-
 # Variant Calling
 ug = steps.UnifiedGenotyper("Unified Genotyper").many2many(input_batch=recalibrated_samples,intervals=contigs)
 cv1 = steps.CombineVariants("Combine Variants",hard_reset=True).many2one(input_batch=ug,group_by=['glm'])
-if len(samples) > 19:
-    inbreeding_coeff = True
-else:
-    inbreeding_coeff = False
+inbreeding_coeff = len(samples)> 19 #20 samples are required to use this annotation for vqr
 vqr = steps.VariantQualityRecalibration("Variant Quality Recalibration").one2one(cv1,exome_or_wgs='exome',inbreeding_coeff=inbreeding_coeff)
 ar = steps.ApplyRecalibration("Apply Recalibration").one2one(input_batch=cv1,vqr_batch=vqr)
 cv2 = steps.CombineVariants("Combine Variants2").many2one(input_batch=ar,group_by=[])
