@@ -31,12 +31,14 @@ class Workflow(models.Model):
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
     
-    created_on = models.DateTimeField(default=timezone.now())
-    finished_on = models.DateTimeField(null=True)
+    created_on = models.DateTimeField(null=True,default=None)
+    finished_on = models.DateTimeField(null=True,default=None)
     
     
     def __init__(self, *args, **kwargs):
+        kwargs['created_on'] = timezone.now()
         super(Workflow,self).__init__(*args, **kwargs)
+        
         validate_name(self.name)
         #Validate unique name
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
@@ -82,22 +84,19 @@ class Workflow(models.Model):
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
         
+        if name is None:
+            raise ValidationError('Name of a workflow cannot be None')
         name = re.sub("\s","_",name)
-        
         
         if root_output_dir is None:
             root_output_dir = cosmos_settings.default_root_output_dir
             
-        if Workflow.objects.filter(name=name).count()>0:
-            if restart:
-                wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run)
-            else:
-                wf = Workflow.__resume(name=name, dry_run=dry_run)
+        if restart:
+            wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
+        elif Workflow.objects.filter(name=name).count() > 0:
+            wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue)
         else:
-            wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir)
-
-        if name is None:
-            raise ValidationError('Name of a workflow cannot be None')
+            wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue)
         
         #remove stale objects
         wf._delete_stale_objects()
@@ -148,14 +147,9 @@ class Workflow(models.Model):
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
-        old_wf_exists = Workflow.objects.filter(name=name).count() > 0
-            
-        if old_wf_exists:
-            old_wf = Workflow.objects.get(name=name)
-            wf_id = old_wf.id
-            old_wf.delete(delete_files=True)
-        else:
-            wf_id=None
+        old_wf = Workflow.objects.get(name=name)
+        wf_id = old_wf.id
+        old_wf.delete(delete_files=True)
         
         new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
         
@@ -173,12 +167,14 @@ class Workflow(models.Model):
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
-        
+        if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
+        print 'Creating'
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
-            
+        
+        print name
         wf = Workflow.objects.create(id=_wf_id,name=name, output_dir=output_dir, dry_run=dry_run, default_queue=default_queue)
-        wf.save()
+        
         wf.log.info('Created Workflow {0}.'.format(wf))
         return wf
             
@@ -291,13 +287,10 @@ class Workflow(models.Model):
         :param delete_files: Deletes all files associated with this workflow
         """
         self.jobManager.delete()
-        self.save()
+        self.log.info("Deleting Working {0}".format(self))
         
-        delete_files=False
-        if 'delete_files' in kwargs:
-            delete_files = kwargs.pop('delete_files')
-        
-        if delete_files:
+        if kwargs.setdefault('delete_files',False):
+            kwargs.pop('delete_files')
             self.log.info('Deleting directory {0}'.format(self.output_dir))
             for h in self.log.handlers:
                 h.close()
@@ -305,6 +298,7 @@ class Workflow(models.Model):
                 os.system('rm -rf {0}'.format(self.output_dir))
                 
         for b in self.batches: b.delete()
+        
         super(Workflow, self).delete(*args, **kwargs)
                 
 
@@ -535,12 +529,14 @@ class Batch(models.Model):
     order_in_workflow = models.IntegerField(null=True)
     status = models.CharField(max_length=200,choices=status_choices,default='no_attempt') 
     successful = models.BooleanField(default=False)
-    created_on = models.DateTimeField(default=timezone.now())
+    created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
     
     def __init__(self,*args,**kwargs):
+        kwargs['created_on'] = timezone.now()
         super(Batch,self).__init__(*args,**kwargs)
+        
         validate_not_null(self.workflow)
         check_and_create_output_dir(self.output_dir)
         
@@ -598,12 +594,16 @@ class Batch(models.Model):
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
         return int(Node.objects.filter(batch=self).aggregate(aggr_fxn(field))[aggr_field])
         
-        
 
     @property
     def file_size(self):
         "Size of the batch's output_dir"
         return folder_size(self.output_dir)
+    
+    @property
+    def wall_time(self):
+        """Time between this batch's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
+        return self.finished_on - self.created_on
     
     @property
     def output_dir(self):
@@ -843,12 +843,14 @@ class Node(models.Model):
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     outputs = PickledObjectField(null=True) #dictionary of outputs
     
-    created_on = models.DateTimeField(default=timezone.now())
+    created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
     
     def __init__(self, *args, **kwargs):
+        kwargs['created_on'] = timezone.now()
         super(Node,self).__init__(*args, **kwargs)
+        
         validate_name(self.name)
         if self.id is None:
             if Node.objects.filter(batch=self,name=kwargs['name']).count() > 0:
@@ -940,9 +942,9 @@ class Node(models.Model):
             self.log.info("{0} Failed!".format(self,jobAttempt))
             
         self.finished_on = timezone.now()
-        if self.batch._are_all_nodes_done():
-            self.batch._has_finished()
         self.save()
+        
+        if self.batch._are_all_nodes_done(): self.batch._has_finished()    
         
     def tag(self,**kwargs):
         """

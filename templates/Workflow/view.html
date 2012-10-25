@@ -8,13 +8,14 @@
   <li class="active">{{workflow}}</li>
 </ul>
 
-<h1>{{workflow}}</h1>
-<p>
-	
+<h1>{{workflow}}
 	<a href="{% url 'workflow_view_log' workflow.id %}"><button class="btn btn-info"><i class="icon-search icon-white"></i> Log</button></a>
-	
 	<a href="{% url 'workflow_analysis' workflow.id %}"><button class="btn btn-info"><i class="icon-wrench icon-white"></i> Analyze</button></a>
-</p>
+</h1>
+<dl class="dl-horizontal">
+<dt>Output Dir</dt><dd>{{workflow.output_dir}}</dd>
+<dt>Default Queue</dt><dd>{{workflow.default_queue}}</dd>
+</dl>
 <p><h3>Batches</h3>
 </p>
 

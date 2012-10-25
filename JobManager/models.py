@@ -50,7 +50,7 @@ class JobAttempt(models.Model):
     )
     state_choices = zip(decode_drmaa_state.keys(),decode_drmaa_state.values()) #dict2tuple
     
-    created_on = models.DateTimeField(default=timezone.now())
+    created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
     jobManager = models.ForeignKey('JobManager',related_name='+')
@@ -138,6 +138,11 @@ class JobAttempt(models.Model):
     drmaa_info = PickledObjectField(null=True) #drmaa_info object returned by python-drmaa will be slow to access
     jobTemplate = None 
     _jobTemplate_attrs = ['args','blockEmail','deadlineTime','delete','email','errorPath','hardRunDurationLimit','hardWallclockTimeLimit','inputPath','jobCategory','jobEnvironment','jobName','jobSubmissionState','joinFiles','nativeSpecification','outputPath','remoteCommand','softRunDurationLimit','softWallclockTimeLimit','startTime','transferFiles','workingDirectory','cpu_time']
+    
+    
+    def __init__(self,*args,**kwargs):
+        kwargs['created_on'] = timezone.now()
+        super(JobAttempt,self).__init__(*args,**kwargs)
         
     @property
     def node(self):
@@ -313,7 +318,7 @@ class JobManager(models.Model):
     """
     Note there can only be one of these instantiated at a time
     """
-    created_on = models.DateTimeField(default=timezone.now())
+    created_on = models.DateTimeField(null=True,default=None)
         
     @property
     def jobAttempts(self):
@@ -321,6 +326,7 @@ class JobManager(models.Model):
         return JobAttempt.objects.filter(jobManager=self)
         
     def __init__(self,*args,**kwargs):
+        kwargs['created_on'] = timezone.now()
         super(JobManager,self).__init__(*args,**kwargs)
     
             
