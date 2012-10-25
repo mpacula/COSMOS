@@ -6,14 +6,13 @@ from sample import Sample,Fastq
 import os
 
 
-WF = Workflow.start(name='GPP 48Exomes GATK3',restart=False)
-step.workflow = WF
-assert isinstance(WF, Workflow)
 
 ##make samples dictionary
 samples=[]
 
 if os.environ['COSMOS_SETTINGS_MODULE'] == 'gpp':
+    WF = Workflow.start(name='GPP 48Exomes GATK3',default_queue='high_priority',restart=False)
+    
     input_dir='/nas/erik/test_data'
     for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
         samples.append(Sample.createFromPath(os.path.join(input_dir,sample_dir)))
@@ -23,9 +22,14 @@ if os.environ['COSMOS_SETTINGS_MODULE'] == 'gpp':
     #       samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
     #     
 elif os.environ['COSMOS_SETTINGS_MODULE'] == 'orch':
+    WF = Workflow.start(name='GPP 48Exomes GATK3 Test',default_queue='i2b2_int_12h',restart=False)
+    
     input_dir='/scratch/esg21/test_data'
     for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(input_dir)):
         samples.append(Sample.createFromPath(os.path.join(input_dir,sample_dir)))
+
+#Enable steps
+step.workflow = WF
 
 ### Alignment
 bwa_aln = steps.BWA_Align("BWA Align").many2many(input_batch=None,samples=samples)

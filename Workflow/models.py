@@ -29,6 +29,7 @@ class Workflow(models.Model):
     resume_from_last_failure = models.BooleanField(default=False,help_text='resumes from last failed node')
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
+    default_queue = models.CharField(max_length=255,default=None,null=True)
     
     created_on = models.DateTimeField(default=timezone.now())
     finished_on = models.DateTimeField(null=True)
@@ -70,14 +71,15 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
     
     @staticmethod
-    def start(name=None, restart=False, dry_run=False, root_output_dir=None):
+    def start(name=None, restart=False, dry_run=False, root_output_dir=None, default_queue=None):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
         
         :param name: (str) A unique name for this workflow. All spaces are converted to underscores. Required.
         :param restart: (bool) Restart the workflow by deleting it and creating a new one. Optional.
         :param dry_run: (bool) Don't actually execute jobs. Optional.
-        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. Optional.
+        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
+        :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
         
         name = re.sub("\s","_",name)
@@ -112,13 +114,14 @@ class Workflow(models.Model):
         
     
     @staticmethod
-    def __resume(name=None,dry_run=False):
+    def __resume(name=None,dry_run=False, default_queue=None):
         """
         Resumes a workflow from the last failed node.
         
         :param name: (str) A unique name for this workflow
-        :param dry_run: (bool) This workflow is a dry run.  No jobs will actually be executed
-        :param root_output_dir: (str) Optional override of the root_output_dir contains in the configuration file
+        :param dry_run: (bool) Don't actually execute jobs. Optional.
+        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
+        :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
 
         if Workflow.objects.filter(name=name).count() == 0:
@@ -126,6 +129,7 @@ class Workflow(models.Model):
         wf = Workflow.objects.get(name=name)
         wf.resume_from_last_failure=True
         wf.dry_run=dry_run
+        wf.default_queue=default_queue
         
         wf.save()
         wf.log.info('Resuming this workflow.')
@@ -134,14 +138,15 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __restart(name=None,root_output_dir=None,dry_run=False):
+    def __restart(name=None,root_output_dir=None,dry_run=False,default_queue=None):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
         
         :param name: (name) A unique name for this workflow. All spaces are converted to underscores. 
-        :param dry_run: (bool) This workflow is a dry run.  No jobs will actually be executed
-        :param root_output_dir: (str) Optional override of the root_output_dir contains in the configuration file
+        :param dry_run: (bool) Don't actually execute jobs. Optional.
+        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
+        :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
         old_wf_exists = Workflow.objects.filter(name=name).count() > 0
             
@@ -152,26 +157,27 @@ class Workflow(models.Model):
         else:
             wf_id=None
         
-        new_wf = Workflow.__create(_wf_id=wf_id,name=name,root_output_dir=root_output_dir,dry_run=dry_run)
+        new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
         
         new_wf.log.info('Restarting this Workflow.')
         
         return new_wf
                 
     @staticmethod
-    def __create(name=None,dry_run=False,root_output_dir=None,_wf_id=None):
+    def __create(name=None,dry_run=False,root_output_dir=None,_wf_id=None,default_queue=None):
         """
         Creates a new workflow
         
         :param name: (str) A unique name for this workflow
-        :param dry_run: (bool) This workflow is a dry run.  No jobs will actually be executed
-        :param root_output_dir: (str) Optional override of the root_output_dir contains in the configuration file
+        :param dry_run: (bool) Don't actually execute jobs. Optional.
+        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
+        :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
         
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
             
-        wf = Workflow.objects.create(id=_wf_id,name=name, output_dir=output_dir, dry_run=dry_run)
+        wf = Workflow.objects.create(id=_wf_id,name=name, output_dir=output_dir, dry_run=dry_run, default_queue=default_queue)
         wf.save()
         wf.log.info('Created Workflow {0}.'.format(wf))
         return wf
@@ -324,7 +330,10 @@ class Workflow(models.Model):
         jobAttempt = self.jobManager.add_jobAttempt(command=node.exec_command,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
-                                     drmaa_native_specification=get_drmaa_ns(cosmos_settings.DRM, node.memory_requirement, node.cpu_requirement))
+                                     drmaa_native_specification=get_drmaa_ns(DRM=cosmos_settings.DRM,
+                                                                             mem_req=node.memory_requirement,
+                                                                             cpu_req=node.cpu_requirement,
+                                                                             queue=self.default_queue))
         
         node._jobAttempts.add(jobAttempt)
         if self.dry_run:
@@ -783,11 +792,11 @@ class Batch(models.Model):
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         self.log.info('Bulk deleting JobAttempts...')
-        self.nodes._jobAttempts.all().delete()
+        JobAttempt.objects.filter(node_set__in = self.nodes).delete()
         self.log.info('Bulk deleting nodes...')
         self.nodes.delete()
         super(Batch, self).delete(*args, **kwargs)
-        self.log.info('Batch {0} Deleted.').format(self.name)
+        self.log.info('Batch {0} Deleted.'.format(self.name))
     
     @models.permalink    
     def url(self):
