@@ -58,6 +58,11 @@ class Workflow(models.Model):
         return Node.objects.filter(batch__in=self.batch_set.all())
     
     @property
+    def wall_time(self):
+        "Returns a timedelta instance of finished_on - created_on"
+        return self.finished_on - self.created_on
+    
+    @property
     def batches(self):
         """Batches in this Workflow"""
         return self.batch_set.all()
@@ -168,14 +173,12 @@ class Workflow(models.Model):
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         """
         if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
-        print 'Creating'
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
         
-        print name
         wf = Workflow.objects.create(id=_wf_id,name=name, output_dir=output_dir, dry_run=dry_run, default_queue=default_queue)
-        
         wf.log.info('Created Workflow {0}.'.format(wf))
+        wf.save()
         return wf
             
         
