@@ -38,7 +38,7 @@ class BWA_Align(step.Step):
 
 class BWA_Sampe(step.Step):
     outputs = {'sam':'raw.sam'}
-    mem_req = 3*1024
+    mem_req = 5*1024
     cpu_req = 1 #4
     
     def many2one_cmd(self,input_nodes,tags):
@@ -63,7 +63,7 @@ class BWA_Sampe(step.Step):
 
 class CleanSam(step.Step):
     outputs = {'bam':'cleaned.bam'}
-    mem_req = 1*1024
+    mem_req = 2*1024
     
     def one2one_cmd(self,input_node,input_type='bam'):
         return {
@@ -101,7 +101,7 @@ class MergeSamFiles(step.Step):
 class MarkDuplicates(step.Step):
     outputs = {'bam':'deduped.bam',
                'metrics_file':'metrics.log'}
-    mem_req = 3.5*1024
+    mem_req = 5*1024
     
     def one2one_cmd(self,input_node,assume_sorted=True):
         return {
@@ -117,7 +117,7 @@ class MarkDuplicates(step.Step):
         }
     
 class BuildBamIndex(step.Step):
-    mem_req = 1*1024
+    mem_req = 2*1024
     
     def one2one_cmd(self,input_node):
         return {
@@ -131,7 +131,7 @@ class BuildBamIndex(step.Step):
 
 class RealignerTargetCreator(step.Step):
     outputs = {'targetIntervals':'target.intervals'}
-    mem_req = 2*1024
+    mem_req = 2.5*1024
     cpu_req = 4
     
     def many2many_cmd(self,input_batch):
@@ -174,7 +174,7 @@ class RealignerTargetCreator(step.Step):
 
 class IndelRealigner(step.Step):
     outputs = {'bam':'realigned.bam'}
-    mem_req = 2*1024
+    mem_req = 2.5*1024
     cpu_req = 1 #-nt is not supported by this tool
     
     def one2many_cmd(self,input_node,rtc_batch,intervals,model='USE_READS'):
@@ -216,7 +216,7 @@ class IndelRealigner(step.Step):
 
 class BaseQualityScoreRecalibration(step.Step):
     outputs = {'recal':'bqsr.recal'}
-    mem_req = 2*1024
+    mem_req = 2.5*1024
     cpu_req = 1 #>1 results in ##### ERROR MESSAGE: We have temporarily disabled the ability to run BaseRecalibrator multi-threaded for performance reasons.  We hope to have this fixed for the next GATK release (2.2) and apologize for the inconvenience.
     
     pcmd = r"""
@@ -244,7 +244,7 @@ class BaseQualityScoreRecalibration(step.Step):
 
 class PrintReads(step.Step):
     outputs = {'bam':'recalibrated.bam'}
-    mem_req = 3*1024
+    mem_req = 5*1024
     
     pcmd = r"""
         {settings.GATK_cmd} \
@@ -273,7 +273,7 @@ class PrintReads(step.Step):
     
 class UnifiedGenotyper(step.Step):
     outputs = {'vcf':'raw.vcf'}
-    mem_req = 3*1024
+    mem_req = 5.5*1024
     cpu_req = 4
     
     def many2many_cmd(self,input_batch,intervals):
@@ -340,7 +340,7 @@ class VariantQualityRecalibration(step.Step):
                'tranches':'vqr.tranches',
                'rscript':'plot.R'
                }
-    mem_req = 3*1024
+    mem_req = 3.5*1024
     
     def one2one_cmd(self,input_node,exome_or_wgs,haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper',inbreeding_coeff=True):
         """
@@ -425,7 +425,7 @@ class VariantQualityRecalibration(step.Step):
 
 class ApplyRecalibration(step.Step):
     outputs = {'vcf':'recalibrated.vcf'}
-    mem_req = 3*1024
+    mem_req = 2*1024
     
     def one2one_cmd(self,input_node,vqr_batch,haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'):
         """
