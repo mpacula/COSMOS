@@ -88,7 +88,6 @@ def view_log(request,pid):
 def analysis(request,pid):
     #from rpy2.robjects import r as R
     from django.conf import settings as django_settings
-    from cosmos_session import cosmos_settings
     
     
     wf = Workflow.objects.get(pk=pid)

@@ -21,8 +21,7 @@ Settings DRMAA_LIBRARY_PATH to the correct :file:`libdrmaa.so` is very system an
    export COSMOS_SETTINGS_MODULE=config.default
    export PYTHONPATH=$COSMOS_HOME_PATH:$PYTHONPATH
    export PATH=$COSMOS_HOME_PATH/bin:$PATH
-   export DJANGO_SETTINGS_MODULE=Cosmos.settings
-   source $COSMOS_HOME_PATH/venv/bin/activate       # automatically enable virtuale environment
+   source $COSMOS_HOME_PATH/venv/bin/activate       # automatically enable virtual environment
 
 ``COSMOS_SETTING_MODULE`` is optional.  By default, cosmos will look for its configuration in ``config/default.py``,
 but if you set ``COSMOS_SETTING_MODULE=config.development`` it will load ``config/development.py`` instead.
@@ -47,7 +46,7 @@ The following bypasses a bug in :term:`LSF` drmaa v1.04.
 
 .. code-block:: bash
 
-   export LSF_DRMAA_CONF=$COSMOS_HOME_PATH/config/lsf_drmaa.conf
+   export LSF_DRMAA_CONF=$COSMOS_HOME_PATH/lsf_drmaa.conf
    
 
 Edit Configuration File

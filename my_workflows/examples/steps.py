@@ -1,4 +1,4 @@
-from Cosmos.addons.step import Step
+from cosmos.Workflow.step import Step
 
 class Echo(Step):
     outputs = {'txt':'out.txt'}
@@ -12,7 +12,8 @@ class Echo(Step):
                 'pcmd' : r"""
                             echo "{input}" > {{output_dir}}/{{outputs[txt]}}
                         """, 
-                'pcmd_dict': {'input':text}
+                'pcmd_dict': {'input':text},
+                'new_tags': {}
             }
         
 class Paste(Step):
@@ -44,7 +45,7 @@ class Cat(Step):
                     'add_tags': {'count':i}
                     }
     
-    def many2one_cmd(self,input_nodes):
+    def many2one_cmd(self,input_nodes,tags):
         """
         Cats all input_node txt outputs into one file
         """

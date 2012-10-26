@@ -1,9 +1,9 @@
 #Import Cosmos
 import sys
-import cosmos_session
+import cosmos.session
 
 #Begin Workflow
-from Workflow.models import Workflow, Batch
+from cosmos.Workflow.models import Workflow
 from datetime import time
 
 workflow = Workflow.start(name='Test_Workflow',restart=True)

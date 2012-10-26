@@ -3,13 +3,10 @@ import os,re,json,time,sys
 from picklefield.fields import PickledObjectField
 from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
-from Cosmos.helpers import check_and_create_output_dir,spinning_cursor
-import cosmos_session
-from cosmos_session import drmaa
+from cosmos.Cosmos.helpers import check_and_create_output_dir,spinning_cursor
+from cosmos import session
 from django.utils import timezone
-
-import django.dispatch
-jobAttempt_done = django.dispatch.Signal(providing_args=["jobAttempt"])
+import drmaa
 
 decode_drmaa_state = SortedDict([
         (drmaa.JobState.UNDETERMINED, 'process status cannot be determined'),
@@ -50,7 +47,7 @@ class JobAttempt(models.Model):
     )
     state_choices = zip(decode_drmaa_state.keys(),decode_drmaa_state.values()) #dict2tuple
     
-    created_on = models.DateTimeField(default=timezone.now())
+    created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
     jobManager = models.ForeignKey('JobManager',related_name='+')
@@ -138,6 +135,11 @@ class JobAttempt(models.Model):
     drmaa_info = PickledObjectField(null=True) #drmaa_info object returned by python-drmaa will be slow to access
     jobTemplate = None 
     _jobTemplate_attrs = ['args','blockEmail','deadlineTime','delete','email','errorPath','hardRunDurationLimit','hardWallclockTimeLimit','inputPath','jobCategory','jobEnvironment','jobName','jobSubmissionState','joinFiles','nativeSpecification','outputPath','remoteCommand','softRunDurationLimit','softWallclockTimeLimit','startTime','transferFiles','workingDirectory','cpu_time']
+    
+    
+    def __init__(self,*args,**kwargs):
+        kwargs['created_on'] = timezone.now()
+        super(JobAttempt,self).__init__(*args,**kwargs)
         
     @property
     def node(self):
@@ -183,7 +185,7 @@ class JobAttempt(models.Model):
         ``base_template`` must be passed down by the JobManager
         """
         
-        cmd = "python {profile} -d {db} -f {profile_out} {command_script_path}".format(profile = os.path.join(cosmos_session.cosmos_settings.home_path,'Cosmos/profile/profile.py'),
+        cmd = "python {profile} -d {db} -f {profile_out} {command_script_path}".format(profile = os.path.join(session.settings.home_path,'cosmos/Cosmos/profile/profile.py'),
                                                                                        db = self.profile_output_path+'.sqlite',
                                                                                        profile_out = self.profile_output_path,
                                                                                        command_script_path = self.command_script_path
@@ -236,7 +238,7 @@ class JobAttempt(models.Model):
         Queries the DRM for the status of the job
         """
         try:
-            s = decode_drmaa_state[cosmos_session.drmaa_session.jobStatus(str(self.drmaa_jobID))]
+            s = decode_drmaa_state[session.drmaa_session.jobStatus(str(self.drmaa_jobID))]
         except drmaa.InvalidJobException:
             if self.queue_status == 'completed':
                 if self.successful:
@@ -313,7 +315,7 @@ class JobManager(models.Model):
     """
     Note there can only be one of these instantiated at a time
     """
-    created_on = models.DateTimeField(default=timezone.now())
+    created_on = models.DateTimeField(null=True,default=None)
         
     @property
     def jobAttempts(self):
@@ -321,12 +323,13 @@ class JobManager(models.Model):
         return JobAttempt.objects.filter(jobManager=self)
         
     def __init__(self,*args,**kwargs):
+        kwargs['created_on'] = timezone.now()
         super(JobManager,self).__init__(*args,**kwargs)
     
             
 #    def close_session(self):
 #        #TODO delete all jobtemplates
-#        cosmos_session.drmaa_session.exit()
+#        session.drmaa_session.exit()
 
 #    def terminate_all_queued_or_running_jobAttempts(self):
 #        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):
@@ -334,7 +337,7 @@ class JobManager(models.Model):
 #        
     def terminate_jobAttempt(self,jobAttempt):
         "Terminates a jobAttempt"
-        cosmos_session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+        session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
 
     def __create_command_sh(self,jobAttempt):
         """Create a sh script that will execute command"""
@@ -355,7 +358,7 @@ class JobManager(models.Model):
         cmd_script_file_path = os.path.join(jobAttempt.drmaa_output_dir,'command.sh')
         jobAttempt.command_script_path = cmd_script_file_path
         jobAttempt.save()
-        jobAttempt.createJobTemplate(base_template = cosmos_session.drmaa_session.createJobTemplate())
+        jobAttempt.createJobTemplate(base_template = session.drmaa_session.createJobTemplate())
         self.__create_command_sh(jobAttempt)
         return jobAttempt
         
@@ -369,7 +372,7 @@ class JobManager(models.Model):
         """Submits and runs a job"""
         if job.queue_status != 'not_queued':
             raise JobStatusError('JobAttempt has already been submitted')
-        job.drmaa_jobID = cosmos_session.drmaa_session.runJob(job.jobTemplate)
+        job.drmaa_jobID = session.drmaa_session.runJob(job.jobTemplate)
         job.queue_status = 'queued'
         job.jobTemplate.delete() #prevents memory leak
         job.save()
@@ -383,7 +386,7 @@ class JobManager(models.Model):
 #        if job.queue_status != 'queued':
 #            raise JobStatusError('JobAttempt is not in the queue.  Make sure you submit() the job first, and make sure it hasn\'t alreay been collected.')
 #        try:
-#            drmaa_info = cosmos_session.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
+#            drmaa_info = session.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
 #        except Exception as e:
 #            if e == "code 24: no usage information was returned for the completed job":
 #                drmaa_info = None
@@ -402,7 +405,7 @@ class JobManager(models.Model):
         """
         try:
             disable_stderr() #python drmaa prints whacky messages sometimes.  if the script just quits without printing anything, something really bad happend while stderr is disabled
-            drmaa_info = cosmos_session.drmaa_session.wait(jobId=drmaa.Session.JOB_IDS_SESSION_ANY,timeout=drmaa.Session.TIMEOUT_NO_WAIT)
+            drmaa_info = session.drmaa_session.wait(jobId=drmaa.Session.JOB_IDS_SESSION_ANY,timeout=drmaa.Session.TIMEOUT_NO_WAIT)
             enable_stderr()
         except drmaa.errors.InvalidJobException as e: #throws this when there are no jobs to wait on.  This should never happen since we should check for num_queued_jobs in yield_all_queued_jobs
             enable_stderr()

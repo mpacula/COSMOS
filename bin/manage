@@ -1,2 +1,8 @@
-#!/bin/bash
-python $COSMOS_HOME_PATH/Cosmos/manage.py $@
+#!/usr/bin/env python
+from cosmos import manage
+
+if __name__ == '__main__':
+    try:
+        manage.main()
+    except KeyboardInterrupt:
+        print "Interrupted, exiting."

@@ -19,7 +19,7 @@ using :py:data:`Workflow.models.Node.output_paths`
 .. code-block:: python
    :linenos:
 
-   import cosmos_session
+   import cosmos.session
    from Workflow.models import Workflow
    import os
    
@@ -43,4 +43,4 @@ using :py:data:`Workflow.models.Node.output_paths`
 Steps
 _____
 
-See ``my_workflows/gatk*`` for examples on using the step addon for creating workflows.
+See ``my_workflows/gatk*`` and ``my_workflows/examples/`` for examples on using the step addon for creating workflows.
