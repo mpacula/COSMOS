@@ -3,9 +3,9 @@ import os,re,json,time,sys
 from picklefield.fields import PickledObjectField
 from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
-from Cosmos.helpers import check_and_create_output_dir,spinning_cursor
-import cosmos_session
-from cosmos_session import drmaa
+from cosmos.Cosmos.helpers import check_and_create_output_dir,spinning_cursor
+from cosmos import cosmos_session
+from cosmos.cosmos_session import drmaa
 from django.utils import timezone
 
 import django.dispatch

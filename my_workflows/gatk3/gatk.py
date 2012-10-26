@@ -10,7 +10,7 @@ import os
 ##make samples dictionary
 samples=[]
 
-if os.environ['COSMOS_SETTINGS_MODULE'] == 'gpp':
+if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
     WF = Workflow.start(name='GPP 48Exomes GATK3',default_queue='high_priority',restart=False)
     
     input_dir='/nas/erik/test_data'
@@ -21,7 +21,7 @@ if os.environ['COSMOS_SETTINGS_MODULE'] == 'gpp':
     #    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(os.path.join(input_dir,pool_dir))):
     #       samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
     #     
-elif os.environ['COSMOS_SETTINGS_MODULE'] == 'orchestra':
+elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
     WF = Workflow.start(name='GPP 48Exomes GATK3 Test',default_queue='i2b2_int_12h',restart=False)
     
     input_dir='/scratch/esg21/test_data'

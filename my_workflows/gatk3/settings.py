@@ -3,19 +3,19 @@ from cosmos_session import cosmos_settings
 ###User Defined Settings
 #This pipeline's settings
 #GATK_path = '/home2/erik/2gatk/GenomeAnalysisTK-2.1-8-g5efb575'
-if os.environ['COSMOS_SETTINGS_MODULE'] == 'gpp':
+if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
     GATK_path = '/home/ch158749/tools/GenomeAnalysisTKLite-2.1-8-gbb7f038'
     Picard_path = '/home/ch158749/tools/picard-tools-1.77'
     bwa_path = '/home/ch158749/tools/bwa-0.6.2/bwa'
     resource_bundle_path = '/nas/erik/bundle/1.5/b37'
     bwa_reference_fasta_path = '/nas/erik/bwa_reference/human_g1k_v37.fasta'
     tmp_dir=cosmos_settings.tmp_dir
-elif os.environ['COSMOS_SETTINGS_MODULE'] == 'orchestra':
+elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
     GATK_path = '/home/esg21/gatk/GenomeAnalysisTKLite-2.1-13-g0f021e6'
     Picard_path = '/home/esg21/gatk/tools/picard-tools-1.78'
     bwa_path = '/home/esg21/gatk/bwa-0.6.2/bwa'
     resource_bundle_path = '/scratch/esg21/gatk/bundle/b37/'
-    bwa_reference_fasta_path = '/scratch/esg21/gatk/bwa_reference/'
+    bwa_reference_fasta_path = '/scratch/esg21/gatk/bwa_reference/human_g1k_v37.fasta'
     tmp_dir=cosmos_settings.tmp_dir
 
 ### auto generated

@@ -12,11 +12,11 @@ name=parts[1]
 cosmos_settings = getattr(__import__(package, fromlist=[name]), name)
 
 ###Setup DJANGO
-path = cosmos_settings.home_path
+path = os.path.join(cosmos_settings.home_path,'cosmos')
 if path not in sys.path:
     sys.path.append(path)
 
-os.environ['DJANGO_SETTINGS_MODULE'] = 'Cosmos.settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.settings'
 
 #DRMAA
 import drmaa
