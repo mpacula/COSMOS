@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from Cosmos.addons import step
+from cosmos.Workflow import step
 from Cosmos.helpers import parse_cmd
 import settings
 from settings import get_Picard_cmd

@@ -1,5 +1,5 @@
 from argh import arg,ArghParser,command,CommandError
-import cosmos_session
+import cosmos.session
 from Workflow.models import Workflow
 import os
 

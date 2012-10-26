@@ -28,7 +28,7 @@ The simplest workflow you could have.  Edit :file:`firstflow.py`, and put the fo
    :linenos:
 
    # These two lines go at the beggining of every workflow
-   import cosmos_session
+   import cosmos.session
    from Workflow.models import Workflow
    
    # Create workflow
@@ -73,7 +73,7 @@ run 5 jobs in the second batch.
 .. code-block:: python
    :linenos:
 
-   import cosmos_session
+   import cosmos.session
    from Workflow.models import Workflow
    import os
    

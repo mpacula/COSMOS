@@ -1,3 +1,6 @@
+"""
+A Cosmos session.  Sets up environment variables, Django, SQL and DRMAA
+"""
 import os,sys
 
 if 'COSMOS_SETTINGS_MODULE' not in os.environ:
@@ -9,14 +12,14 @@ if 'COSMOS_HOME_PATH' not in os.environ:
 parts = os.environ['COSMOS_SETTINGS_MODULE'].split('.')
 package=parts[0]
 name=parts[1]
-cosmos_settings = getattr(__import__(package, fromlist=[name]), name)
+settings = getattr(__import__(package, fromlist=[name]), name)
 
 ###Setup DJANGO
-path = os.path.join(cosmos_settings.home_path,'cosmos')
+path = os.path.join(settings.home_path,'cosmos')
 if path not in sys.path:
     sys.path.append(path)
 
-os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.Cosmos.django_settings'
 
 #DRMAA
 import drmaa
@@ -25,7 +28,7 @@ try:
     drmaa_session = drmaa.Session()
     drmaa_session.initialize()
 except Exception as e:
-    #print "WARNING! WARNING! Could not enable drmaa.  Proceeding without drmaa enabled."
+    print "WARNING! WARNING! Could not enable drmaa.  Proceeding without drmaa enabled."
     #print e
     pass
     

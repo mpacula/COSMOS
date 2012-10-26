@@ -1,7 +1,7 @@
 from django.conf import settings
-from cosmos_session import cosmos_settings
+from cosmos import session
 
 def contproc(request):
     return {
-        'cosmos_settings' : cosmos_settings,
+        'cosmos_settings' : session.settings,
     }

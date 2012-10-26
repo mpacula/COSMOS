@@ -46,7 +46,7 @@ The following bypasses a bug in :term:`LSF` drmaa v1.04.
 
 .. code-block:: bash
 
-   export LSF_DRMAA_CONF=$COSMOS_HOME_PATH/config/lsf_drmaa.conf
+   export LSF_DRMAA_CONF=$COSMOS_HOME_PATH/lsf_drmaa.conf
    
 
 Edit Configuration File

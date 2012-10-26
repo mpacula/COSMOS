@@ -6,7 +6,7 @@ from cosmos.Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, 
 from cosmos.Cosmos import helpers
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField
-from cosmos.cosmos_session import cosmos_settings
+from cosmos import session
 from django.utils import timezone
 
 
@@ -94,7 +94,7 @@ class Workflow(models.Model):
         name = re.sub("\s","_",name)
         
         if root_output_dir is None:
-            root_output_dir = cosmos_settings.default_root_output_dir
+            root_output_dir = session.settings.default_root_output_dir
             
         if restart:
             wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
@@ -327,7 +327,7 @@ class Workflow(models.Model):
         jobAttempt = self.jobManager.add_jobAttempt(command=node.exec_command,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
                                      jobName=node.name,
-                                     drmaa_native_specification=get_drmaa_ns(DRM=cosmos_settings.DRM,
+                                     drmaa_native_specification=get_drmaa_ns(DRM=session.settings.DRM,
                                                                              mem_req=node.memory_requirement,
                                                                              cpu_req=node.cpu_requirement,
                                                                              queue=self.default_queue))
