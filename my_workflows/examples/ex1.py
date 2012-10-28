@@ -1,6 +1,6 @@
-import cosmos_session
-from Workflow.models import Workflow
-from Cosmos.addons import step
+import cosmos.session
+from cosmos.Workflow.models import Workflow
+from cosmos.contrib import step
 import steps
 
 WF = Workflow.start('Example1',default_queue='high_priority',restart=True)

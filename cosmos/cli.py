@@ -1,6 +1,6 @@
 from argh import arg,ArghParser,command,CommandError
 import cosmos.session
-from Workflow.models import Workflow
+from cosmos.Workflow.models import Workflow
 import os
 
 @arg('-p','--port',help='port to serve on',default='8080')
@@ -37,7 +37,6 @@ def jobs(args):
             print ja.drmaa_jobID
         else:
             print ja
-    
             
 def list(args):
     """List all workflows"""
@@ -48,7 +47,8 @@ parser = ArghParser()
 parser.add_commands([runweb,shell,syncdb,resetentiredb],namespace='adm',title='Admin')
 parser.add_commands([list,jobs],namespace='wf',title='Workflow')
 
-if __name__=='__main__':
-    parser.dispatch()
+
 def main():
     parser.dispatch()
+if __name__=='__main__':
+    main()

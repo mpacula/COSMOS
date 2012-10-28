@@ -1,257 +1,58 @@
-import cosmos_session
-from Workflow.models import Workflow
-import commands
-from sample import Sample,Fastq
+import cosmos.session
+from cosmos.Workflow.models import Workflow
+from cosmos.contrib import step
+import steps
 import os
+import make_data_dict
+import json
 
 ##make samples dictionary
-input_dir='/scratch/esg21/projects/48exomes'
 samples=[]
 
-for pool_dir in os.listdir(input_dir):
-    for sample_dir in filter(lambda x: x!='.DS_Store',os.listdir(os.path.join(input_dir,pool_dir))):
-        samples.append(Sample.createFromPath(os.path.join(input_dir,pool_dir,sample_dir)))
+if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
+    WF = Workflow.start(name='GP 48Exomes with Simulated',default_queue='high_priority',restart=False)
+    data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/48exomes',depth=2))
+    simulated = [s for s in make_data_dict.yield_simulated_files(input_dir='/nas/erik/ngs_data/simulated')]
+    data_dict += simulated
+elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
+    WF = Workflow.start(name='GPP 48Exomes GATK3 Test',default_queue='i2b2_int_12h',restart=False)
+    data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/test_data',depth=1))
+    simulated = [s for s in make_data_dict.yield_simulated_files(input_dir='/nas/erik/ngs_data/simulated')]
+    data_dict += simulated
 
-WF = Workflow.start(name='GPP 48Exomes GATK',restart=False)
-#WF = Workflow.start(name='GATK Test2')
-assert isinstance(WF, Workflow)
-
-contigs = [str(x) for x in range(1,23)+['X','Y']] #list of chroms: [1,2,3,..X,Y]
+#Enable steps
+step.workflow = WF
 
 ### Alignment
+bwa_aln = steps.BWA_Align("BWA Align").many2many(input_batch=None,data_dict=data_dict)
+bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=bwa_aln,group_by=['sample','lane','fq_chunk'])
+clean_bams = steps.CleanSam("Clean Bams").one2one(input_batch=bwa_sampe,input_type='sam')
 
-B_bwa_aln = WF.add_batch("BWA Align")
-if not B_bwa_aln.successful:
-    for sample in samples:
-        for fqp in sample.yield_fastq_pairs():
-            for fq in fqp:
-                B_bwa_aln.add_node(name = fq.filename,
-                    pcmd = commands.bwa_aln(fastq=fq.path,
-                                            output_sai='{output_dir}/{outputs[sai]}'),
-                    outputs = {'sai':'align.sai'},
-                    tags = {
-                    'sample':sample.name,
-                    'lane': fq.lane,
-                    'fq_partNumber': fq.partNumber,
-                    'fq_path': fq.path,
-                    'RG_ID':'%s.L%s' % (sample.flowcell,fq.lane),
-                    'RG_LIB':'LIB-%s' % sample.name,
-                    'RG_PLATFORM':'ILLUMINA',
-                },
-                mem_req=3500)
-    WF.run_wait(B_bwa_aln) 
+"""
+Following the "Best" GATK practices for deduping, realignment, and bqsr
+for each sample
+    lanes.bam <- merged lane.bams for sample
+    dedup.bam <- MarkDuplicates(lanes.bam)
+    realigned.bam <- realign(dedup.bam) [with known sites included if available]
+    recal.bam <- recal(realigned.bam)
+    sample.bam <- recal.bam
+"""
+contigs = [str(x) for x in range(1,23)+['X','Y']] #list of chroms: [1,2,3,..X,Y]
 
-B_bwa_sampe = WF.add_batch("BWA Sampe")
-if not B_bwa_sampe.successful:
-    for tags,input_nodes in B_bwa_aln.group_nodes_by('sample','lane','fq_partNumber'):
-        node_r1 = input_nodes[0]
-        node_r2 = input_nodes[1]
-        n = input_nodes[0]
-        name = '{tags[sample]} {tags[lane]} {tags[fq_partNumber]}'.format(tags=n.tags) #can take out r1 and r2
-        B_bwa_sampe.add_node(name = name,
-                            pcmd = commands.bwa_sampe(r1_sai=node_r1.output_paths['sai'],
-                                                      r2_sai=node_r2.output_paths['sai'],
-                                                      r1_fq=node_r1.tags['fq_path'],
-                                                      r2_fq=node_r2.tags['fq_path'],
-                                                      ID=n.tags['RG_ID'],
-                                                      LIBRARY=n.tags['RG_LIB'],
-                                                      SAMPLE_NAME=n.tags['sample'],
-                                                      PLATFORM=n.tags['RG_PLATFORM'],
-                                                      output_sam='{output_dir}/{outputs[sam]}'),
-                            outputs = {'sam':'sampe.sam'},
-                            tags = tags,
-                            mem_req=5000)
-    WF.run_wait(B_bwa_sampe)    
+sample_bams = steps.MergeSamFiles("Merge Bams by Sample").many2one(input_batch=clean_bams,group_by=['sample'],assume_sorted=False)
+deduped_by_samples = steps.MarkDuplicates("Mark Duplicates in Samples").one2one(input_batch=sample_bams)
+index_samples = steps.BuildBamIndex("Index Deduped Samples").one2one(input_batch=deduped_by_samples)
+rtc_by_sample_chr = steps.RealignerTargetCreator("RealignerTargetCreator by Sample Chr").one2many(input_batch=deduped_by_samples,intervals=contigs)
+realigned_by_sample_chr = steps.IndelRealigner("IndelRealigner by Sample Chr").one2many(input_batch=deduped_by_samples,rtc_batch=rtc_by_sample_chr,intervals=contigs,model='USE_READS')
+bqsr_by_sample = steps.BaseQualityScoreRecalibration("Base Quality Score Recalibration by Sample").many2one(input_batch=realigned_by_sample_chr,group_by=['sample'])
+recalibrated_samples = steps.PrintReads("Apply BQSR").many2one(input_batch=realigned_by_sample_chr,bqsr_batch=bqsr_by_sample,group_by=['sample'])
 
-#### Clean and Merge
-
-B_clean_sam = WF.add_batch("Clean Bams")
-if not B_clean_sam.successful:
-    for n in B_bwa_sampe.nodes:
-        name = '{tags[sample]} L{tags[lane]} PN{tags[fq_partNumber]}'.format(tags=n.tags)
-        B_clean_sam.add_node(name=name,
-                             pcmd = commands.CleanSam(input_bam=n.output_paths['sam'],
-                                                      output_bam='{output_dir}/{outputs[bam]}'),
-                             outputs = {'bam':'cleaned.bam'},
-                             tags = n.tags,
-                             mem_req=3500)
-    WF.run_wait(B_clean_sam)
+# Variant Calling
+ug = steps.UnifiedGenotyper("Unified Genotyper").many2many(input_batch=recalibrated_samples,intervals=contigs)
+cv1 = steps.CombineVariants("Combine Variants",hard_reset=True).many2one(input_batch=ug,group_by=['glm'])
+inbreeding_coeff = len(samples)> 19 #20 samples are required to use this annotation for vqr
+vqr = steps.VariantQualityRecalibration("Variant Quality Recalibration").one2one(cv1,exome_or_wgs='exome',inbreeding_coeff=inbreeding_coeff)
+ar = steps.ApplyRecalibration("Apply Recalibration").one2one(input_batch=cv1,vqr_batch=vqr)
+cv2 = steps.CombineVariants("Combine Variants2").many2one(input_batch=ar,group_by=[])
     
-    
-B_merge_bams = WF.add_batch("Merge Cleaned Bams")
-if not B_merge_bams.successful:
-    for tags,input_nodes in B_clean_sam.group_nodes_by('sample','lane'):
-        input_bams = [ n.output_paths['bam'] for n in input_nodes ]
-        name = "{tags[sample]} L{tags[lane]}".format(tags=tags)
-        B_merge_bams.add_node(name=name,
-                             pcmd = commands.MergeSamFiles(input_bams=input_bams,
-                                                      output_bam='{output_dir}/{outputs[bam]}',
-                                                      assume_sorted=False),
-                             outputs = {'bam':'lane.bam'},
-                             tags = tags,
-                             mem_req=3500)
-    WF.run_wait(B_merge_bams)    
-
-B_index = WF.add_batch("Index Merged Cleaned Bams")
-if not B_index.successful:
-    for n in B_merge_bams.nodes:
-        B_index.add_node(name=n.name,
-                       pcmd = commands.BuildBamIndex(input_bam=n.output_paths['bam'],
-                                                     output_bai=n.output_paths['bam']+'.bai'),
-                       tags = n.tags,
-                       mem_req=2000)
-    WF.run_wait(B_index)
-                                            
-### INDEL Realignment    
- 
-B_RTC = WF.add_batch("Realigner Target Creator")
-if not B_RTC.successful:
-    for n in B_merge_bams.nodes:
-        B_RTC.add_node(name=n.name,
-                       pcmd = commands.RealignerTargetCreator(input_bam=n.output_paths['bam'],
-                                                              output_recal_intervals='{output_dir}/{outputs[targetIntervals]}'
-                                                              ),
-                       outputs = {'targetIntervals':'list.intervals'},
-                       tags = n.tags,
-                       mem_req=3000)
-    WF.run_wait(B_RTC)
-                                            
-B_IR = WF.add_batch("Indel Realigner")
-if not B_IR.successful:
-    for n in B_merge_bams.nodes:
-        B_IR.add_node(name=n.name,
-                      pcmd = commands.IndelRealigner(input_bam=n.output_paths['bam'],
-                                                    targetIntervals=B_RTC.get_node_by(**n.tags).output_paths['targetIntervals'],
-                                                    output_bam='{output_dir}/{outputs[bam]}',
-                                                    ),
-                      outputs = {'bam':'realigned.bam'},
-                      tags = n.tags,
-                      mem_req=1500)
-    WF.run_wait(B_IR)
-
-### Base Quality Score Recalibration
-     
-B_BQSR = WF.add_batch("Base Quality Score Recalibration") #TODO test using SW
-if not B_BQSR.successful:
-    for n in B_IR.nodes:
-        B_BQSR.add_node(name=n.name,
-                        pcmd = commands.BaseQualityScoreRecalibration(input_bam = n.output_paths['bam'],
-                                                                      output_recal_report='{output_dir}/{outputs[recal]}'),
-                        outputs = {'recal':'bqsr.recal'},
-                        tags = n.tags,
-                        mem_req=3000)
-    WF.run_wait(B_BQSR)
-    
-B_PR = WF.add_batch("Apply BQSR") #TODO test using SW
-if not B_PR.successful:
-    for n in B_IR.nodes:
-        bqsr_node = B_BQSR.get_node_by(**n.tags)
-        B_PR.add_node(name=n.name,
-                      pcmd = commands.PrintReads(input_bam = n.output_paths['bam'],
-                                                 output_bam = '{output_dir}/{outputs[bam]}',
-                                                 input_recal_report=bqsr_node.output_paths['recal']),
-                      outputs = {'bam':'recalibrated.bam'},
-                      tags = n.tags,
-                      mem_req=3000)
-    WF.run_wait(B_PR) 
-
-
-def MergeAndIndexBySample(input_batch,name1,name2):
-    B_merge_bams = WF.add_batch(name1)
-    if not B_merge_bams.successful:
-        for tags,input_nodes in input_batch.group_nodes_by('sample'):
-            sample_name = tags['sample']
-            sample_sams = [ n.output_paths['bam'] for n in input_nodes ]
-            B_merge_bams.add_node(name=sample_name,
-                              pcmd = commands.MergeSamFiles(input_bams=sample_sams,
-                                                            output_bam='{output_dir}/{outputs[bam]}',
-                                                            assume_sorted=False),
-                              outputs = {'bam':'{0}.bam'.format(sample_name)},
-                              tags = tags,
-                              mem_req=3000)
-        WF.run_wait(B_merge_bams)
-    
-    B_index = WF.add_batch(name2)
-    if not B_index.successful:
-        for n in B_merge_bams.nodes:
-            B_index.add_node(name=n.name,
-                              pcmd = commands.BuildBamIndex(input_bam=n.output_paths['bam'],
-                                                            output_bai='{outputs[bai]}'),
-                              outputs = {'bai':'{0}.bai'.format(n.output_paths['bam'])},
-                              tags = n.tags,
-                              mem_req=3000)
-        WF.run_wait(B_index)    
-    return B_merge_bams, B_index
-
-B_merge_bams_sample, B_index = MergeAndIndexBySample(B_PR,"Merge Bams by Sample","Index Merged Sample Bams")
-
-
-### Genotype
-
-B_UG = WF.add_batch(name="Unified Genotyper")
-if not B_UG.successful:
-    input_bams = [ n.output_paths['bam'] for n in B_merge_bams_sample.nodes ]
-    for chrom in contigs:
-        for glm in ['INDEL','SNP']:
-            B_UG.add_node(name='{0} chr{1}'.format(glm,chrom),
-                          pcmd = commands.UnifiedGenotyper(input_bams=input_bams,
-                                                        output_bam='{output_dir}/{outputs[vcf]}',
-                                                        glm=glm,
-                                                        interval=chrom),
-                          outputs = {'vcf':'raw.vcf'},
-                          tags = {'chr':chrom,
-                                  'glm':glm},
-                          mem_req=3000)
-    WF.run_wait(B_UG)
-
-### Merge VCFS
-B_CV = WF.add_batch(name="Combine Variants")
-if not B_CV.successful:
-    for tags,input_nodes in B_UG.group_nodes_by('glm'):
-        glm_vcfs = [ n.output_paths['vcf'] for n in input_nodes ]
-        B_CV.add_node(name=tags['glm'],
-                      pcmd=commands.CombineVariants(input_vcfs=glm_vcfs,
-                                                   output_vcf="{output_dir}/{outputs[vcf]}",
-                                                   genotypeMergeOptions='UNSORTED'),
-                      tags=tags,
-                      outputs={'vcf':'raw.vcf'},
-                      mem_req=3000)
-    WF.run_wait(B_CV)
-
-
-### Variant Recalibration
-
-B_VQR = WF.add_batch(name="Variant Quality Recalibration")
-if not B_VQR.successful:
-    for n in B_CV.nodes:
-        input_vcf = n.output_paths['vcf']
-        B_VQR.add_node(name=n.name,
-                       pcmd=commands.VariantQualityRecalibration(input_vcf=input_vcf,
-                                                                inbreedingcoeff=False,
-                                                                output_recal="{output_dir}/{outputs[recal]}",
-                                                                output_tranches="{output_dir}/{outputs[tranches]}",
-                                                                output_rscript="{output_dir}/{outputs[rscript]}",
-                                                                mode=n.tags['glm'],
-                                                                exome_or_wgs='exome',
-                                                                haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'),
-                      tags=n.tags,
-                      outputs={'recal':'output_bam.recal','tranches':'output_bam.tranches','rscript':'plot.R'},
-                      mem_req=3000)
-    WF.run_wait(B_VQR)
-
-B_AR = WF.add_batch(name="Apply Recalibration")
-if not B_AR.successful:
-    for n in B_VQR.nodes:
-        B_AR.add_node(name=n.name,
-                      pcmd=commands.ApplyRecalibration(input_vcf=input_vcf,
-                                                      input_recal=n.output_paths['recal'],
-                                                      input_tranches=n.output_paths['tranches'],
-                                                      output_recalibrated_vcf="{output_dir}/{outputs[vcf]}",
-                                                      mode=n.tags['glm'],
-                                                      haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'),
-                      tags=n.tags,
-                      outputs={'vcf':'recalibrated.vcf'},
-                      mem_req=3000)
-    WF.run_wait(B_AR)
-        
 WF.finished(delete_unused_batches=True)

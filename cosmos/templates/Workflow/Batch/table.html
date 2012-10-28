@@ -1,0 +1,62 @@
+{% load extras %}
+
+<table class="table table-condensed">
+    <tbody>
+    <tr><th>Step</th>
+        <th>Batch</th>
+        <th></th>
+        <th>Progress</th>
+        <th>Nodes</th>
+        <th>Batch Wall Time</th>
+        <th>Avg CPU Req</th>
+        <th>Avg % CPU</th>
+        <th>Avg Node Wall Time</th>
+        <th>Max Node Wall Time</th>
+        <th>Total Node Wall Time</th>
+        <th>Avg Blocked I/O Time</th>
+        
+        <th>Avg Mem Req</th>
+        <th>Avg RSS</th>
+        <th>Max RSS</th>
+        <th>Avg Virtual Ram</th>
+        
+        {% if details %}
+        <th>Created</th>
+        <th>Finished</th>
+        {% endif %}
+    </tr>
+    {% for batch in batches %}
+        <tr onclick="window.location.href = '{{batch.url}}';" style="cursor:pointer">
+            <td>{{batch.order_in_workflow}}.</td>
+            <td>[{{batch.id}}] <a href="{{batch.url}}"><strong>{{batch.name|underscore2space}}</strong></a></td>
+            <td>
+                {%with status=batch.status %}
+                    {%if status == "successful"%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
+                    {%if status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
+                    {%if status == "in_progress"%}<i class="icon-refresh" rel="tooltip" title="In Progress"></i>{%endif%}
+                {%endwith%}
+                </td>
+            <td><div style="padding:0px;margin:0px" class="progress progress-{% status2csstype batch.status %} progress-striped" rel="tooltip" title="{{batch.percent_done}}% Completed" data-placement="right">
+                    <div class="bar" style="opacity:.75;width:{{batch.percent_done}}%"%></div>
+                </div></td>
+            <td>{{batch.num_nodes_successful}}/{{batch.num_nodes}}</td>
+            <td>{{batch.wall_time}}</td>
+            <td>{% get_node_stat batch "cpu_requirement" "Avg"%}</td>
+            <td>{% get_sjob_stat batch "percent_cpu" "Avg" "convert2int"%}</td>
+            <td>{% get_sjob_stat batch "wall_time" "Avg" "format_time"%}</td>
+            <td>{% get_sjob_stat batch "wall_time" "Max" "format_time"%}</td>
+            <td>{% get_sjob_stat batch "wall_time" "Sum" "format_time"%}</td>
+            <td>{% get_sjob_stat batch "block_io_delays" "Avg" "format_time"%}</td>
+            
+            <td>{% get_node_stat batch "memory_requirement" "Avg" "format_memory_mb"%}</td>
+            <td>{% get_sjob_stat batch "avg_rss_mem" "Avg" "format_memory_kb"%}</td>
+            <td>{% get_sjob_stat batch "max_rss_mem" "Max" "format_memory_kb"%}</td>
+            <td>{% get_sjob_stat batch "avg_virtual_mem" "Avg" "format_memory_kb"%}</td>
+            {% if details %}
+               <td>{{batch.created_on|date:"SHORT_DATETIME_FORMAT"}}</td>
+               <td>{{batch.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
+            {% endif %}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>

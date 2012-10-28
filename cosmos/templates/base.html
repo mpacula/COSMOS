@@ -15,9 +15,10 @@
       }
       {%block style%}{%endblock%}
     </style>
+    <script src="http://code.jquery.com/jquery.min.js"></script>
+    {% block head %}{% endblock %}
   </head>
   <body>
-    <script src="http://code.jquery.com/jquery.min.js"></script>
     <script src="{% static "bootstrap/js/bootstrap.min.js" %}"></script>
     <script type="text/javascript">
     $(function() {
@@ -50,8 +51,7 @@
       </div>
     </div>
     <div class="container">
-                    {%block content%}{%endblock%}
-                    
+        {%block content%}{%endblock%}
         <hr>
         <footer>
             <p>© Erik Gafni</p>

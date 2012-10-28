@@ -4,8 +4,66 @@ import os
 import logging
 import subprocess
 import itertools
-import pprint 
+import pprint
+
+import signal
+
+def confirm(prompt=None, default=False, timeout=0):
+    """prompts for yes or no defaultonse from the user. Returns True for yes and
+    False for no.
+
+    'default' should be set to the default value assumed by the caller when
+    user simply types ENTER.
+
+    :param timeout: (int) If set, prompt will return default. 
+
+    >>> confirm(prompt='Create Directory?', default=True)
+    Create Directory? [y]|n: 
+    True
+    >>> confirm(prompt='Create Directory?', default=False)
+    Create Directory? [n]|y: 
+    False
+    >>> confirm(prompt='Create Directory?', default=False)
+    Create Directory? [n]|y: y
+    True
+    """
+    class TimeOutException(Exception): pass
+    def timed_out(signum, frame):
+        "called when stdin read times out"
+        raise TimeOutException('Timed out')
+    signal.signal(signal.SIGALRM, timed_out)
+
+    if prompt is None:
+        prompt = 'Confirm'
+
+    if default:
+        prompt = '%s [%s]|%s: ' % (prompt, 'y', 'n')
+    else:
+        prompt = '%s [%s]|%s: ' % (prompt, 'n', 'y')
+
+    while True:
+        signal.alarm(timeout)
+        try:
+            ans = raw_input(prompt)
+            signal.alarm(0)
+            if not ans:
+                return default
+            if ans not in ['y', 'Y', 'yes', 'n', 'no', 'N']:
+                print 'please enter y or n.'
+                continue
+            if ans in ['y','yes','Yes']:
+                return True
+            if ans in ['n','no','N']:
+                return False
+        except TimeOutException:
+            print "Confirmation timed out after {0}s, returning default of '{1}'".format(timeout,'yes' if default else 'no')
+            return default
+
+
 def formatError(txt,dict):
+    """
+    Prints a useful debugging message for a bad .format() call, then raises an exception
+    """
     logging.warning('*'*76)
     logging.warning("format() error occurred here:")
     logging.warning('txt is:\n'+txt)
@@ -13,7 +71,7 @@ def formatError(txt,dict):
     logging.warning('dict available is:\n'+pprint.pformat(dict,indent=4))
     
     logging.warning('*'*76)
-    raise ValidationError("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
+    raise Exception("Format() KeyError.  You did not pass the proper arguments to format() the txt.")
     
 
 def groupby(iterable,fxn):
@@ -78,21 +136,21 @@ def check_and_create_output_dir(path):
     else:
         os.mkdir(path)
     
-def addExt(file_path,new_extension,remove_dir_path=True):
-    """
-    Adds an extension to a filename
-    remove_dir_path will remove the directory path and return only the filename with the added extension
-    """
-    if remove_dir_path:
-        dir,file_path = os.path.split(file_path)
-    return re.sub(r'^(.*)(\..+)$', r'\1.{0}\2'.format(new_extension), file_path)
+#def addExt(file_path,new_extension,remove_dir_path=True):
+#    """
+#    Adds an extension to a filename
+#    remove_dir_path will remove the directory path and return only the filename with the added extension
+#    """
+#    if remove_dir_path:
+#        dir,file_path = os.path.split(file_path)
+#    return re.sub(r'^(.*)(\..+)$', r'\1.{0}\2'.format(new_extension), file_path)
 
-def sizeof_fmt(num):
-    for x in ['bytes','KB','MB','GB']:
-        if num < 1024.0 and num > -1024.0:
-            return "%3.1f %s" % (num, x)
-        num /= 1024.0
-    return "%3.1f %s" % (num, 'TB')
+#def sizeof_fmt(num):
+#    for x in ['bytes','KB','MB','GB']:
+#        if num < 1024.0 and num > -1024.0:
+#            return "%3.1f %s" % (num, x)
+#        num /= 1024.0
+#    return "%3.1f %s" % (num, 'TB')
 
 def execute(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -104,14 +162,6 @@ def folder_size(folder,human_readable=True):
         return re.match('(.+?)\s',execute('du -hs {0}'.format(folder))[0]).group(1)
     else:
         return re.match('(.+?)\s',execute('du -s {0}'.format(folder))[0]).group(1)
-#    folder_size = 0
-#    for (path, dirs, files) in os.walk(folder):
-#        for f in files:
-#            filename = os.path.join(path, f)
-#            folder_size += os.path.getsize(filename)
-#            
-#    return sizeof_fmt(folder_size)
-    
 
 def get_logger(name,path):
     """

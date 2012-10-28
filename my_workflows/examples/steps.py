@@ -1,4 +1,4 @@
-from cosmos.Workflow.step import Step
+from cosmos.contrib.step import Step
 
 class Echo(Step):
     outputs = {'txt':'out.txt'}

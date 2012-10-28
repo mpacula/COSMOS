@@ -133,6 +133,7 @@ class Workflow(models.Model):
         wf = Workflow.objects.get(name=name)
         wf.resume_from_last_failure=True
         wf.dry_run=dry_run
+        wf.finished_on = None
         wf.default_queue=default_queue
         
         wf.save()
@@ -142,7 +143,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __restart(name=None,root_output_dir=None,dry_run=False,default_queue=None):
+    def __restart(name=None,root_output_dir=None,dry_run=False,default_queue=None,prompt_confirm=True):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
@@ -151,10 +152,18 @@ class Workflow(models.Model):
         :param dry_run: (bool) Don't actually execute jobs. Optional.
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
+        :param prompt_confirm: (bool) If True, will prompt the user for a confirmation before deleting the workflow.
         """
-        old_wf = Workflow.objects.get(name=name)
-        wf_id = old_wf.id
-        old_wf.delete(delete_files=True)
+        if prompt_confirm:
+            if not helpers.confirm("Are you sure you want to restart this workflow?  All files will be deleted.",default=True,timeout=30):
+                print "Exiting."
+                sys.exit(1)
+                
+        wf_id = None
+        if Workflow.objects.filter(name=name).count():
+            old_wf = Workflow.objects.get(name=name)
+            wf_id = old_wf.id
+            old_wf.delete(delete_files=True)
         
         new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
         
@@ -206,8 +215,11 @@ class Workflow(models.Model):
             old_batch = Batch.objects.get(workflow=self,name=name)
             _old_id = old_batch.id
             if hard_reset:
-                self.log.info("Doing a hard reset on batch {0}.".format(name))
-                old_batch.delete()
+                if helpers.confirm("Are you sure you want to do a hard reset on {0}?".format(old_batch),default=True,timeout=30):
+                    self.log.info("Doing a hard reset on {0}.".format(old_batch))
+                    old_batch.delete()
+                else:
+                    self.log.info("Skipping hard reset.")
                 
         b, created = Batch.objects.get_or_create(workflow=self,name=name,id=_old_id)
         if created:
@@ -248,7 +260,7 @@ class Workflow(models.Model):
         jobAttempts.update(queue_status='completed',finished_on = timezone.now())
         nodes = Node.objects.filter(_jobAttempts__in=jids)
 
-        self.log.info("Marking all terminated Nodes as failed %s.")
+        self.log.info("Marking all terminated Nodes as failed.")
         nodes.update(status = 'failed',finished_on = timezone.now())
         
         self.log.info("Marking all terminated Batches as failed.")
@@ -407,6 +419,8 @@ class Workflow(models.Model):
                     if terminate_on_fail:
                         self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
                         self.terminate()
+            if batch and batch.is_done():
+                break;
             
                     
         if batch is None: #no waiting on a batch
@@ -454,8 +468,9 @@ class Workflow(models.Model):
         """
         Deletes any batches in the history that haven't been added yet
         """
-        self.log.info('Restarting Workflow from here.')
-        for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete()
+        if helpers.confirm("Are you sure you want to restart this workflow?  All files will be deleted.",default=True,timeout=30):
+            self.log.info('Restarting Workflow from here.')
+            for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete()
     
     def get_nodes_by(self,batch=None,tags={},op="and"):
         """
@@ -595,7 +610,8 @@ class Batch(models.Model):
             raise ValidationError('Statistic {0} not supported'.format(statistic))
         aggr_fxn = getattr(models, statistic)
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
-        return int(Node.objects.filter(batch=self).aggregate(aggr_fxn(field))[aggr_field])
+        r = Node.objects.filter(batch=self).aggregate(aggr_fxn(field))[aggr_field]
+        return int(r) if r else r
         
 
     @property
@@ -606,7 +622,7 @@ class Batch(models.Model):
     @property
     def wall_time(self):
         """Time between this batch's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
-        return self.finished_on - self.created_on
+        return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
     
     @property
     def output_dir(self):

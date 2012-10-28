@@ -1,0 +1,80 @@
+{% load extras %}
+
+
+{% if paged_nodes.paginator.num_pages > 1 %}
+    {% if paged_nodes.paginator.page_range|length <= 10 %}
+    <div class="pagination">
+    {%else%}
+    <div class="pagination_big">
+    {%endif%}
+        <span class="step-links">
+            <ul>
+            {% if paged_nodes.has_previous %}
+                <li><a href="?page={{ paged_nodes.previous_page_number }}{{filter_url}}">«</a></li>
+            {% endif %}
+            {% for pagenum in paged_nodes.paginator.page_range%}
+                <li {%if pagenum == paged_nodes.number%}class="active"{%endif%}><a href="?page={{pagenum}}{{filter_url}}">{{pagenum|add:"-1"|mult:page_size|add:"1"}} -
+                {%if forloop.last %} {{paged_nodes.paginator.count}}
+                {%else%}
+                 {{pagenum|mult:page_size}}{%endif%}</a>{% if paged_nodes.paginator.page_range|length > 10 %}, {%endif%}</li>
+                {%endfor %}
+    
+            {% if paged_nodes.has_next %}
+                <li><a href="?page={{ paged_nodes.next_page_number }}{{filter_url}}">»</a></li>
+            {% endif %}
+            </ul>
+        </span>
+    </div>
+{% endif %}
+
+<table class="table table-condensed">
+    <tbody>
+    <tr>
+        <th>Node</th>
+        <th>Status</th>
+        <th>Wall Time</th>
+        <th>File_Size</th>
+        <th>Job Attempts</th>
+    </tr>
+    {% for node in paged_nodes %}
+        <tr>
+            <td>
+                {%with status=node.status %}
+                    {%if status == "successful"%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
+                    {%if status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
+                    {%if status == "in_progress"%}<i class="icon-refresh" rel="tooltip" title="In Progress"></i>{%endif%}
+                {%endwith%} 
+            <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong>
+            </td>
+            <td>{{node.status}}
+            </td>
+            <td>
+                {{node.wall_time|format_time}}
+            </td>
+            <td>
+                {%if settings.show_node_file_sizes%}{{node.file_size}}{%else%}off{%endif%}
+            </td>
+            <td>
+                {% for j in node.jobAttempts %}
+                        {% with qs=j.queue_status %}
+                            {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
+                            {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
+                            {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
+                                {%with ds=j.get_drmaa_status %}
+                                    {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
+                                    {%if ds == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
+                                {% endwith%}
+                            {%endif%}
+                        {% endwith%}
+                        <a href="{{j.url}}">{{ j }}</a><br/>
+                {% empty %}
+                  No job attempts in this node.
+                {% endfor %}
+                </ul>
+            </td>
+        </tr>
+    {% empty %}
+      No nodes.
+    {% endfor %}
+    </tbody>
+</table>

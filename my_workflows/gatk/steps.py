@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
-from Cosmos.addons import step
-from Cosmos.helpers import parse_cmd
+from cosmos.contrib import step
+from cosmos.Cosmos.helpers import parse_cmd
 import settings
 from settings import get_Picard_cmd
 
@@ -8,37 +8,36 @@ step.settings = settings
 
 class BWA_Align(step.Step):
     outputs = {'sai':'aln.sai'}
-    mem_req = 3500
-    cpu_req = 2
+    mem_req = 3.5*1024
+    cpu_req = 2 #4
     
-    def many2many_cmd(self,input_batch,samples):
+    def many2many_cmd(self,input_batch,data_dict):
         """
         :param: input_batch is a place holder and is ignored
         """
-        for sample in samples:
-            for fqp in sample.yield_fastq_pairs():
-                for i,fq in enumerate(fqp):
-                    yield {
-                            'pcmd':r"""
-                                       {settings.bwa_path} aln -t {self.cpu_req} {settings.bwa_reference_fasta_path} {fastq_path} > {{output_dir}}/{{outputs[sai]}}
-                                    """,
-                            'pcmd_dict': {'fastq_path':fq.path },
-                            'new_tags': {'sample':sample.name,
-                                        'lane': fq.lane,
-                                        'fq_chunk': fq.chunk,
-                                        'fq_pair': i,
-                                        'fq_path': fq.path,
-                                        'RG_ID':'%s.L%s' % (sample.flowcell,fq.lane),
-                                        'RG_LIB':'LIB-%s' % sample.name,
-                                        'RG_PLATFORM':'ILLUMINA'
-                                        },
-                            'name' : step.dict2node_name({'sample':sample.name,'lane':fq.lane,'fq_chunk':fq.chunk,'fq_pair':i})
-                        }
+        for file in data_dict:
+            yield {
+                    'pcmd':r"""
+                               {settings.bwa_path} aln -t {self.cpu_req} {settings.bwa_reference_fasta_path} {fastq_path} > {{output_dir}}/{{outputs[sai]}}
+                            """,
+                    'pcmd_dict': {'fastq_path':file['path'] },
+                    'new_tags': {'sample':file['sample'],
+                                'lane': file['lane'],
+                                'fq_chunk': file['chunk'],
+                                'fq_pair': file['pair'],
+                                'fq_path': file['path'],
+                                'RG_ID':'%s.L%s' % (file['flowcell'],file['lane']),
+                                'RG_LIB': file['library'],
+                                'RG_PLATFORM': file['platform']
+                                },
+                    'name' : step.dict2node_name({'sample':file['sample'],'lane':file['lane'],'fq_chunk':file['chunk'],'fq_pair':file['pair']})
+                }
 
 
 class BWA_Sampe(step.Step):
     outputs = {'sam':'raw.sam'}
-    mem_req = 4000
+    mem_req = 5*1024
+    cpu_req = 1 #4
     
     def many2one_cmd(self,input_nodes,tags):
         node_r1 = input_nodes[0]
@@ -61,7 +60,7 @@ class BWA_Sampe(step.Step):
 
 class CleanSam(step.Step):
     outputs = {'bam':'cleaned.bam'}
-    mem_req = 3500
+    mem_req = 2*1024
     
     def one2one_cmd(self,input_node,input_type='bam'):
         return {
@@ -77,7 +76,7 @@ class CleanSam(step.Step):
 class MergeSamFiles(step.Step):
     "Merges and Sorts"
     outputs = {'bam':'merged.bam'}
-    mem_req = 5000
+    mem_req = 3*1024
     
     def many2one_cmd(self,input_nodes,tags,assume_sorted=True):
         INPUTs = " \\\n".join(["INPUT={0}".format(n.output_paths['bam']) for n in input_nodes])
@@ -99,7 +98,7 @@ class MergeSamFiles(step.Step):
 class MarkDuplicates(step.Step):
     outputs = {'bam':'deduped.bam',
                'metrics_file':'metrics.log'}
-    mem_req = 3000
+    mem_req = 5*1024
     
     def one2one_cmd(self,input_node,assume_sorted=True):
         return {
@@ -115,7 +114,7 @@ class MarkDuplicates(step.Step):
         }
     
 class BuildBamIndex(step.Step):
-    mem_req = 3500
+    mem_req = 2*1024
     
     def one2one_cmd(self,input_node):
         return {
@@ -128,119 +127,142 @@ class BuildBamIndex(step.Step):
         }
 
 class RealignerTargetCreator(step.Step):
-    outputs = {'intervals':'target.intervals'}
-    mem_req = 3000
+    outputs = {'targetIntervals':'target.intervals'}
+    mem_req = 2.5*1024
+    cpu_req = 4
+        
+    pcmd = r"""
+                {settings.GATK_cmd} \
+                -nt {self.cpu_req} \
+                -T RealignerTargetCreator \
+                -R {settings.reference_fasta_path} \
+                -o {{output_dir}}/{{outputs[targetIntervals]}} \
+                --known {settings.indels_1000g_phase1_path} \
+                --known {settings.mills_path} \
+                -nt {self.cpu_req}
+            """,
     
-    def many2many_cmd(self,input_batch):
+    def many2many_cmd(self,input_batch=None):
         """
         Used to generate the knowns only interval list.  Just ignore the input_batch.
         """
         yield {
-            'pcmd':r"""
-                        {settings.GATK_cmd} \
-                        -T RealignerTargetCreator \
-                        -R {settings.reference_fasta_path} \
-                        -o {{output_dir}}/{{outputs[intervals]}} \
-                        --known {settings.indels_1000g_phase1_path} \
-                        --known {settings.mills_path}
-                    """,
+            'pcmd': self.pcmd,
             'pcmd_dict': {},
             'new_tags': {'mode':'KNOWNS_ONLY'}
          }    
     
-    def one2one_cmd(self,input_node):
-        return {
-            'pcmd': r"""
-                    {settings.GATK_cmd} \
-                    -T RealignerTargetCreator \
-                    -R {settings.reference_fasta_path} \
-                    -I {input_node.output_paths[bam]} \
-                    -o {{output_dir}}/{{outputs[intervals]}} \
-                    --known {settings.indels_1000g_phase1_path} \
-                    --known {settings.mills_path}
-                """,
-            'pcmd_dict':{}
-        }
+    def one2many_cmd(self,input_node,intervals):
+        for interval in intervals:
+            yield {
+                'pcmd': self.pcmd.strip() + ' \\\n -I {input_node.output_paths[bam]}',
+                'pcmd_dict':{'interval':interval},
+                'add_tags':{'interval':interval}
+            }
 
 class IndelRealigner(step.Step):
     outputs = {'bam':'realigned.bam'}
-    mem_req = 1500
+    mem_req = 2.5*1024
+    cpu_req = 1 #-nt is not supported by this tool
     
-    def one2one_cmd(self,input_node,rtc_batch,model='USE_READS'):
+    def one2many_cmd(self,input_node,rtc_batch,intervals,model='USE_READS'):
         """
+        Expects rtc_batch to have been split by the same intervals.
         
+        :param rtc_batch: the realigner target creator batch.  Its expected that it was parallelized by the same intervals as :param:`intervals`
+        :param intervals: the intervals to split by.  Usually a list of chromosomes.
         :param model: USE_READS or KNOWNS_ONLY
         """
-        if rtc_batch == None:
-            intervals = '/dev/null'
-        else:
-            rtc_node = rtc_batch.get_node_by(tags=input_node.tags)
-            if model=='USE_READS':
-                intervals = rtc_node.output_paths['intervals']
-            elif model == 'KNOWNS_ONLY':
-                intervals = rtc_batch.nodes[0].output_paths['intervals'] #in knowns only, there's just one node in the RTC step
-        return {
-            'pcmd': r"""
-                        {settings.GATK_cmd} \
-                        -T IndelRealigner \
-                        -R {settings.reference_fasta_path} \
-                        -I {input_node.output_paths[bam]} \
-                        -o {{output_dir}}/{{outputs[bam]}} \
-                        -targetIntervals {intervals} \
-                        -known {settings.indels_1000g_phase1_path} \
-                        -known {settings.mills_path} \
-                        -model {model}
-                    """,
-            'pcmd_dict':{'model':model,
-                         'intervals':intervals}
-        }
+        if model == 'KNOWNS_ONLY':
+            targetIntervals = rtc_batch.nodes[0].output_paths['intervals']
+            
+        for interval in intervals:
+            if model == 'USE_READS':
+                search_tags = input_node.tags
+                search_tags['interval'] = interval
+                rtc_node = rtc_batch.get_node_by(tags=search_tags)
+                targetIntervals = rtc_node.output_paths['targetIntervals']
+                
+            yield {
+                'pcmd': r"""
+                            {settings.GATK_cmd} \
+                            -T IndelRealigner \
+                            -R {settings.reference_fasta_path} \
+                            -I {input_node.output_paths[bam]} \
+                            -o {{output_dir}}/{{outputs[bam]}} \
+                            -targetIntervals {targetIntervals} \
+                            -known {settings.indels_1000g_phase1_path} \
+                            -known {settings.mills_path} \
+                            -model {model} \
+                            -L {interval}
+                        """,
+                'pcmd_dict':{'model':model,
+                             'targetIntervals':targetIntervals,
+                             'interval':interval},
+                'add_tags': {'interval':interval}
+            }
 
 class BaseQualityScoreRecalibration(step.Step):
     outputs = {'recal':'bqsr.recal'}
-    mem_req = 2000
+    mem_req = 2.5*1024
+    cpu_req = 1 #>1 results in ##### ERROR MESSAGE: We have temporarily disabled the ability to run BaseRecalibrator multi-threaded for performance reasons.  We hope to have this fixed for the next GATK release (2.2) and apologize for the inconvenience.
     
-    def one2one_cmd(self,input_node):
+    pcmd = r"""
+        {settings.GATK_cmd} \
+        -T BaseRecalibrator \
+        -R {settings.reference_fasta_path} \
+        {INPUTs} \
+        -o {{output_dir}}/{{outputs[recal]}} \
+        -knownSites {settings.indels_1000g_phase1_path} \
+        -knownSites {settings.mills_path} \
+        --disable_indel_quals \
+        -cov ReadGroupCovariate \
+        -cov QualityScoreCovariate \
+        -cov CycleCovariate \
+        -cov ContextCovariate \
+        -nt {self.cpu_req}
+    """
+    
+    def many2one_cmd(self,input_nodes,tags):
+        INPUTs = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_nodes ])
         return {
-            'pcmd': r"""
-                        {settings.GATK_cmd} \
-                        -T BaseRecalibrator \
-                        -R {settings.reference_fasta_path} \
-                        -I {input_node.output_paths[bam]} \
-                        -o {{output_dir}}/{{outputs[recal]}} \
-                        -knownSites {settings.indels_1000g_phase1_path} \
-                        -knownSites {settings.mills_path} \
-                        --disable_indel_quals \
-                        -cov ReadGroupCovariate \
-                        -cov QualityScoreCovariate \
-                        -cov CycleCovariate \
-                        -cov ContextCovariate
-                    """,
-            'pcmd_dict': {}
+            'pcmd': self.pcmd,
+            'pcmd_dict': {'INPUTs':INPUTs}
         }
 
 class PrintReads(step.Step):
     outputs = {'bam':'recalibrated.bam'}
-    mem_req = 3000
+    mem_req = 5*1024
+    
+    pcmd = r"""
+        {settings.GATK_cmd} \
+        -T PrintReads \
+        -R {settings.reference_fasta_path} \
+        -I {INPUTs} \
+        -o {{output_dir}}/{{outputs[bam]}}  \
+        -BQSR {recal_file}
+    """
+    
+    def many2one_cmd(self,input_nodes,tags,bqsr_batch):
+        INPUTs = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_nodes ])
+        bqsr_node = bqsr_batch.get_node_by(tags)
+        return {
+            'pcmd': self.pcmd,
+            'pcmd_dict': {'INPUTs':INPUTs,
+                          'recal_file': bqsr_batch.get_node_by(tags=bqsr_node.tags).output_paths['recal']}
+        }
     
     def one2one_cmd(self,input_node,bqsr_batch):
-        """
-        
-        """
         return {
-            'pcmd': r"""
-                    {settings.GATK_cmd} \
-                    -T PrintReads \
-                    -R {settings.reference_fasta_path} \
-                    -I {input_node.output_paths[bam]} \
-                    -o {{output_dir}}/{{outputs[bam]}}  \
-                    -BQSR {bqsr_node.output_paths[recal]}
-                """,
-            'pcmd_dict': {'bqsr_node': bqsr_batch.get_node_by(tags=input_node.tags)}
+            'pcmd': self.pcmd,
+            'pcmd_dict': {'INPUTs': "-I {0}".format(input_node.output_paths['bam']),
+                          'recal_file': bqsr_batch.get_node_by(tags=input_node.tags).output_paths['recal']}
         }
     
 class UnifiedGenotyper(step.Step):
     outputs = {'vcf':'raw.vcf'}
-    mem_req = 3000
+    mem_req = 5.5*1024
+    cpu_req = 4
     
     def many2many_cmd(self,input_batch,intervals):
         """
@@ -264,7 +286,8 @@ class UnifiedGenotyper(step.Step):
                                 -A HaplotypeScore \
                                 -A InbreedingCoeff \
                                 -baq CALCULATE_AS_NECESSARY \
-                                -L {interval}
+                                -L {interval} \
+                                -nt {self.cpu_req}
                             """,
                     'pcmd_dict': {'input_bams':input_bams,
                                   'interval':interval,
@@ -276,7 +299,7 @@ class UnifiedGenotyper(step.Step):
 
 class CombineVariants(step.Step):
     outputs = {'vcf':'combined.vcf'}
-    mem_req = 3000
+    mem_req = 2*1024
 
     def many2one_cmd(self,input_nodes,tags,genotypeMergeOptions='UNSORTED'):
         """
@@ -305,7 +328,7 @@ class VariantQualityRecalibration(step.Step):
                'tranches':'vqr.tranches',
                'rscript':'plot.R'
                }
-    mem_req = 3000
+    mem_req = 3.5*1024
     
     def one2one_cmd(self,input_node,exome_or_wgs,haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper',inbreeding_coeff=True):
         """
@@ -379,7 +402,7 @@ class VariantQualityRecalibration(step.Step):
                     -tranchesFile {{output_dir}}/{{outputs[tranches]}} \
                     -rscriptFile {{output_dir}}/{{outputs[rscript]}}
                     """
-        elif mode == 'wgs':
+        elif glm == 'wgs':
             raise NotImplementedError()
         
         return {
@@ -390,7 +413,7 @@ class VariantQualityRecalibration(step.Step):
 
 class ApplyRecalibration(step.Step):
     outputs = {'vcf':'recalibrated.vcf'}
-    mem_req = 3000
+    mem_req = 2*1024
     
     def one2one_cmd(self,input_node,vqr_batch,haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'):
         """

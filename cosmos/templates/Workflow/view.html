@@ -1,6 +1,25 @@
 {% extends "base.html" %}
 {% load url from future %}
 {% load extras %}
+
+{% block head %}
+    <script type="text/javascript">
+    $(document).ready(function(){
+        update_html = function(selector,url){
+            //updates selector with the html from url every second
+                jQuery.ajax({
+                     url:    url,
+                     success: function(result) {
+                                  $(selector).html(result),
+                                  setTimeout("update_html('"+selector+"','"+url+"')",1000)
+                              },
+                     async:   true,
+                }); 
+            }
+        update_html('#batches','{% url 'workflow_batch_table' workflow.id %}')
+    });
+    </script>
+{% endblock %}
 {%block content%}
 
 <ul class="breadcrumb">
@@ -18,13 +37,13 @@
 <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
 <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
 <dt>Wall Time</dt><dd>{{workflow.wall_time}}</dd>
-
 </dl>
+
 <p><h3>Batches</h3>
 </p>
-
+<div id="batches">
 {%with batches=batches_ordered%}
-    {%include "Workflow/Batch/batches.html"%}
+    {%include "Workflow/Batch/table.html"%}
 {%endwith%}
-
+</div>
 {%endblock%}
