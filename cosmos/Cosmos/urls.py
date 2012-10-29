@@ -1,8 +1,8 @@
 from django.conf.urls.defaults import patterns, include, url
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
-from dajaxice.core import dajaxice_autodiscover, dajaxice_config
-dajaxice_autodiscover()
+#from dajaxice.core import dajaxice_autodiscover, dajaxice_config
+#dajaxice_autodiscover()
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -18,7 +18,7 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     url(r'^admin/', include(admin.site.urls)),
-    url(dajaxice_config.dajaxice_url, include('dajaxice.urls')),
+    #url(dajaxice_config.dajaxice_url, include('dajaxice.urls')),
     url(r'JobManager/JobAttempt/(\d+)/$', 'JobManager.views.jobAttempt',name='jobAttempt_view'),
     url(r'JobManager/JobAttempt/(\d+)/output/(.+)$', 'JobManager.views.jobAttempt_output',name='jobAttempt_output'),
     url(r'JobManager/JobAttempt/(\d+)/profile_output/$', 'JobManager.views.jobAttempt_profile_output',name='jobAttempt_profile_output'),

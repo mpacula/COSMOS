@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from cosmos.JobManager.models import JobAttempt,JobManager
 import os,sys,re,signal
@@ -137,7 +137,7 @@ class Workflow(models.Model):
         wf.default_queue=default_queue
         
         wf.save()
-        wf.log.info('Resuming this workflow.')
+        wf.log.info('Resuming workflow.')
         Batch.objects.filter(workflow=wf).update(order_in_workflow=None)
         
         return wf
@@ -163,11 +163,9 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=name).count():
             old_wf = Workflow.objects.get(name=name)
             wf_id = old_wf.id
-            old_wf.delete(delete_files=True)
+            old_wf.delete()
         
         new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
-        
-        new_wf.log.info('Restarting this Workflow.')
         
         return new_wf
                 
@@ -219,7 +217,8 @@ class Workflow(models.Model):
                     self.log.info("Doing a hard reset on {0}.".format(old_batch))
                     old_batch.delete()
                 else:
-                    self.log.info("Skipping hard reset.")
+                    self.log.info("Exiting.")
+                    sys.exit(1)
                 
         b, created = Batch.objects.get_or_create(workflow=self,name=name,id=_old_id)
         if created:
@@ -295,26 +294,55 @@ class Workflow(models.Model):
             dicts = [ dict(nru) for nru in batch.yield_node_resource_usage() ]
             for d in dicts: d['batch'] = re.sub('_',' ',batch.name)
             yield dicts
+    
+    @transaction.commit_on_success
+    def bulk_save_nodes(self,nodes_and_tags):
+        """
+        Does a bulk insert to speedup adding lots of nodes.  Will filter out any None values in the nodes_and_tags list.
+        
+        :param nodes_and_tags: (list of (Node,dict,bool)) [(node1,tags1,node_exists),(node2,tags2,node_exists),...]
+        
+        >>> nodes = [(batch.add_node(name='1'pcmd='cmd1',save=False),{},True),(batch.add_node(name='2',pcmd='cmd2',save=False,{},True))]
+        >>> batch.bulk_add_nodes(nodes)
+        """
+        ### Bulk add nodes
+        self.log.info("Bulk adding {0} nodes...".format(len(nodes_and_tags)))
+        nodes_and_tags = filter(lambda x: not x[2],nodes_and_tags)
+        nodes = map(lambda x: x[0],nodes_and_tags)
+        
+        #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
+        id_start = Node.objects.all().aggregate(models.Max('id'))['id__max'] + 1
+        for i,node in enumerate(nodes): node.id = id_start + i
+        
+        Node.objects.bulk_create(nodes)
+        
+        ### Bulk add tags
+        tags = map(lambda x: x[1],nodes_and_tags)
+        nodetags = []
+        for node,tags in zip(nodes,tags):
+            for k,v in tags.items():
+                nodetags.append(NodeTag(node=node,key=k,value=v))
+        self.log.info("Bulk adding {0} node tags...".format(len(nodetags)))
+        NodeTag.objects.bulk_create(nodetags)
             
     def delete(self, *args, **kwargs):
         """
         Deletes this workflow.
-        :param delete_files: Deletes all files associated with this workflow
         """
         self.jobManager.delete()
-        self.log.info("Deleting Working {0}".format(self))
+        self.log.info("Deleting {0}...".format(self))
+        for h in self.log.handlers: h.close()
         
-        if kwargs.setdefault('delete_files',False):
-            kwargs.pop('delete_files')
-            self.log.info('Deleting directory {0}'.format(self.output_dir))
-            for h in self.log.handlers:
-                h.close()
-            if os.path.exists(self.output_dir):
-                os.system('rm -rf {0}'.format(self.output_dir))
+#        if kwargs.setdefault('delete_files',False):
+#            kwargs.pop('delete_files')
+#            self.log.info('Deleting directory {0}'.format(self.output_dir))
+        if os.path.exists(self.output_dir):
+            os.system('rm -rf {0}'.format(self.output_dir))
                 
         for b in self.batches: b.delete()
         
         super(Workflow, self).delete(*args, **kwargs)
+        self.log.info("Deleted {0}".format(self))
                 
 
 
@@ -658,7 +686,7 @@ class Batch(models.Model):
             if sja: 
                 yield [jru for jru in sja.resource_usage_short] + node.tags.items() #add in tags to resource usage tuples
         
-    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, mem_req=0, cpu_req=1, time_limit=None):
+    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, save=True, mem_req=0, cpu_req=1, time_limit=None):
         """
         Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
         If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
@@ -668,9 +696,12 @@ class Batch(models.Model):
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
         :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
         :param tags: (dict) A dictionary keys and values to tag the node with.  These tags can later be used by methods such as :py:meth:`~Workflow.models.Batch.group_nodes_by` and :py:meth:`~Workflow.models.Batch.get_nodes_by` Optional.
+        :param save: (bool) If False, will not save the node to the database.  Used in concert with :method:`Workflow.bulk_save_nodes`
         :param mem_req: (int) How much memory to reserve for this node in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this node. Optional.
         :param time_limit: (datetime.time) Not implemented.
+        
+        :returns: If save=True, an instance of a Node.   If save=False, returns (node,tags) where node is a Node, tags is a dict, and node_exists is a bool.
         """
         #validation
         
@@ -693,20 +724,25 @@ class Batch(models.Model):
             node.delete()
         
         if node_exists and (not node.successful) and self.workflow.resume_from_last_failure:
-            self.log.info("Node was unsuccessful last time, deleting old one and trying again {0}".format(node))
+            self.log.info("{0} was unsuccessful last time, deleting old one and trying again".format(node))
             node.delete()
                
-        node,created = Node.objects.get_or_create(batch=self,name=name,defaults={'pre_command':pcmd,'outputs':outputs,'memory_requirement':mem_req, 'cpu_requirement': cpu_req, 'time_limit':time_limit})
+        if not node_exists:
+            if save:
+                node = Node.objects.create(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
+                self.log.info("Created {0} in {1} and saved to the database.".format(node,self))
+            else:
+                node = Node(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
+                #self.log.info("Created {0} in {1} without saving to the database.".format(node,self))
         
         #validation
-        if (not created) and node.successful:  
+        if node_exists and node.successful:  
             if node.pre_command != pcmd:
                 self.log.error("You can't change the pcmd of a existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
             if node.outputs != outputs:
                 self.log.error("You can't change the outputs of an existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
         
-        if created:
-            self.log.info("Created node {0} from scratch.".format(node))
+        if not node_exists:
             #if adding to a finished batch, set that batch's status to in_progress so new nodes are executed
             batch = node.batch
             if batch.is_done():
@@ -715,14 +751,16 @@ class Batch(models.Model):
                 batch.save()
         
         #this error should never occur?
-        elif not created and not self.successful:
-            if self.workflow.resume_from_last_failure and node.successful:
-                self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history.".format(node,node.batch))
+#        elif not created and not self.successful:
+#            if self.workflow.resume_from_last_failure and node.successful:
+#                self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history.".format(node,node.batch))
 
-        node.save()
-        node.tag(**tags)
-            
-        return node
+        if save:
+            node.save()
+            node.tag(**tags)
+            return node
+        else:
+            return node,tags,node_exists
 
 
     def is_done(self):

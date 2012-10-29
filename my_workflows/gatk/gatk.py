@@ -42,7 +42,7 @@ contigs = [str(x) for x in range(1,23)+['X','Y']] #list of chroms: [1,2,3,..X,Y]
 sample_bams = steps.MergeSamFiles("Merge Bams by Sample").many2one(input_batch=clean_bams,group_by=['sample'],assume_sorted=False)
 deduped_by_samples = steps.MarkDuplicates("Mark Duplicates in Samples").one2one(input_batch=sample_bams)
 index_samples = steps.BuildBamIndex("Index Deduped Samples").one2one(input_batch=deduped_by_samples)
-rtc_by_sample_chr = steps.RealignerTargetCreator("RealignerTargetCreator by Sample Chr").one2many(input_batch=deduped_by_samples,intervals=contigs)
+rtc_by_sample_chr = steps.RealignerTargetCreator("RealignerTargetCreator by Sample Chr",hard_reset=True).one2many(input_batch=deduped_by_samples,intervals=contigs)
 realigned_by_sample_chr = steps.IndelRealigner("IndelRealigner by Sample Chr").one2many(input_batch=deduped_by_samples,rtc_batch=rtc_by_sample_chr,intervals=contigs,model='USE_READS')
 bqsr_by_sample = steps.BaseQualityScoreRecalibration("Base Quality Score Recalibration by Sample").many2one(input_batch=realigned_by_sample_chr,group_by=['sample'])
 recalibrated_samples = steps.PrintReads("Apply BQSR").many2one(input_batch=realigned_by_sample_chr,bqsr_batch=bqsr_by_sample,group_by=['sample'])

@@ -5,6 +5,8 @@ TODO
 * capture all exceptions so that I can do a graceful exit
 * prompt user with a 30s timeout if they're doing hard resets or restart_from_here()
 * allow for batch deletes so hard_resets don't take forever
+* remove workflow.resume_from_failure
+* add drmaa.session.delete(jobtemplate)
 
 
 Completed

@@ -50,15 +50,19 @@ class Step():
     
     def one2one(self,input_batch,*args,**kwargs):
         if not self.batch.successful:
+            new_nodes = []
             for n in input_batch.nodes:
                 r = self.one2one_cmd(input_node=n,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                self.batch.add_node(name = n.name,
+                new_node = self.batch.add_node(name = n.name,
                                     pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
                                     tags = n.tags,
+                                    save = False,
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
+                new_nodes.append(new_node)
+            workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
         return self.batch
     
@@ -70,15 +74,19 @@ class Step():
         """
         #TODO make sure there are no name conflicts in kwargs and 'input_batch' and 'group_by'
         if not self.batch.successful:
+            new_nodes = []
             for tags,input_nodes in input_batch.group_nodes_by(keys=group_by):
                 r = self.many2one_cmd(input_nodes=input_nodes,tags=tags,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                self.batch.add_node(name = dict2node_name(tags),
+                new_node = self.batch.add_node(name = dict2node_name(tags),
                                     pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
                                     tags = tags,
+                                    save = False,
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
+                new_nodes.append(new_node)
+            workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
         return self.batch
     
@@ -87,17 +95,21 @@ class Step():
         Used when one input node becomes multiple output nodes
         """
         if not self.batch.successful:
+            new_nodes = []
             for n in input_batch.nodes:
                 for r in self.one2many_cmd(input_node=n,*args,**kwargs):
                     validate_dict_has_keys(r,['pcmd','add_tags'])
                     pcmd_dict = r.setdefault('pcmd_dict',{})
                     new_tags = merge_dicts(n.tags, r['add_tags'])
-                    self.batch.add_node(name = dict2node_name(new_tags),
+                    new_node = self.batch.add_node(name = dict2node_name(new_tags),
                                         pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
                                         tags = new_tags,
+                                        save = False,
                                         outputs = self.outputs,
                                         mem_req = self.mem_req,
                                         cpu_req = self.cpu_req)
+                    new_nodes.append(new_node)
+            workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
         return self.batch
     
@@ -107,17 +119,21 @@ class Step():
         the entire input_batch rather than any nodes.
         """
         if not self.batch.successful:
+            new_nodes = []
             for r in self.many2many_cmd(input_batch=input_batch,*args,**kwargs):
                 #Set defaults
                 validate_dict_has_keys(r,['pcmd','new_tags'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
                 name = r.setdefault('name',dict2node_name(r['new_tags']))
-                self.batch.add_node(name = name,
+                new_node = self.batch.add_node(name = name,
                                     pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_batch=input_batch,tags=r['new_tags']),
                                     tags = r['new_tags'],
+                                    save = False,
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
+                new_nodes.append(new_node)
+            workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
         return self.batch
     

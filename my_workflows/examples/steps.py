@@ -33,11 +33,11 @@ class Paste(Step):
 class Cat(Step):
     outputs = {'txt':'cat.txt'}
     
-    def one2many_cmd(self,input_node):
+    def one2many_cmd(self,input_node,copies=2):
         """
         Cats a file 4 times
         """
-        for i in range(1,4):
+        for i in range(1,copies+1):
             yield {
                    'pcmd' : r"""
                         cat {input_node.output_paths[txt]} > {{output_dir}}/{{outputs[txt]}}

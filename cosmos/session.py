@@ -14,7 +14,11 @@ if 'COSMOS_HOME_PATH' not in os.environ:
 #package=parts[0]
 #name=parts[1]
 #settings = getattr(__import__(package, fromlist=[name]), name)
-settings = importlib.import_module(os.environ['COSMOS_SETTINGS_MODULE'])
+try:
+    settings = importlib.import_module(os.environ['COSMOS_SETTINGS_MODULE'])
+except ImportError:
+    print >> sys.stderr, "ERROR!! The file {} in the COSMOS_SETTINGS_MODULE environment variable could not be imported.".format(os.environ['COSMOS_SETTINGS_MODULE'])
+    sys.exit(1)
 
 ###Setup DJANGO
 path = os.path.join(settings.home_path,'cosmos')

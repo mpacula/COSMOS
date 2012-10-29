@@ -133,14 +133,13 @@ class RealignerTargetCreator(step.Step):
         
     pcmd = r"""
                 {settings.GATK_cmd} \
-                -nt {self.cpu_req} \
                 -T RealignerTargetCreator \
                 -R {settings.reference_fasta_path} \
                 -o {{output_dir}}/{{outputs[targetIntervals]}} \
                 --known {settings.indels_1000g_phase1_path} \
                 --known {settings.mills_path} \
                 -nt {self.cpu_req}
-            """,
+            """
     
     def many2many_cmd(self,input_batch=None):
         """
