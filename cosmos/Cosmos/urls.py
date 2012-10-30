@@ -1,6 +1,8 @@
 from django.conf.urls.defaults import patterns, include, url
-import Workflow
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+
+#from dajaxice.core import dajaxice_autodiscover, dajaxice_config
+#dajaxice_autodiscover()
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -16,6 +18,7 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     url(r'^admin/', include(admin.site.urls)),
+    #url(dajaxice_config.dajaxice_url, include('dajaxice.urls')),
     url(r'JobManager/JobAttempt/(\d+)/$', 'JobManager.views.jobAttempt',name='jobAttempt_view'),
     url(r'JobManager/JobAttempt/(\d+)/output/(.+)$', 'JobManager.views.jobAttempt_output',name='jobAttempt_output'),
     url(r'JobManager/JobAttempt/(\d+)/profile_output/$', 'JobManager.views.jobAttempt_profile_output',name='jobAttempt_profile_output'),
@@ -23,6 +26,9 @@ urlpatterns = patterns('',
     url(r'LSF/$', 'Cosmos.views.LSF',name='lsf'),
     url(r'Workflow/$', 'Workflow.views.index',name='workflow'),
     url(r'Workflow/(\d+)/$', 'Workflow.views.view',name='workflow_view'),
+    url(r'Workflow/(\d+)/batch_table/$', 'Workflow.views.workflow_batch_table',name='workflow_batch_table'),
+    url(r'Workflow/Batch/(\d+)/table/$', 'Workflow.views.batch_table',name='batch_table'),
+    url(r'Workflow/Batch/(\d+)/batch_node_table/$', 'Workflow.views.batch_node_table',name='batch_node_table'),
     url(r'Workflow/view_log/(\d+)/$', 'Workflow.views.view_log',name='workflow_view_log'),
     url(r'Workflow/analysis/(\d+)/$', 'Workflow.views.analysis',name='workflow_analysis'),
     url(r'Workflow/Batch/(\d+)/$', 'Workflow.views.batch_view',name='batch_view'),

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load extras %}
-
+{% load url from future %}
 
 {%block style%}
     ul.dropdown-form {
@@ -15,111 +15,85 @@
     }
 {%endblock%}
 
+{% block head %}
+    <script type="text/javascript">
+    $(document).ready(function() {
+        update_html = function(selector,urlfunc){
+            //updates selector with the html from url every second
+                jQuery.ajax({
+                     url:    urlfunc(),
+                     success: function(result) {
+                                  $(selector).html(result)
+                                  setTimeout("update_html('"+selector+"',"+urlfunc+")",1000)
+                              },
+                     async:   true,
+                }); 
+            }
+        // url_batch_table = function() { return '{% url 'batch_table' batch.id %}' }
+        // update_html('#batch_table',url_batch_table)
+        // url_node_table = function() { return '{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize() }
+        // update_html('#node_table',url_node_table)
+        
+        //Filter Submit Button
+        $('#filter_submit').click(function() {
+            $('#filter_dropdown-toggle').dropdown('toggle')
+            $('#node_table').load('{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize() );
+            return false;
+        });
+    });
+    </script>
+{% endblock %}
+
 {%block content%}
-
-<ul class="breadcrumb">
-  <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
-  <li><a href="{{batch.workflow.url }}">{{batch.workflow}}</a> <span class="divider">/</span></li>
-  <li class="active">{{batch}}</li>
-</ul>
-{% with details=1 batches=batch|aslist%}
-{%include "Workflow/Batch/batches.html"%}
-{% endwith %}
-<div class="dropdown">
-    <h3 style="display:inline" class="dropdown-toggle" data-toggle="dropdown">
-        Nodes
-        <button class="btn btn-small">Filter
-        <span class="caret"></span>
-        </button>
-    </h3>
-   
-    <div class="dropdown dropdown-menu">
-    <form method="GET" action="{{ request.url }}" class="form-inline">
-        <input type="hidden" name="filter" value="True"/>
-        {% csrf_token %}
-        <ul class="dropdown-form">
-            {% for key,values in filter_choices.items %}
-            <li>
-            <label class="control-label" for="id_{{key}}">{%if key == "f_status"%}status{%else%}{{key}}{%endif%}</label>
-            <select id="id_{{key}}" name="{{key}}">
-                    <option value="{{v}}"{%if current_filters.key == "" %}selected="selected"{%endif%}></option>
-                {%for v in values%}
-                    <option value="{{v}}"{%if current_filters|key2val:key == v %}selected="selected"{%endif%}>{{v}}</option>
-                {%endfor%}
-            </select>
-            </li>
-            {%endfor%}
-            <li class="divider">
-            </li>
-            <li>
-            <input type="submit" value="filter" class="btn">
-            </li>
-        </ul>
-    </form>
+    <ul class="breadcrumb">
+      <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
+      <li><a href="{{batch.workflow.url }}">{{batch.workflow}}</a> <span class="divider">/</span></li>
+      <li class="active">{{batch}}</li>
+    </ul>
+    
+    <div id="batch_table">
+        {% with details=1 batches=batch|aslist%}
+        {%include "Workflow/Batch/table.html"%}
+        {% endwith %}
     </div>
-</div>
-<br/>
 
+    <div class="dropdown">
+        <h3 style="display:inline" class="dropdown-toggle" data-toggle="dropdown"  id="filter_dropdown-toggle">
+            Nodes
+            <button class="btn btn-small">Filter
+            <span class="caret"></span>
+            </button>
+        </h3>
+       
+        <div class="dropdown dropdown-menu" role="menu"  aria-labelledby="dLabel">
+        <form method="GET" action="{{ request.url }}" class="form-inline" id="filter_form">
+            <input type="hidden" name="filter" value="True"/>
+            {% csrf_token %}
+            <ul class="dropdown-form">
+                {% for key,values in filter_choices.items %}
+                <li>
+                <label class="control-label" for="id_{{key}}">{%if key == "f_status"%}status{%else%}{{key}}{%endif%}</label>
+                <select id="id_{{key}}" name="{{key}}">
+                        <option value="{{v}}"{%if current_filters.key == "" %}selected="selected"{%endif%}></option>
+                    {%for v in values%}
+                        <option value="{{v}}"{%if current_filters|key2val:key == v %}selected="selected"{%endif%}>{{v}}</option>
+                    {%endfor%}
+                </select>
+                </li>
+                {%endfor%}
+                <li class="divider">
+                </li>
+                <li>
+                <input type="submit" value="filter" class="btn" id="filter_submit">
+                </li>
+            </ul>
+        </form>
+        </div>
+    </div>
+    <br/>
 
-{% if paged_nodes.paginator.num_pages > 1 %}
-	{% if paged_nodes.paginator.page_range|length <= 10 %}
-	<div class="pagination">
-	{%else%}
-	<div class="pagination_big">
-	{%endif%}
-	    <span class="step-links">
-	        <ul>
-	        {% if paged_nodes.has_previous %}
-	            <li><a href="?page={{ paged_nodes.previous_page_number }}{{filter_url}}">«</a></li>
-	        {% endif %}
-	        {% for pagenum in paged_nodes.paginator.page_range%}
-	            <li {%if pagenum == paged_nodes.number%}class="active"{%endif%}><a href="?page={{pagenum}}{{filter_url}}">{{pagenum|add:"-1"|mult:page_size|add:"1"}} -
-				{%if forloop.last %} {{paged_nodes.paginator.count}}
-				{%else%}
-				 {{pagenum|mult:page_size}}{%endif%}</a>{% if paged_nodes.paginator.page_range|length > 10 %}, {%endif%}</li>
-	        	{%endfor %}
-	
-	        {% if paged_nodes.has_next %}
-	            <li><a href="?page={{ paged_nodes.next_page_number }}{{filter_url}}">»</a></li>
-	        {% endif %}
-	        </ul>
-	    </span>
-	</div>
-{% endif %}
-
-<table class="table table-hover table-striped">
-{% for node in paged_nodes %}
-    <tr><td>
-        {%if node.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
-        {%if node.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
-        <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong>
-        (status: {{node.status}}, 
-        file_size: {%if settings.show_node_file_sizes%}{{node.file_size}}{%else%}off{%endif%}, 
-        wall_time: {{node.wall_time|format_time}}, 
-        successful: {{node.successful}})
-        <ul>
-        {% for j in node.jobAttempts %}
-            <li style="list-style-type:none">
-                {% with qs=j.queue_status %}
-                    {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
-	                {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
-	                {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
-	                	{%with ds=j.get_drmaa_status %}
-			                {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
-		                    {%if ds == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
-	                	{% endwith%}
-	                {%endif%}
-                {% endwith%}
-                <a href="{{j.url}}">{{ j }}</a>
-            </li>
-        {% empty %}
-          No job attempts in this node.
-        {% endfor %}
-        </ul>
-    </td></tr>
-{% empty %}
-  No nodes.
-{% endfor %}
-</table>
+    <div id="node_table">
+        {% include "Workflow/Node/table.html" %}
+    </div>
 
 {% endblock %}

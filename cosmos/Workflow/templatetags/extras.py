@@ -1,17 +1,12 @@
 from django import template
-from django.core.urlresolvers import reverse
-import time
-from django.core.validators import ValidationError
 import re
-from JobManager.models import JobAttempt
 import sys 
-
+import datetime
 register = template.Library()
 
 @register.filter
 def aslist(o):
     return [o]
-
 
 @register.simple_tag
 def get_sjob_stat(batch,field,statistic,pipe=None):
@@ -29,6 +24,12 @@ def convert2int(x):
     if x:
         return int(x)
     else: return x
+
+
+def format_percent(x):
+    if x:
+        return '{0}%'.format(int(x))
+    else: return ''
 
 @register.filter
 def underscore2space(s):
@@ -99,16 +100,10 @@ def format_memory_kb(kb):
 @register.filter
 def format_memory_mb(mb):
     """converts mb to human readible"""
-    return format_memory_kb(mb*1024.0)
+    return format_memory_kb(mb*1024.0) if mb else ""
 
 @register.filter
 def format_time(seconds):
     if seconds == None or seconds == '': return ''
-    m, s = divmod(seconds, 60)
-    h, m = divmod(m, 60)
-    d, h = divmod(h, 24)
-    if d:
-        return "%dd:%02d:%02d:%02d" % (d, h, m, s)
-    else:
-        return "%d:%02d:%02d" % (h, m, s)
+    return datetime.timedelta(seconds=int(seconds))
         
