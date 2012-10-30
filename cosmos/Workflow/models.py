@@ -26,7 +26,6 @@ class Workflow(models.Model):
     name = models.CharField(max_length=250,unique=True)
     output_dir = models.CharField(max_length=250)
     jobManager = models.OneToOneField(JobManager,null=True, related_name='workflow')
-    resume_from_last_failure = models.BooleanField(default=False,help_text='resumes from last failed node')
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
@@ -131,7 +130,6 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=name).count() == 0:
             raise ValidationError('Workflow {0} does not exist, cannot resume it'.format(name))
         wf = Workflow.objects.get(name=name)
-        wf.resume_from_last_failure=True
         wf.dry_run=dry_run
         wf.finished_on = None
         wf.default_queue=default_queue
@@ -552,13 +550,6 @@ class Workflow(models.Model):
     
     def __str__(self):
         return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
-            
-    def toString(self):
-        s = 'Workflow[{0.id}] {0.name} resume_from_last_failure={0.resume_from_last_failure}\n'.format(self)
-        #s = '{:*^72}\n'.format(s) #center s with stars around it
-        for batch in self.batch_set.all():
-            s = s + batch.toString(tabs=1)
-        return s
     
     @models.permalink    
     def url(self):
@@ -723,15 +714,17 @@ class Batch(models.Model):
                 raise ValidationError("Cannot hard_reset node with name {0} as it doesn't exist.".format(name))
             node.delete()
         
-        if node_exists and (not node.successful) and self.workflow.resume_from_last_failure:
+        if node_exists and (not node.successful):
             self.log.info("{0} was unsuccessful last time, deleting old one and trying again".format(node))
             node.delete()
                
         if not node_exists:
             if save:
+                #Create and save a node
                 node = Node.objects.create(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
                 self.log.info("Created {0} in {1} and saved to the database.".format(node,self))
             else:
+                #Just instantiate a node
                 node = Node(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
                 #self.log.info("Created {0} in {1} without saving to the database.".format(node,self))
         
@@ -742,8 +735,8 @@ class Batch(models.Model):
             if node.outputs != outputs:
                 self.log.error("You can't change the outputs of an existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
         
-        if not node_exists:
-            #if adding to a finished batch, set that batch's status to in_progress so new nodes are executed
+        if not node_exists and not save:
+            #if adding to a finished batch, set that batch's status to in_progress so new nodes are executed.  Skip if Node is not being saved.
             batch = node.batch
             if batch.is_done():
                 batch.status = 'in_progress'
@@ -756,7 +749,6 @@ class Batch(models.Model):
 #                self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history.".format(node,node.batch))
 
         if save:
-            node.save()
             node.tag(**tags)
             return node
         else:
@@ -862,16 +854,6 @@ class Batch(models.Model):
         
     def __str__(self):
         return 'Batch[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
-    
-    def toString(self,tabs=0):
-        # s = ['-'*72]
-        s = ['{tabs}Batch[{1}] {0}'.format(self.name,self.id,tabs="  "*tabs)]
-        #s = ['-'*72]
-        for node in self.nodes.all():
-            node_str = '  '*(tabs+1)+node.toString()
-            node_str = node_str.replace("\n","{0}{1}".format('\n',"  "*(tabs+2)))
-            s.append(node_str)
-        return '\n'.join(s)
             
 
 class NodeTag(models.Model):
@@ -1044,29 +1026,6 @@ class Node(models.Model):
     
     def __str__(self):
         return 'Node[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
-        
-    def toString(self):
-        drmaa_stdout = '' #default if job is unsuccessful
-        drmaa_stderr = '' #default if job is unsuccessful
-        if self.successful:
-            j = self.get_successful_jobAttempt()
-            drmaa_stdout = j.get_drmaa_STDOUT_filepath()
-            drmaa_stderr = j.get_drmaa_STDERR_filepath()
-        return ("Node[{self.id}] {self.name}:\n"
-        "Belongs to batch {batch}:\n"
-        "exec_command: \"{self.exec_command}\"\n"
-        "successful: {successful}\n"
-        "status: {status}\n"
-        "attempts: {attempts}\n"
-        "time_to_run: {self.time_to_run}\n"
-        "drmaa_stdout:\n"
-        "drmaa_stderr:").format(self=self,
-                                batch=self.batch,
-                                status=self.status(),
-                                attempts=self.numAttempts(),
-                                successful=self.successful,
-                                drmaa_stdout=drmaa_stdout,
-                                drmaa_stderr=drmaa_stderr)
 
 
 
