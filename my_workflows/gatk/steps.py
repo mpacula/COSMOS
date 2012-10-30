@@ -1,6 +1,5 @@
 from django.core.exceptions import ValidationError
 from cosmos.contrib import step
-from cosmos.Cosmos.helpers import parse_cmd
 import settings
 from settings import get_Picard_cmd, get_GATK_cmd
 
@@ -13,7 +12,8 @@ class BWA_Align(step.Step):
     
     def many2many_cmd(self,input_batch,data_dict):
         """
-        :param: input_batch is a place holder and is ignored
+        :para: input_batch: a place holder and is ignored
+        :param data_dict: a list of fastq file dictionaries
         """
         for file in data_dict:
             yield {
@@ -54,7 +54,7 @@ class BWA_Sampe(step.Step):
                     {node_r2.tags[fq_path]}
                 """,
             'pcmd_dict':{'node_r1': node_r1,
-                         'node_r2': node_r1 }
+                         'node_r2': node_r2 }
              
         }
 

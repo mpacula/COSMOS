@@ -10,17 +10,17 @@
         <span class="step-links">
             <ul>
             {% if paged_nodes.has_previous %}
-                <li><a href="?page={{ paged_nodes.previous_page_number }}{{filter_url}}">«</a></li>
+                <li><a href="?page={{ paged_nodes.previous_page_number }}&{{filter_url}}">«</a></li>
             {% endif %}
             {% for pagenum in paged_nodes.paginator.page_range%}
-                <li {%if pagenum == paged_nodes.number%}class="active"{%endif%}><a href="?page={{pagenum}}{{filter_url}}">{{pagenum|add:"-1"|mult:page_size|add:"1"}} -
+                <li {%if pagenum == paged_nodes.number%}class="active"{%endif%}><a href="?page={{pagenum}}&{{filter_url}}">{{pagenum|add:"-1"|mult:page_size|add:"1"}} -
                 {%if forloop.last %} {{paged_nodes.paginator.count}}
                 {%else%}
                  {{pagenum|mult:page_size}}{%endif%}</a>{% if paged_nodes.paginator.page_range|length > 10 %}, {%endif%}</li>
                 {%endfor %}
     
             {% if paged_nodes.has_next %}
-                <li><a href="?page={{ paged_nodes.next_page_number }}{{filter_url}}">»</a></li>
+                <li><a href="?page={{ paged_nodes.next_page_number }}&{{filter_url}}">»</a></li>
             {% endif %}
             </ul>
         </span>

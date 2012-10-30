@@ -58,8 +58,8 @@ class Workflow(models.Model):
     
     @property
     def wall_time(self):
-        "Returns a timedelta instance of finished_on - created_on"
-        return self.finished_on - self.created_on
+        """Time between thisworkflowh's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
+        return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
     
     @property
     def batches(self):
@@ -327,20 +327,24 @@ class Workflow(models.Model):
         """
         Deletes this workflow.
         """
-        self.jobManager.delete()
         self.log.info("Deleting {0}...".format(self))
-        for h in self.log.handlers: h.close()
+        self.log.propogate = False
+        for h in self.log.handlers:
+            h.close();
+            self.log.removeHandler()
         
 #        if kwargs.setdefault('delete_files',False):
 #            kwargs.pop('delete_files')
 #            self.log.info('Deleting directory {0}'.format(self.output_dir))
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
+            
+        self.jobManager.delete()
                 
         for b in self.batches: b.delete()
         
         super(Workflow, self).delete(*args, **kwargs)
-        self.log.info("Deleted {0}".format(self))
+        self.log.propogate = True
                 
 
 
@@ -757,13 +761,13 @@ class Batch(models.Model):
 
     def is_done(self):
         """
-        Returns True if this batch is finished successfully or failed
+        :returns: True if this batch is finished successfully or failed, else False
         """
         return self.status == 'successful' or self.status == 'failed'
 
     def _are_all_nodes_done(self):
         """
-        Returns True if all nodes have succeeded or failed in this batch
+        :returns: True if all nodes have succeeded or failed in this batch, else False
         """
         return self.nodes.filter(Q(status = 'successful') | Q(status='failed')).count() == self.nodes.count()
         
@@ -837,15 +841,15 @@ class Batch(models.Model):
         Bulk deletes this batch and all files associated with it.
         """
         self.log.info('Deleting Batch {0}.'.format(self.name))
-        self.log.info('Deleting directory {0}...'.format(self.output_dir))
         if os.path.exists(self.output_dir):
+            self.log.info('Deleting directory {0}...'.format(self.output_dir))
             os.system('rm -rf {0}'.format(self.output_dir))
         self.log.info('Bulk deleting JobAttempts...')
         JobAttempt.objects.filter(node_set__in = self.nodes).delete()
-        self.log.info('Bulk deleting nodes...')
+        self.log.info('Bulk deleting Nodes...')
         self.nodes.delete()
         super(Batch, self).delete(*args, **kwargs)
-        self.log.info('Batch {0} Deleted.'.format(self.name))
+        self.log.info('{0} Deleted.'.format(self))
     
     @models.permalink    
     def url(self):
@@ -930,7 +934,7 @@ class Node(models.Model):
     
     @property
     def output_paths(self):
-        "Dictionary of this node's outputs appended to this node's output_dir."
+        "Dict of this node's outputs appended to this node's output_dir."
         r = {}
         for key,val in self.outputs.items():
             r[key] = os.path.join(self.job_output_dir,val)

@@ -18,7 +18,7 @@ def _get_batches_dict(workflow):
 
 @never_cache
 def index(request):
-    workflows = Workflow.objects.all()
+    workflows = Workflow.objects.all().order_by('-id')
     return render_to_response('Workflow/index.html', { 'request':request,'workflows': workflows }, context_instance=RequestContext(request))
 
 @never_cache
@@ -93,7 +93,7 @@ def __get_context_for_batch_node_table(request,pid):
     page_slice = "{0}:{1}".format(page,int(page)+9)
     
     
-    return { 'request':request,'batch': batch,'page_size':page_size,'paged_nodes':nodes, 'page_slice':page_slice, 'current_filters':all_filters, 'filter_as_url':filter_url }
+    return { 'request':request,'batch': batch,'page_size':page_size,'paged_nodes':nodes, 'page_slice':page_slice, 'current_filters':all_filters, 'filter_url':filter_url }
 
 @never_cache
 def batch_node_table(request,pid):

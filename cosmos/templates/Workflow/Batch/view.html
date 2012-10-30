@@ -24,20 +24,20 @@
                      url:    urlfunc(),
                      success: function(result) {
                                   $(selector).html(result)
-                                  setTimeout("update_html('"+selector+"',"+urlfunc+")",5000)
+                                  setTimeout("update_html('"+selector+"',"+urlfunc+")",1000)
                               },
                      async:   true,
                 }); 
             }
-        url_batch_table = function() { return '{% url 'batch_table' batch.id %}' }
-        update_html('#batch_table',url_batch_table)
-        url_node_table = function() { return '{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize() }
-        update_html('#node_table',url_node_table)
+        // url_batch_table = function() { return '{% url 'batch_table' batch.id %}' }
+        // update_html('#batch_table',url_batch_table)
+        // url_node_table = function() { return '{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize() }
+        // update_html('#node_table',url_node_table)
         
         //Filter Submit Button
         $('#filter_submit').click(function() {
             $('#filter_dropdown-toggle').dropdown('toggle')
-            $('#node_table').load('{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize());
+            $('#node_table').load('{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize() );
             return false;
         });
     });
@@ -65,7 +65,7 @@
             </button>
         </h3>
        
-        <div class="dropdown dropdown-menu">
+        <div class="dropdown dropdown-menu" role="menu"  aria-labelledby="dLabel">
         <form method="GET" action="{{ request.url }}" class="form-inline" id="filter_form">
             <input type="hidden" name="filter" value="True"/>
             {% csrf_token %}

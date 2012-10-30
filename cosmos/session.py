@@ -25,8 +25,6 @@ path = os.path.join(settings.home_path,'cosmos')
 if path not in sys.path:
     sys.path.append(path)
 
-os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.Cosmos.django_settings'
-
 #DRMAA
 import drmaa
 drmaa_enabled = True
