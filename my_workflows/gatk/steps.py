@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from cosmos.contrib import step
 from cosmos.Cosmos.helpers import parse_cmd
 import settings
-from settings import get_Picard_cmd
+from settings import get_Picard_cmd, get_GATK_cmd
 
 step.settings = settings
 
@@ -69,7 +69,7 @@ class CleanSam(step.Step):
                         I= {input} \
                         O={{output_dir}}/{{outputs[bam]}}
                     """,
-            'pcmd_dict': {'Picard_cmd':get_Picard_cmd('CleanSam.jar'),
+            'pcmd_dict': {'Picard_cmd':get_Picard_cmd('CleanSam.jar',self.mem_req),
                           'input':input_node.output_paths[input_type]}
         }
 
@@ -89,7 +89,7 @@ class MergeSamFiles(step.Step):
                         MERGE_SEQUENCE_DICTIONARIES=True \
                         ASSUME_SORTED={assume_sorted}
                     """,
-            'pcmd_dict': {'Picard_cmd':get_Picard_cmd('MergeSamFiles.jar'),
+            'pcmd_dict': {'Picard_cmd':get_Picard_cmd('MergeSamFiles.jar',self.mem_req),
                          'INPUTs':INPUTs,
                          'assume_sorted':assume_sorted
                          }
@@ -109,7 +109,7 @@ class MarkDuplicates(step.Step):
                         METRICS_FILE={{output_dir}}/{{outputs[metrics_file]}} \
                         ASSUME_SORTED={assume_sorted}
                     """,
-            'pcmd_dict' : {'Picard_cmd':get_Picard_cmd('MarkDuplicates.jar'),
+            'pcmd_dict' : {'Picard_cmd':get_Picard_cmd('MarkDuplicates.jar',self.mem_req),
                          'assume_sorted':assume_sorted}
         }
     
@@ -123,39 +123,43 @@ class BuildBamIndex(step.Step):
                 INPUT={input_node.output_paths[bam]} \
                 OUTPUT={input_node.output_paths[bam]}.bai
             """,
-            'pcmd_dict': {'Picard_cmd':get_Picard_cmd('BuildBamIndex.jar')}
+            'pcmd_dict': {'Picard_cmd':get_Picard_cmd('BuildBamIndex.jar',self.mem_req)}
         }
 
 class RealignerTargetCreator(step.Step):
     outputs = {'targetIntervals':'target.intervals'}
     mem_req = 2.5*1024
-    cpu_req = 4
+    cpu_req = 1
         
     pcmd = r"""
-                {settings.GATK_cmd} \
+                {GATK_cmd} \
                 -T RealignerTargetCreator \
                 -R {settings.reference_fasta_path} \
                 -o {{output_dir}}/{{outputs[targetIntervals]}} \
                 --known {settings.indels_1000g_phase1_path} \
                 --known {settings.mills_path} \
-                -nt {self.cpu_req}
+                -nt {self.cpu_req} \
+                -L {interval} 
             """
     
-    def many2many_cmd(self,input_batch=None):
-        """
-        Used to generate the knowns only interval list.  Just ignore the input_batch.
-        """
-        yield {
-            'pcmd': self.pcmd,
-            'pcmd_dict': {},
-            'new_tags': {'mode':'KNOWNS_ONLY'}
-         }    
+#    def many2many_cmd(self,input_batch=None,intervals):
+#        """
+#        Used to generate the knowns only interval list.  Just ignore the input_batch.
+#        """
+#        for interval in intervals:
+#        yield {
+#            'pcmd': self.pcmd,
+#            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req)},
+#            'new_tags': {'mode':'KNOWNS_ONLY'}
+#         }    
     
     def one2many_cmd(self,input_node,intervals):
         for interval in intervals:
             yield {
-                'pcmd': self.pcmd.strip() + ' \\\n -I {input_node.output_paths[bam]}',
-                'pcmd_dict':{'interval':interval},
+                'pcmd': self.pcmd.strip() + r""" \
+                                                -I {input_node.output_paths[bam]}""",
+                'pcmd_dict':{'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                             'interval':interval},
                 'add_tags':{'interval':interval}
             }
 
@@ -184,7 +188,7 @@ class IndelRealigner(step.Step):
                 
             yield {
                 'pcmd': r"""
-                            {settings.GATK_cmd} \
+                            {GATK_cmd} \
                             -T IndelRealigner \
                             -R {settings.reference_fasta_path} \
                             -I {input_node.output_paths[bam]} \
@@ -195,7 +199,8 @@ class IndelRealigner(step.Step):
                             -model {model} \
                             -L {interval}
                         """,
-                'pcmd_dict':{'model':model,
+                'pcmd_dict':{'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                             'model':model,
                              'targetIntervals':targetIntervals,
                              'interval':interval},
                 'add_tags': {'interval':interval}
@@ -207,7 +212,7 @@ class BaseQualityScoreRecalibration(step.Step):
     cpu_req = 1 #>1 results in ##### ERROR MESSAGE: We have temporarily disabled the ability to run BaseRecalibrator multi-threaded for performance reasons.  We hope to have this fixed for the next GATK release (2.2) and apologize for the inconvenience.
     
     pcmd = r"""
-        {settings.GATK_cmd} \
+        {GATK_cmd} \
         -T BaseRecalibrator \
         -R {settings.reference_fasta_path} \
         {INPUTs} \
@@ -226,7 +231,8 @@ class BaseQualityScoreRecalibration(step.Step):
         INPUTs = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_nodes ])
         return {
             'pcmd': self.pcmd,
-            'pcmd_dict': {'INPUTs':INPUTs}
+            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                          'INPUTs':INPUTs}
         }
 
 class PrintReads(step.Step):
@@ -234,7 +240,7 @@ class PrintReads(step.Step):
     mem_req = 5*1024
     
     pcmd = r"""
-        {settings.GATK_cmd} \
+        {GATK_cmd} \
         -T PrintReads \
         -R {settings.reference_fasta_path} \
         -I {INPUTs} \
@@ -247,14 +253,16 @@ class PrintReads(step.Step):
         bqsr_node = bqsr_batch.get_node_by(tags)
         return {
             'pcmd': self.pcmd,
-            'pcmd_dict': {'INPUTs':INPUTs,
+            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                          'INPUTs':INPUTs,
                           'recal_file': bqsr_batch.get_node_by(tags=bqsr_node.tags).output_paths['recal']}
         }
     
     def one2one_cmd(self,input_node,bqsr_batch):
         return {
             'pcmd': self.pcmd,
-            'pcmd_dict': {'INPUTs': "-I {0}".format(input_node.output_paths['bam']),
+            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                          'INPUTs': "-I {0}".format(input_node.output_paths['bam']),
                           'recal_file': bqsr_batch.get_node_by(tags=input_node.tags).output_paths['recal']}
         }
     
@@ -274,7 +282,7 @@ class UnifiedGenotyper(step.Step):
             for interval in intervals:
                 yield {
                     'pcmd':r"""
-                                {settings.GATK_cmd} \
+                                {GATK_cmd} \
                                 -T UnifiedGenotyper \
                                 -R {settings.reference_fasta_path} \
                                 --dbsnp {settings.dbsnp_path} \
@@ -288,7 +296,8 @@ class UnifiedGenotyper(step.Step):
                                 -L {interval} \
                                 -nt {self.cpu_req}
                             """,
-                    'pcmd_dict': {'input_bams':input_bams,
+                    'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                                  'input_bams':input_bams,
                                   'interval':interval,
                                   'glm':glm},
                     'new_tags':{'interval':interval,
@@ -311,14 +320,15 @@ class CombineVariants(step.Step):
         INPUTs = " \\\n".join(["--variant {0}".format(n.output_paths['vcf']) for n in input_nodes])
         return {
                 'pcmd': r"""
-                        {settings.GATK_cmd} \
+                        {GATK_cmd} \
                         -T CombineVariants \
                         -R {settings.reference_fasta_path} \
                         {INPUTs} \
                         -o {{output_dir}}/{{outputs[vcf]}} \
                         -genotypeMergeOptions {genotypeMergeOptions}
                     """,
-                'pcmd_dict': {'INPUTs':INPUTs,
+                'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                              'INPUTs':INPUTs,
                               'genotypeMergeOptions':genotypeMergeOptions}
             }
         
@@ -354,7 +364,7 @@ class VariantQualityRecalibration(step.Step):
             if haplotypeCaller_or_unifiedGenotyper == 'UnifiedGenotyper':
                 if glm == 'SNP': 
                     cmd = r"""
-                    {settings.GATK_cmd} \
+                    {GATK_cmd} \
                     -T VariantRecalibrator \
                     -R {settings.reference_fasta_path} \
                     -input {input_vcf} \
@@ -370,7 +380,7 @@ class VariantQualityRecalibration(step.Step):
                     """
                 elif glm == 'INDEL':
                     cmd = r"""
-                    {settings.GATK_cmd} \
+                    {GATK_cmd} \
                     -T VariantRecalibrator \
                     -R {settings.reference_fasta_path} \
                     -input {input_vcf} \
@@ -386,7 +396,7 @@ class VariantQualityRecalibration(step.Step):
                 raise NotImplementedError()
                 if glm == 'SNP' or glm == 'INDEL': 
                     cmd = r"""
-                    {settings.GATK_cmd} \
+                    {GATK_cmd} \
                     -T VariantRecalibrator \
                     -R {settings.reference_fasta_path} \
                     -input {input_vcf} \
@@ -406,7 +416,8 @@ class VariantQualityRecalibration(step.Step):
         
         return {
             'pcmd' : cmd,
-            'pcmd_dict': {'input_vcf':input_node.output_paths['vcf'],
+            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                          'input_vcf':input_node.output_paths['vcf'],
                           'InbreedingCoeff':InbreedingCoeff}
         } 
 
@@ -436,7 +447,7 @@ class ApplyRecalibration(step.Step):
         if haplotypeCaller_or_unifiedGenotyper == 'UnifiedGenotyper':
             if glm == 'SNP': 
                 cmd = r"""
-                {settings.GATK_cmd} \
+                {GATK_cmd} \
                 -T ApplyRecalibration \
                 -R {settings.reference_fasta_path} \
                 -input {input_vcf} \
@@ -448,7 +459,7 @@ class ApplyRecalibration(step.Step):
                 """
             elif glm == 'INDEL':
                 cmd = r"""
-                {settings.GATK_cmd} \
+                {GATK_cmd} \
                 -T ApplyRecalibration \
                 -R {settings.reference_fasta_path} \
                 -input {input_vcf} \
@@ -462,7 +473,7 @@ class ApplyRecalibration(step.Step):
             raise NotImplementedError()
             if glm == 'SNP' or glm == 'INDEL': 
                 cmd = r"""
-                {settings.GATK_cmd} \
+                {GATK_cmd} \
                 -T ApplyRecalibration \
                 -R {settings.reference_fasta_path} \
                 -input {input_vcf} \
@@ -474,7 +485,8 @@ class ApplyRecalibration(step.Step):
                 """
         return {
             'pcmd': cmd,
-            'pcmd_dict': {'input_vcf':input_node.output_paths['vcf'],
+            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                          'input_vcf':input_node.output_paths['vcf'],
                          'input_tranches':vqr_node.output_paths['tranches'],
                          'input_recal':vqr_node.output_paths['recal'],}
         }

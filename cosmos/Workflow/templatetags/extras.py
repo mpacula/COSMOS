@@ -29,6 +29,7 @@ def convert2int(x):
 def format_percent(x):
     if x:
         return '{0}%'.format(int(x))
+    else: return ''
 
 @register.filter
 def underscore2space(s):
