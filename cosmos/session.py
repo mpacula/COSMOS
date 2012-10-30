@@ -27,12 +27,15 @@ if path not in sys.path:
 
 #DRMAA
 import drmaa
-drmaa_enabled = True
+drmaa_enabled = False
 try:
+    drmaa_enabled = True
     drmaa_session = drmaa.Session()
     drmaa_session.initialize()
+    
 except Exception as e:
-    print "WARNING! WARNING! Could not enable drmaa.  Proceeding without drmaa enabled."
-    #print e
+    print e
+    print "ERROR! Could not enable drmaa.  Proceeding without drmaa enabled."
+    
     pass
     

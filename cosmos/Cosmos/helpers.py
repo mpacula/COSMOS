@@ -106,7 +106,7 @@ def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_limit=None):
     :param queue: name of queue to submit to 
     """
     if DRM == 'LSF':  
-        s = '-R "rusage[mem={0}]" -n {1}'.format(mem_req,cpu_req)
+        s = '-R "rusage[mem={0}] span[hosts=1]" -n {1}'.format(mem_req,cpu_req)
         if queue:
             s += ' -q {0}'.format(queue)
         return s
@@ -171,7 +171,7 @@ def get_logger(name,path):
     #logging.basicConfig(level=logging.DEBUG)
     
     #check if we've already configured logger
-    if len(log.handlers) > 0:
+    if len(log.handlers) > 1:
         return log
     
     log.setLevel(logging.INFO)

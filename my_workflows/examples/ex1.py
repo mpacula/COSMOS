@@ -3,7 +3,7 @@ from cosmos.Workflow.models import Workflow
 from cosmos.contrib import step
 import steps
 
-WF = Workflow.start('Example1',default_queue='high_priority',restart=True)
+WF = Workflow.start('Example1',default_queue='i2b2_15m',restart=True)
 step.workflow = WF
 
 echo = steps.Echo('Echo').many2many(input_batch=None,strings=['Hello World'])

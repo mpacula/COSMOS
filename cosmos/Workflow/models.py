@@ -152,13 +152,12 @@ class Workflow(models.Model):
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         :param prompt_confirm: (bool) If True, will prompt the user for a confirmation before deleting the workflow.
         """
-        if prompt_confirm:
-            if not helpers.confirm("Are you sure you want to restart this workflow?  All files will be deleted.",default=True,timeout=30):
-                print "Exiting."
-                sys.exit(1)
-                
         wf_id = None
         if Workflow.objects.filter(name=name).count():
+            if prompt_confirm:
+                if not helpers.confirm("Are you sure you want to restart Workflow '{0}'?  All files will be deleted.".format(name),default=True,timeout=30):
+                    print "Exiting."
+                    sys.exit(1)
             old_wf = Workflow.objects.get(name=name)
             wf_id = old_wf.id
             old_wf.delete()
@@ -309,7 +308,8 @@ class Workflow(models.Model):
         nodes = map(lambda x: x[0],nodes_and_tags)
         
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
-        id_start = Node.objects.all().aggregate(models.Max('id'))['id__max'] + 1
+        m = Node.objects.all().aggregate(models.Max('id'))['id__max']
+        id_start =  m + 1 if m else 1
         for i,node in enumerate(nodes): node.id = id_start + i
         
         Node.objects.bulk_create(nodes)
@@ -328,10 +328,9 @@ class Workflow(models.Model):
         Deletes this workflow.
         """
         self.log.info("Deleting {0}...".format(self))
-        self.log.propogate = False
-        for h in self.log.handlers:
-            h.close();
-            self.log.removeHandler()
+        for h in list(self.log.handlers):
+            h.close()
+            self.log.removeHandler(h)
         
 #        if kwargs.setdefault('delete_files',False):
 #            kwargs.pop('delete_files')
@@ -344,7 +343,6 @@ class Workflow(models.Model):
         for b in self.batches: b.delete()
         
         super(Workflow, self).delete(*args, **kwargs)
-        self.log.propogate = True
                 
 
 
@@ -498,7 +496,7 @@ class Workflow(models.Model):
         """
         Deletes any batches in the history that haven't been added yet
         """
-        if helpers.confirm("Are you sure you want to restart this workflow?  All files will be deleted.",default=True,timeout=30):
+        if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0}?  All files will be deleted.".format(self),default=True,timeout=30):
             self.log.info('Restarting Workflow from here.')
             for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete()
     
@@ -726,7 +724,7 @@ class Batch(models.Model):
             if save:
                 #Create and save a node
                 node = Node.objects.create(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
-                self.log.info("Created {0} in {1} and saved to the database.".format(node,self))
+                self.log.info("Created {0} in {1}, and saved to the database.".format(node,self))
             else:
                 #Just instantiate a node
                 node = Node(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
