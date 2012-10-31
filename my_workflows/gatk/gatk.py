@@ -29,7 +29,6 @@ step.workflow = WF
 bwa_aln = steps.BWA_Align("BWA Align").many2many(input_batch=None,data_dict=data_dict)
 bwa_sampe = steps.BWA_Sampe("BWA Sampe").many2one(input_batch=bwa_aln,group_by=['sample','lane','fq_chunk'])
 clean_bams = steps.CleanSam("Clean Bams").one2one(input_batch=bwa_sampe,input_type='sam')
-
 """
 Following the "Best" GATK practices for deduping, realignment, and bqsr
 for each sample

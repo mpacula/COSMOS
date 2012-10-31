@@ -210,7 +210,7 @@ class Workflow(models.Model):
             old_batch = Batch.objects.get(workflow=self,name=name)
             _old_id = old_batch.id
             if old_batch.status == 'failed':
-                if helpers.confirm('{0} has a status of failed.  Would you like to perform a hard_reset on it before proceeding?'.format(old_batch),default=False):
+                if helpers.confirm('{0} has a status of failed.  Would you like to perform a hard_reset on it before proceeding? Answering no will proceed with the workflow with the batch left unchanged.  Unsuccessful nodes will be re-run.'.format(old_batch),default=True):
                     old_batch.delete()
             if hard_reset:
                 if helpers.confirm("Are you sure you want to do a hard reset on {0}?".format(old_batch),default=True,timeout=30):
@@ -309,6 +309,8 @@ class Workflow(models.Model):
         self.log.info("Bulk adding {0} nodes...".format(len(nodes_and_tags)))
         nodes_and_tags = filter(lambda x: not x[2],nodes_and_tags)
         nodes = map(lambda x: x[0],nodes_and_tags)
+        if len(nodes) == 0:
+            return []
         
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
         m = Node.objects.all().aggregate(models.Max('id'))['id__max']
@@ -324,7 +326,8 @@ class Workflow(models.Model):
             for k,v in tags.items():
                 nodetags.append(NodeTag(node=node,key=k,value=v))
         self.log.info("Bulk adding {0} node tags...".format(len(nodetags)))
-        NodeTag.objects.bulk_create(nodetags)
+        return NodeTag.objects.bulk_create(nodetags)
+        
             
     def delete(self, *args, **kwargs):
         """
