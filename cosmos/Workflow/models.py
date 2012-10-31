@@ -708,6 +708,17 @@ class Batch(models.Model):
         if pcmd == '' or pcmd is None:
             raise ValidationError('pre_command cannot be blank')
         
+        node_kwargs = {
+                       'batch':self,
+                       'name':name,
+                       'pre_command':pcmd,
+                       'outputs':outputs,
+                       'memory_requirement':mem_req,
+                       'cpu_requirement':cpu_req,
+                       'time_limit':time_limit
+                       }
+            
+        
         
         node_exists = Node.objects.filter(batch=self,name=name).count() > 0
         if node_exists:
@@ -719,19 +730,18 @@ class Batch(models.Model):
                 raise ValidationError("Cannot hard_reset node with name {0} as it doesn't exist.".format(name))
             node.delete()
         
-        if node_exists and (not node.successful):
+        if node_exists and not node.successful:
             self.log.info("{0} was unsuccessful last time, deleting old one and trying again".format(node))
             node.delete()
                
         if not node_exists:
             if save:
                 #Create and save a node
-                node = Node.objects.create(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
+                node = Node.objects.create(**node_kwargs)
                 self.log.info("Created {0} in {1}, and saved to the database.".format(node,self))
             else:
                 #Just instantiate a node
-                node = Node(batch=self, name=name, pre_command=pcmd, outputs=outputs, memory_requirement=mem_req, cpu_requirement=cpu_req, time_limit=time_limit)
-                #self.log.info("Created {0} in {1} without saving to the database.".format(node,self))
+                node = Node(**node_kwargs)
         
         #validation
         if node_exists and node.successful:  

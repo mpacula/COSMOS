@@ -99,6 +99,7 @@ class MarkDuplicates(step.Step):
     outputs = {'bam':'deduped.bam',
                'metrics_file':'metrics.log'}
     mem_req = 5*1024
+    cpu_req = 1
     
     def one2one_cmd(self,input_node,assume_sorted=True):
         return {
@@ -238,6 +239,7 @@ class BaseQualityScoreRecalibration(step.Step):
 class PrintReads(step.Step):
     outputs = {'bam':'recalibrated.bam'}
     mem_req = 5*1024
+    cpu_req = 1
     
     pcmd = r"""
         {GATK_cmd} \
@@ -269,7 +271,7 @@ class PrintReads(step.Step):
 class UnifiedGenotyper(step.Step):
     outputs = {'vcf':'raw.vcf'}
     mem_req = 5.5*1024
-    cpu_req = 4
+    cpu_req = 6
     
     def many2many_cmd(self,input_batch,intervals):
         """
