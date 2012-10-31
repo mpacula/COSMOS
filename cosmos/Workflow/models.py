@@ -209,6 +209,9 @@ class Workflow(models.Model):
         if batch_exists:
             old_batch = Batch.objects.get(workflow=self,name=name)
             _old_id = old_batch.id
+            if old_batch.status == 'failed':
+                if helpers.confirm('{0} has a status of failed.  Would you like to perform a hard_reset on it before proceeding?'.format(old_batch),default=False):
+                    old_batch.delete()
             if hard_reset:
                 if helpers.confirm("Are you sure you want to do a hard reset on {0}?".format(old_batch),default=True,timeout=30):
                     self.log.info("Doing a hard reset on {0}.".format(old_batch))

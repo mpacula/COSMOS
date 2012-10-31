@@ -10,7 +10,7 @@ import json
 samples=[]
 
 if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
-    WF = Workflow.start(name='GP 48Exomes with Simulated',default_queue='high_priority',restart=True)
+    WF = Workflow.start(name='GP 48Exomes with Simulated',default_queue='high_priority',restart=False)
     data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/48exomes',depth=2))
     simulated = [s for s in make_data_dict.yield_simulated_files(input_dir='/nas/erik/ngs_data/simulated')]
     data_dict += simulated
@@ -18,7 +18,7 @@ if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
 #    WF = Workflow.start(name='GPP 48Exomes GATK i2b2',default_queue='i2b2_2h',restart=True)
 #    data_dict = json.loads(make_data_dict.main(input_dir='/scratch/esg21/ngs_data/48exomes',depth=2))
 elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
-    WF = Workflow.start(name='GPP 48Exomes GATK shared',default_queue='shared_2h',restart=True)
+    WF = Workflow.start(name='GPP 48Exomes GATK shared',default_queue='shared_2h',restart=False)
     data_dict = json.loads(make_data_dict.main(input_dir='/scratch/esg21/ngs_data/48exomes',depth=2))
     simulated = [s for s in make_data_dict.yield_simulated_files(input_dir='/scratch/esg21/ngs_data/simulated')]
     data_dict += simulated

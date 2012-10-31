@@ -28,7 +28,7 @@ mills_path = os.path.join(resource_bundle_path,'Mills_and_1000G_gold_standard.in
 indels_1000g_phase1_path = os.path.join(resource_bundle_path,'1000G_phase1.indels.b37.vcf')
 #Setup Cosmos
 
-def get_Picard_cmd(jar,mem_req="5g"):
-    return 'java -Xmx{mem_req} -Djava.io.tmpdir={tmp_dir} -jar {picard_jar}'.format(picard_jar = os.path.join(Picard_path,jar),mem_req=mem_req,tmp_dir=tmp_dir)
-def get_GATK_cmd(gatk_jar=os.path.join(GATK_path,'GenomeAnalysisTKLite.jar'),mem_req="5g",tmp_dir=tmp_dir):
-    return 'java -Xmx{mem_req} -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(gatk_jar = gatk_jar,mem_req="5g",tmp_dir=tmp_dir)
+def get_Picard_cmd(jar,mem_req=5000):
+    return 'java -Xmx{mem_req}m -Djava.io.tmpdir={tmp_dir} -jar {picard_jar}'.format(picard_jar = os.path.join(Picard_path,jar),mem_req=int(mem_req),tmp_dir=tmp_dir)
+def get_GATK_cmd(gatk_jar=os.path.join(GATK_path,'GenomeAnalysisTKLite.jar'),mem_req=5000,tmp_dir=tmp_dir):
+    return 'java -Xmx{mem_req}m -Djava.io.tmpdir={tmp_dir} -jar {gatk_jar}'.format(gatk_jar = gatk_jar,mem_req=int(mem_req),tmp_dir=tmp_dir)
