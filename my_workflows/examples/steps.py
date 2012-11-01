@@ -3,7 +3,7 @@ from cosmos.contrib.step import Step
 class Echo(Step):
     outputs = {'txt':'out.txt'}
     
-    def many2many_cmd(self,input_batch=None,strings=[]):
+    def none2many_cmd(self,input_batch=None,strings=[]):
         """
         :param strings: the items to echo, one item per node
         """

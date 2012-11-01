@@ -31,6 +31,7 @@
     <tbody>
     <tr>
         <th>Node</th>
+        <th>Parents</th>
         <th>Status</th>
         <th>Wall Time</th>
         <th>File_Size</th>
@@ -46,6 +47,7 @@
                 {%endwith%} 
             <strong><a href="{{node.url}}" style="color:#C09853">{{node}}</a></strong>
             </td>
+            <td>{{node.parents}}</td>
             <td>{{node.status}}
             </td>
             <td>

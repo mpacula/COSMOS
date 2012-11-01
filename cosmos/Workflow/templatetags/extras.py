@@ -29,6 +29,8 @@ def convert2int(x):
 def format_percent(x):
     if x:
         return '{0}%'.format(int(x))
+    elif x == 0:
+        return '0%'
     else: return ''
 
 @register.filter

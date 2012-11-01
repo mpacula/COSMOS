@@ -25,6 +25,6 @@ Optionally, if you want the graphing capabilities, R and R package ggplot2 are r
 
 .. code-block:: bash
 
-   sudo apt-get install r # or whatever works on your OS
+   sudo apt-get install r graphviz-dev # or whatever works on your OS
    sudo R
    > install.packages("ggplot2")

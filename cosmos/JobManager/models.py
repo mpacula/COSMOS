@@ -325,7 +325,6 @@ class JobManager(models.Model):
     def __init__(self,*args,**kwargs):
         kwargs['created_on'] = timezone.now()
         super(JobManager,self).__init__(*args,**kwargs)
-    
             
 #    def close_session(self):
 #        #TODO delete all jobtemplates

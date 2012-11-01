@@ -30,6 +30,7 @@
 <h1>{{workflow}}
 	<a href="{% url 'workflow_view_log' workflow.id %}"><button class="btn btn-info"><i class="icon-search icon-white"></i> Log</button></a>
 	<a href="{% url 'workflow_analysis' workflow.id %}"><button class="btn btn-info"><i class="icon-wrench icon-white"></i> Analyze</button></a>
+    <a href="{% url 'workflow_dag' workflow.id %}"><button class="btn btn-info"><i class="icon-cog icon-white"></i> Visualize</button></a>
 </h1>
 
 <dl class="dl-horizontal">

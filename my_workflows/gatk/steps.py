@@ -273,13 +273,13 @@ class UnifiedGenotyper(step.Step):
     mem_req = 5.5*1024
     cpu_req = 6
     
-    def many2many_cmd(self,input_batch,intervals):
+    def many2many_cmd(self,input_nodes,intervals):
         """
         UnifiedGenotyper takes as input all bams [sample1.bam,sample2.bam...sample3.bam]
         
         :param input_batch: sample level bams
         """
-        input_bams = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_batch.nodes ])
+        input_bams = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_nodes ])
         for glm in ['SNP','INDEL']:
             for interval in intervals:
                 yield {

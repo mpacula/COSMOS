@@ -51,7 +51,7 @@ bqsr_by_sample = steps.BaseQualityScoreRecalibration("Base Quality Score Recalib
 recalibrated_samples = steps.PrintReads("Apply BQSR").many2one(input_batch=realigned_by_sample_chr,bqsr_batch=bqsr_by_sample,group_by=['sample'])
 
 # Variant Calling
-ug = steps.UnifiedGenotyper("Unified Genotyper").many2many(input_batch=recalibrated_samples,intervals=contigs)
+ug = steps.UnifiedGenotyper("Unified Genotyper").many2many(input_batch=recalibrated_samples,group_by=[],intervals=contigs)
 cv1 = steps.CombineVariants("Combine Variants").many2one(input_batch=ug,group_by=['glm'])
 inbreeding_coeff = len(samples)> 19 #20 samples are required to use this annotation for vqr
 vqr = steps.VariantQualityRecalibration("Variant Quality Recalibration").one2one(cv1,exome_or_wgs='exome',inbreeding_coeff=inbreeding_coeff)

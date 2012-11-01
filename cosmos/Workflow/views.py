@@ -1,6 +1,6 @@
 from django.shortcuts import render_to_response,render
 from django.template import RequestContext
-from models import Workflow, Batch, Node, NodeTag
+from cosmos.Workflow.models import Workflow, Batch, Node, NodeTag, WorkflowDAG
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from cosmos.Cosmos.helpers import groupby
 from models import status_choices
@@ -118,6 +118,10 @@ def node_view(request,pid):
 def view_log(request,pid):
     workflow = Workflow.objects.get(pk=pid)
     return render_to_response('Workflow/view_log.html', { 'request':request,'workflow': workflow }, context_instance=RequestContext(request))
+
+def visualize(request,pid):
+    workflow = Workflow.objects.get(pk=pid)
+    return render_to_response('Workflow/visualize.html', { 'request':request,'workflowDAG': WorkflowDAG(workflow) }, context_instance=RequestContext(request))
 
 @never_cache
 def analysis(request,pid):

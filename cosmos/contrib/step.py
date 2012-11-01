@@ -54,11 +54,12 @@ class Step():
     
     
     
-    def add_node(self,pcmd,tags):
+    def add_node(self,pcmd,tags,parents):
         """adds a node"""
         return self.batch.add_node(name = dict2node_name(tags),
                                     pcmd = pcmd,
                                     tags = tags,
+                                    parents = parents,
                                     save = False,
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
@@ -66,31 +67,43 @@ class Step():
         
     def __x2many(self,*args,**kwargs):
         """proxy for none2many and many2many"""
-        many2many = True if 'input_batch' in kwargs else False
+        
+    def none2many(self,*args,**kwargs):
+        """Basically a many2many, without the input_batch"""
         if not self.batch.successful:
             new_nodes = []
-            gnrtr = self.many2many_cmd(*args,**kwargs) if many2many else self.none2many_cmd(*args,**kwargs)
-            for r in gnrtr:
+            for r in self.none2many_cmd(*args,**kwargs):
                 #Set defaults
                 validate_dict_has_keys(r,['pcmd','new_tags'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
                 new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=r['new_tags']),
-                                         tags = r['new_tags'])
+                                         tags = r['new_tags'],
+                                         parents = [])
                 new_nodes.append(new_node)
             workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
         return self.batch 
-        
-    def none2many(self,*args,**kwargs):
-        """Basically a many2many, without the input_batch"""
-        return self.__x2many(*args,**kwargs)
     
-    def many2many(self,input_batch,*args,**kwargs):
+    def many2many(self,input_batch,group_by,*args,**kwargs):
         """
         Used when the parallelization is complex enough that the command should specify it.  The func:`self.many2many_cmd` will be passed
         the entire input_batch rather than any nodes.
         """
-        return self.__x2many(input_batch,*args,**kwargs)
+        if not self.batch.successful:
+            new_nodes = []
+            for tags,input_nodes in input_batch.group_nodes_by(keys=group_by):
+                for r in self.many2many_cmd(input_nodes=input_nodes,tags=group_by,*args,**kwargs):
+                    #Set defaults
+                    validate_dict_has_keys(r,['pcmd','new_tags'])
+                    pcmd_dict = r.setdefault('pcmd_dict',{})
+                    tags = merge_dicts(r['new_tags'],group_by)
+                    new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
+                                             tags = tags,
+                                             parents = input_nodes)
+                    new_nodes.append(new_node)
+                workflow.bulk_save_nodes(new_nodes)
+                workflow.run_wait(self.batch)
+            return self.batch 
     
     def one2one(self,input_batch,*args,**kwargs):
         if not self.batch.successful:
@@ -100,7 +113,8 @@ class Step():
                 validate_dict_has_keys(r,['pcmd'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
                 new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
-                                         tags = n.tags)
+                                         tags = n.tags,
+                                         parents = [n])
                 new_nodes.append(new_node)
             workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
@@ -119,7 +133,8 @@ class Step():
                 r = self.many2one_cmd(input_nodes=input_nodes,tags=tags,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
                 new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
-                                         tags = tags)
+                                         tags = tags,
+                                         parents = input_nodes)
                 new_nodes.append(new_node)
             workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
@@ -137,7 +152,8 @@ class Step():
                     pcmd_dict = r.setdefault('pcmd_dict',{})
                     new_tags = merge_dicts(n.tags, r['add_tags'])
                     new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
-                                             tags = new_tags)
+                                             tags = new_tags,
+                                             parents = [n])
                     new_nodes.append(new_node)
             workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)

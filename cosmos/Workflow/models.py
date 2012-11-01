@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField
 from cosmos import session
 from django.utils import timezone
-
+import networkx
 
 status_choices=(
                 ('successful','Successful'),
@@ -55,6 +55,11 @@ class Workflow(models.Model):
     def nodes(self):
         """Nodes in this Workflow"""
         return Node.objects.filter(batch__in=self.batch_set.all())
+    
+    @property
+    def edges(self):
+        """Edges in this Workflow"""
+        return NodeEdge.objects.filter(Q(parent__in=self.nodes)|Q(child__in=self.nodes))
     
     @property
     def wall_time(self):
@@ -296,38 +301,49 @@ class Workflow(models.Model):
             yield dicts
     
     @transaction.commit_on_success
-    def bulk_save_nodes(self,nodes_and_tags):
+    def bulk_save_nodes(self,data):
         """
         Does a bulk insert to speedup adding lots of nodes.  Will filter out any None values in the nodes_and_tags list.
         
-        :param nodes_and_tags: (list of (Node,dict,bool)) [(node1,tags1,node_exists),(node2,tags2,node_exists),...]
+        :param data: (list of {Node,dict,bool,parent_nodes)}) ie: [(node1,tags1,node_exists,parents),(node2,tags2,node_exists,parent_nodes),...]
         
-        >>> nodes = [(batch.add_node(name='1'pcmd='cmd1',save=False),{},True),(batch.add_node(name='2',pcmd='cmd2',save=False,{},True))]
+        >>> nodes = [(batch.add_node(name='1'pcmd='cmd1',save=False),{},True,[]),(batch.add_node(name='2',pcmd='cmd2',save=False,{},True,[]))]
         >>> batch.bulk_add_nodes(nodes)
         """
         ### Bulk add nodes
-        self.log.info("Bulk adding {0} nodes...".format(len(nodes_and_tags)))
-        nodes_and_tags = filter(lambda x: not x[2],nodes_and_tags)
-        nodes = map(lambda x: x[0],nodes_and_tags)
-        if len(nodes) == 0:
+        self.log.info("Bulk adding {0} nodes...".format(len(data)))
+        filtered_data = filter(lambda x: not x['node_exists'],data)
+        if len(filtered_data) == 0:
             return []
         
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
         m = Node.objects.all().aggregate(models.Max('id'))['id__max']
         id_start =  m + 1 if m else 1
-        for i,node in enumerate(nodes): node.id = id_start + i
+        for i,d in enumerate(filtered_data): d['node'].id = id_start + i
         
-        Node.objects.bulk_create(nodes)
+        Node.objects.bulk_create(map(lambda d: d['node'], filtered_data))
+        #create output directories
+        for n in map(lambda d: d['node'], filtered_data):
+            os.mkdir(n.output_dir)
+            os.mkdir(n.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
         
         ### Bulk add tags
-        tags = map(lambda x: x[1],nodes_and_tags)
         nodetags = []
-        for node,tags in zip(nodes,tags):
-            for k,v in tags.items():
-                nodetags.append(NodeTag(node=node,key=k,value=v))
+        for d in filtered_data:
+            for k,v in d['tags'].items():
+                nodetags.append(NodeTag(node=d['node'],key=k,value=v))
         self.log.info("Bulk adding {0} node tags...".format(len(nodetags)))
-        return NodeTag.objects.bulk_create(nodetags)
+        NodeTag.objects.bulk_create(nodetags)
         
+        ### Bulk add parents
+        node_edges = []
+        for  d in filtered_data:
+            for parent in d['parents']:
+                node_edges.append(NodeEdge(parent=parent,child=d['node'],tags=d['tags']))
+        self.log.info("Bulk adding {0} NodeEdges...".format(len(node_edges)))
+        NodeEdge.objects.bulk_create(node_edges)
+        
+        return
             
     def delete(self, *args, **kwargs):
         """
@@ -372,7 +388,7 @@ class Workflow(models.Model):
         
         jobAttempt = self.jobManager.add_jobAttempt(command=node.exec_command,
                                      drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
-                                     jobName=node.name,
+                                     jobName="",
                                      drmaa_native_specification=get_drmaa_ns(DRM=session.settings.DRM,
                                                                              mem_req=node.memory_requirement,
                                                                              cpu_req=node.cpu_requirement,
@@ -562,7 +578,15 @@ class Workflow(models.Model):
     @models.permalink    
     def url(self):
         return ('workflow_view',[str(self.id)])
-    
+
+class WorkflowDAG():
+    def __init__(self,workflow):
+        self.workflow = workflow
+    def __str__(self):
+        return 'wf dag'
+        
+
+
 class Batch(models.Model):
     """
     A group of jobs that can be run independently.  See `Embarassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_ .
@@ -685,7 +709,7 @@ class Batch(models.Model):
             if sja: 
                 yield [jru for jru in sja.resource_usage_short] + node.tags.items() #add in tags to resource usage tuples
         
-    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, save=True, mem_req=0, cpu_req=1, time_limit=None):
+    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, parents=[], save=True, mem_req=0, cpu_req=1, time_limit=None):
         """
         Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
         If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
@@ -696,6 +720,7 @@ class Batch(models.Model):
         :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
         :param tags: (dict) A dictionary keys and values to tag the node with.  These tags can later be used by methods such as :py:meth:`~Workflow.models.Batch.group_nodes_by` and :py:meth:`~Workflow.models.Batch.get_nodes_by` Optional.
         :param save: (bool) If False, will not save the node to the database.  Used in concert with :method:`Workflow.bulk_save_nodes`
+        :param parents: (list) A list of parent nodes that this node is dependent on.
         :param mem_req: (int) How much memory to reserve for this node in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this node. Optional.
         :param time_limit: (datetime.time) Not implemented.
@@ -704,16 +729,18 @@ class Batch(models.Model):
         """
         #validation
         
-        name = re.sub("\s","_",name) #user convenience
-        
-        if name == '' or name is None:
-            raise ValidationError('name cannot be blank')
+#        name = re.sub("\s","_",name) #user convenience
+#        
+#        if name == '' or name is None:
+#            raise ValidationError('name cannot be blank')
         if pcmd == '' or pcmd is None:
             raise ValidationError('pre_command cannot be blank')
         
         node_kwargs = {
                        'batch':self,
-                       'name':name,
+                       'name':None,
+                       'tags':tags,
+#                       'name':name,
                        'pre_command':pcmd,
                        'outputs':outputs,
                        'memory_requirement':mem_req,
@@ -723,9 +750,11 @@ class Batch(models.Model):
             
         
         
-        node_exists = Node.objects.filter(batch=self,name=name).count() > 0
+#        node_exists = Node.objects.filter(batch=self,name=name).count() > 0
+        node_exists = Node.objects.filter(batch=self,tags=tags).count() > 0
         if node_exists:
-            node = Node.objects.get(batch=self,name=name)
+#            node = Node.objects.get(batch=self,name=name)
+            node = Node.objects.get(batch=self,tags=tags)
         
         #delete if hard_reset
         if hard_reset:
@@ -740,7 +769,9 @@ class Batch(models.Model):
         if not node_exists:
             if save:
                 #Create and save a node
-                node = Node.objects.create(**node_kwargs)
+                node = Node.create(**node_kwargs)
+                for k,v in tags.items():
+                    NodeTag.objects.create(node=node,key=k,value=v)
                 self.log.info("Created {0} in {1}, and saved to the database.".format(node,self))
             else:
                 #Just instantiate a node
@@ -767,10 +798,10 @@ class Batch(models.Model):
 #                self.log.error("Loaded successful node {0} in unsuccessful batch {0} from history.".format(node,node.batch))
 
         if save:
-            node.tag(**tags)
+#            node.tag(**tags)
             return node
         else:
-            return node,tags,node_exists
+            return {'node':node,'tags':tags,'parents':parents,'node_exists':node_exists}
 
 
     def is_done(self):
@@ -875,6 +906,9 @@ class Batch(models.Model):
             
 
 class NodeTag(models.Model):
+    """
+    A SQL row that duplicates the information of Node.tags that can be used for filtering, etc.
+    """
     "A keyword/value object used to describe a node."
     node = models.ForeignKey('Node')
     key = models.CharField(max_length=63)
@@ -883,6 +917,16 @@ class NodeTag(models.Model):
     
     def __str__(self):
         return "NodeTag[self.id] {self.key}: {self.value} for Node[{node.id}]".format(self=self,node=self.node)
+
+class NodeEdge(models.Model):
+    parent = models.ForeignKey('Node',related_name='parent_edge_set')
+    child = models.ForeignKey('Node',related_name='child_edge_set')
+    tags = PickledObjectField(null=True,default={})
+    "The keys associated with the relationship.  ex, the group_by parameter of a many2one" 
+    
+    
+    def __str__(self):
+        return "{0.parent}->{0.child}".format(self)
 
 class Node(models.Model):
     """
@@ -900,6 +944,7 @@ class Node(models.Model):
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     outputs = PickledObjectField(null=True) #dictionary of outputs
     
+    tags = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
@@ -907,24 +952,34 @@ class Node(models.Model):
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
         super(Node,self).__init__(*args, **kwargs)
+    
+    @staticmethod
+    def create(*args,**kwargs):
+        node = Node.objects.create(*args,**kwargs)
         
-        validate_name(self.name)
-        if self.id is None:
-            if Node.objects.filter(batch=self,name=kwargs['name']).count() > 0:
-                raise ValidationError("Nodes belonging to a batch with the same name detected!".format(self.name))
-        if self.id is None: #creating for the first time
-            check_and_create_output_dir(self.output_dir) 
-            check_and_create_output_dir(self.job_output_dir)
+        if Node.objects.filter(batch=node.batch,tags=node.tags).count() > 1:
+            node.delete()
+            raise ValidationError("Nodes belonging to a batch with the same tags detected! tags: {0}".format(node.tags))
+        
+        check_and_create_output_dir(node.output_dir)
+        check_and_create_output_dir(node.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
+            
+        #Create node tags    
+        if type(node.tags) == dict:
+            for key,value in node.tags.items():
+                NodeTag.objects.create(node=node,key=key,value=value)
+                
+        return node
     
     @property
     def workflow(self):
         "This node's workflow"
         return self.batch.workflow
-    
+
     @property
-    def nodetags(self):
-        "Queryset of NodeTag Objects"
-        return NodeTag.objects.filter(node=self)
+    def parents(self):
+        "This node's parents"
+        return map(lambda n: n.parent, NodeEdge.objects.filter(child=self).all())
 
     @property
     def log(self):
@@ -939,7 +994,7 @@ class Node(models.Model):
     @property
     def output_dir(self):
         "Node output dir"
-        return os.path.join(self.batch.output_dir,self.name)
+        return os.path.join(self.batch.output_dir,str(self.id))
     
     @property
     def job_output_dir(self):
@@ -1002,27 +1057,37 @@ class Node(models.Model):
         self.save()
         
         if self.batch._are_all_nodes_done(): self.batch._has_finished()    
+ 
+#    def __tag(self,tags):
+#        """
+#        Tag this node with key value pairs.  Should only be called by Node.__init__
+#        
+#        :param tags: (dict) the node's tags
+#        """
+#        #TODO don't allow tags called things like 'status' or other node attributes
+#        for key,value in tags.items():
+#            NodeTag.objects.create(node=self,key=key,value=value)
         
-    def tag(self,**kwargs):
-        """
-        Tag this node with key value pairs.  If the key already exists, its value will be overwritten.
-        
-        >>> node.tag(color="blue",shape="circle")
-        """
-        #TODO don't allow tags called things like 'status' or other node attributes
-        for key,value in kwargs.items():
-            value = str(value)
-            nodetag, created = NodeTag.objects.get_or_create(node=self,key=key,defaults= {'value':value})
-            if not created:
-                nodetag.value = value
-            nodetag.save()
+#    def tag(self,**kwargs):
+#        """
+#        Tag this node with key value pairs.  If the key already exists, its value will be overwritten.
+#        
+#        >>> node.tag(color="blue",shape="circle")
+#        """
+#        #TODO don't allow tags called things like 'status' or other node attributes
+#        for key,value in kwargs.items():
+#            value = str(value)
+#            nodetag, created = NodeTag.objects.get_or_create(node=self,key=key,defaults= {'value':value})
+#            if not created:
+#                nodetag.value = value
+#            nodetag.save()
 
-    @property            
-    def tags(self):
-        """
-        The dictionary of this node's tags.
-        """
-        return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
+#    @property            
+#    def tags(self):
+#        """
+#        The dictionary of this node's tags.
+#        """
+#        return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
     
     @models.permalink    
     def url(self):
@@ -1043,7 +1108,7 @@ class Node(models.Model):
         super(Node, self).delete(*args, **kwargs)
     
     def __str__(self):
-        return 'Node[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
+        return 'Node[{0}] {1}'.format(self.id,self.tags)
 
 
 
