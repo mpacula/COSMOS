@@ -2,14 +2,12 @@ from django.shortcuts import render_to_response,render
 from django.template import RequestContext
 from models import Workflow, Batch, Node, NodeTag
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from Cosmos.helpers import groupby
+from cosmos.Cosmos.helpers import groupby
 from models import status_choices
 from django.utils.datastructures import SortedDict
-from django.http import HttpResponse
 import os
 from django.views.decorators.cache import never_cache
 from django.utils.safestring import mark_safe
-from django.template import Context, Template
 
 @never_cache
 def _get_batches_dict(workflow):

@@ -7,13 +7,13 @@ class Echo(Step):
         """
         :param strings: the items to echo, one item per node
         """
-        for text in strings: 
+        for i,text in enumerate(strings): 
             yield { 
                 'pcmd' : r"""
                             echo "{input}" > {{output_dir}}/{{outputs[txt]}}
                         """, 
                 'pcmd_dict': {'input':text},
-                'new_tags': {}
+                'new_tags': {'i':i}
             }
         
 class Paste(Step):

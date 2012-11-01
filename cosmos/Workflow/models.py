@@ -673,7 +673,7 @@ class Batch(models.Model):
     
     def get_all_tag_keywords_used(self):
         """Returns a set of all the keyword tags used on any node in this batch"""
-        return set([ d['key'] for d in NodeTag.objects.filter(node__in=self.nodes).values('key') ])
+        return map(lambda x: x['key'],NodeTag.objects.filter(node__in=self.nodes).values('key').distinct())
         
     def yield_node_resource_usage(self):
         """
