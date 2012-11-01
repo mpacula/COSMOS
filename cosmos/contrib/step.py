@@ -143,6 +143,14 @@ class Step():
             workflow.run_wait(self.batch)
         return self.batch
     
+    def none2many_cmd(self,*args,**kwargs):
+        """
+        The command to run
+        
+        :returns: {pcmd, pcmd_dict, new_tags}.  pcmd is required. pcmd_dict is a dictionary that pcmd will be .formated()ed with.  new_tags is required so that the node name stays unique.
+        """
+        raise NotImplementedError()
+    
     def one2one_cmd(self,input_node,*args,**kwargs):
         """
         The command to run
@@ -171,7 +179,7 @@ class Step():
         """
         The command to run
         
-        :yields: {pcmd, pcmd_dict, new_tags, name}.  pcmd is required. pcmd_dict is a dictionary that pcmd will be .formated()ed with. and new_tags is required so that the node name stays unique.
+        :yields: {pcmd, pcmd_dict, new_tags, name}.  pcmd is required. pcmd_dict is a dictionary that pcmd will be .formated()ed with. new_tags is required so that the node name stays unique.
         """
         raise NotImplementedError()
     

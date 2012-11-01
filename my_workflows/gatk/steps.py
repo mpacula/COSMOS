@@ -10,27 +10,27 @@ class BWA_Align(step.Step):
     mem_req = 3.5*1024
     cpu_req = 2 #4
     
-    def many2many_cmd(self,input_batch,data_dict):
+    def none2many_cmd(self,data_dict):
         """
         :para: input_batch: a place holder and is ignored
         :param data_dict: a list of fastq file dictionaries
         """
-        for file in data_dict:
+        for f in data_dict:
             yield {
                     'pcmd':r"""
                                {settings.bwa_path} aln -t {self.cpu_req} {settings.bwa_reference_fasta_path} {fastq_path} > {{output_dir}}/{{outputs[sai]}}
                             """,
-                    'pcmd_dict': {'fastq_path':file['path'] },
-                    'new_tags': {'sample':file['sample'],
-                                'lane': file['lane'],
-                                'fq_chunk': file['chunk'],
-                                'fq_pair': file['pair'],
-                                'fq_path': file['path'],
-                                'RG_ID':'%s.L%s' % (file['flowcell'],file['lane']),
-                                'RG_LIB': file['library'],
-                                'RG_PLATFORM': file['platform']
+                    'pcmd_dict': {'fastq_path':f['path'] },
+                    'new_tags': {'sample':f['sample'],
+                                'lane': f['lane'],
+                                'fq_chunk': f['chunk'],
+                                'fq_pair': f['pair'],
+                                'fq_path': f['path'],
+                                'RG_ID':'%s.L%s' % (f['flowcell'],f['lane']),
+                                'RG_LIB': f['library'],
+                                'RG_PLATFORM': f['platform']
                                 },
-                    'name' : step.dict2node_name({'sample':file['sample'],'lane':file['lane'],'fq_chunk':file['chunk'],'fq_pair':file['pair']})
+                    'name' : step.dict2node_name({'sample':f['sample'],'lane':f['lane'],'fq_chunk':f['chunk'],'fq_pair':f['pair']})
                 }
 
 
