@@ -30,7 +30,7 @@
 <h1>{{workflow}}
 	<a href="{% url 'workflow_view_log' workflow.id %}"><button class="btn btn-info"><i class="icon-search icon-white"></i> Log</button></a>
 	<a href="{% url 'workflow_analysis' workflow.id %}"><button class="btn btn-info"><i class="icon-wrench icon-white"></i> Analyze</button></a>
-    <a href="{% url 'workflow_dag' workflow.id %}"><button class="btn btn-info"><i class="icon-cog icon-white"></i> Visualize</button></a>
+    <a href="{% url 'workflow_visualize' workflow.id %}"><button class="btn btn-info"><i class="icon-cog icon-white"></i> Visualize</button></a>
 </h1>
 
 <dl class="dl-horizontal">
@@ -39,6 +39,7 @@
 <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
 <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
 <dt>Wall Time</dt><dd>{{workflow.wall_time}}</dd>
+<dt>Total Batch Wall Time</dt><dd>{{workflow.total_batch_wall_time}}</dd>
 </dl>
 
 <p><h3>Batches</h3>

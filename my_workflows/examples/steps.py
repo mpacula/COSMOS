@@ -3,7 +3,7 @@ from cosmos.contrib.step import Step
 class Echo(Step):
     outputs = {'txt':'out.txt'}
     
-    def none2many_cmd(self,input_batch=None,strings=[]):
+    def none2many_cmd(self,strings=[]):
         """
         :param strings: the items to echo, one item per node
         """
@@ -15,7 +15,15 @@ class Echo(Step):
                 'pcmd_dict': {'input':text},
                 'new_tags': {'i':i}
             }
-        
+class WordCount(Step):
+    outputs = {'txt','out.txt'}
+    
+    def one2one_cmd(self,input_node,flags=""):
+        return {
+                'pcmd': r"""wc {flags} "{input_node.output_paths[txt]}" > {{output_dir}}/{{outputs[txt]}} """,
+                'pcmd_dict': {},
+                }
+               
 class Paste(Step):
     outputs = {'txt':'out.txt'}
     

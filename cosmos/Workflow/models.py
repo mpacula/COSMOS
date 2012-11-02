@@ -8,7 +8,8 @@ from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField
 from cosmos import session
 from django.utils import timezone
-import networkx
+import networkx as nx
+import pygraphviz as pgv
 
 status_choices=(
                 ('successful','Successful'),
@@ -57,14 +58,21 @@ class Workflow(models.Model):
         return Node.objects.filter(batch__in=self.batch_set.all())
     
     @property
-    def edges(self):
+    def node_edges(self):
         """Edges in this Workflow"""
-        return NodeEdge.objects.filter(Q(parent__in=self.nodes)|Q(child__in=self.nodes))
+        return NodeEdge.objects.filter(parent__in=self.nodes)
     
     @property
     def wall_time(self):
         """Time between thisworkflowh's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
+    
+    @property
+    def total_batch_wall_time(self):
+        """
+        Sum(batch_wall_times).  Can be different from workflow.wall_time due to workflow stops and resumes.
+        """
+        return reduce(lambda x,y: x+y, [b.wall_time for b in self.batches ])
     
     @property
     def batches(self):
@@ -582,8 +590,29 @@ class Workflow(models.Model):
 class WorkflowDAG():
     def __init__(self,workflow):
         self.workflow = workflow
+        
+    def createAGraph(self):
+        G = pgv.AGraph(strict=False,directed=True)
+        G.add_edges_from([(ne.parent,ne.child) for ne in self.workflow.node_edges])
+        
+        for batch in self.workflow.batches:
+            sg = G.add_subgraph(name="cluster_{0}".format(batch.name),label=batch.name,color='lightgrey')
+            for n in batch.nodes:
+                sg.add_node(n,label=n.id)
+            #sg.set_attr()
+            
+            
+    
+        return G
+    
+    def as_img(self):        
+        g = self.createAGraph()
+        g.layout(prog="dot")
+        return g.draw(format="svg")
+        
     def __str__(self):
-        return 'wf dag'
+        return self.createAGraph().to_string()
+    
         
 
 
@@ -686,6 +715,11 @@ class Batch(models.Model):
         return Node.objects.filter(batch=self)
     
     @property
+    def node_edges(self):
+        """Edges in this Batch"""
+        return NodeEdge.objects.filter(parent__in=self.nodes)
+    
+    @property
     def num_nodes(self):
         "The number of nodes in this batch"
         return Node.objects.filter(batch=self).count()
@@ -720,7 +754,7 @@ class Batch(models.Model):
         :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
         :param tags: (dict) A dictionary keys and values to tag the node with.  These tags can later be used by methods such as :py:meth:`~Workflow.models.Batch.group_nodes_by` and :py:meth:`~Workflow.models.Batch.get_nodes_by` Optional.
         :param save: (bool) If False, will not save the node to the database.  Used in concert with :method:`Workflow.bulk_save_nodes`
-        :param parents: (list) A list of parent nodes that this node is dependent on.
+        :param parents: (list) A list of parent nodes that this node is dependent on.  This is optional and only used by the DAG functionality.
         :param mem_req: (int) How much memory to reserve for this node in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this node. Optional.
         :param time_limit: (datetime.time) Not implemented.
@@ -747,7 +781,6 @@ class Batch(models.Model):
                        'cpu_requirement':cpu_req,
                        'time_limit':time_limit
                        }
-            
         
         
 #        node_exists = Node.objects.filter(batch=self,name=name).count() > 0
@@ -772,6 +805,8 @@ class Batch(models.Model):
                 node = Node.create(**node_kwargs)
                 for k,v in tags.items():
                     NodeTag.objects.create(node=node,key=k,value=v)
+                for n in parents:
+                    NodeEdge.objects.create(parent=n,child=node,tags=tags) #TODO think about what a NodeEdge tag is
                 self.log.info("Created {0} in {1}, and saved to the database.".format(node,self))
             else:
                 #Just instantiate a node

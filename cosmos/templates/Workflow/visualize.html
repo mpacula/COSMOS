@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load url from future %}
+{% load extras %}
+
+{% block head %}
+{% endblock %}
+{%block content%}
+
+{{workflowDAG.digraph.nodes}}
+<hr>
+{{workflowDAG.digraph.edges}}
+<hr>
+<img src="{% url 'visualize_as_img' workflowDAG.workflow.id %}">
+<pre>
+{{workflowDAG}}
+</pre>
+<hr>
+    
+{% url 'visualize_as_img' workflowDAG.workflow.id %}
+{%endblock%}

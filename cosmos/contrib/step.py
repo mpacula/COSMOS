@@ -4,6 +4,9 @@ workflow = None
 settings = {}
 
 def merge_dicts(x,y):
+    """
+    Merges two dictionaries.  On duplicate keys, y's dictionary takes precedence.
+    """
     for k,v in y.items(): x[k]=v
     return x
 
@@ -76,7 +79,7 @@ class Step():
                 #Set defaults
                 validate_dict_has_keys(r,['pcmd','new_tags'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=r['new_tags']),
+                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=r['new_tags']),
                                          tags = r['new_tags'],
                                          parents = [])
                 new_nodes.append(new_node)
@@ -97,7 +100,7 @@ class Step():
                     validate_dict_has_keys(r,['pcmd','new_tags'])
                     pcmd_dict = r.setdefault('pcmd_dict',{})
                     tags = merge_dicts(r['new_tags'],group_by)
-                    new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
+                    new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=tags),
                                              tags = tags,
                                              parents = input_nodes)
                     new_nodes.append(new_node)
@@ -112,7 +115,7 @@ class Step():
                 r = self.one2one_cmd(input_node=n,*args,**kwargs)
                 validate_dict_has_keys(r,['pcmd'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
+                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),input_node=n,tags=n.tags),
                                          tags = n.tags,
                                          parents = [n])
                 new_nodes.append(new_node)
@@ -120,7 +123,7 @@ class Step():
             workflow.run_wait(self.batch)
         return self.batch
     
-    def many2one(self,input_batch,group_by=[],*args,**kwargs):
+    def many2one(self,input_batch,group_by,*args,**kwargs):
         """
         
         :param group_by: a list of tag keywords with which to parallelize input by.  see the keys parameter in :func:`Workflow.models.Workflow.group_nodes_by`.  An empty list will simply place all nodes in the batch into one group.
@@ -132,7 +135,7 @@ class Step():
             for tags,input_nodes in input_batch.group_nodes_by(keys=group_by):
                 r = self.many2one_cmd(input_nodes=input_nodes,tags=tags,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
+                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=tags),
                                          tags = tags,
                                          parents = input_nodes)
                 new_nodes.append(new_node)
@@ -151,7 +154,7 @@ class Step():
                     validate_dict_has_keys(r,['pcmd','add_tags'])
                     pcmd_dict = r.setdefault('pcmd_dict',{})
                     new_tags = merge_dicts(n.tags, r['add_tags'])
-                    new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
+                    new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),input_node=n,tags=n.tags),
                                              tags = new_tags,
                                              parents = [n])
                     new_nodes.append(new_node)

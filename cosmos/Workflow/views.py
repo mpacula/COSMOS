@@ -1,5 +1,6 @@
 from django.shortcuts import render_to_response,render
 from django.template import RequestContext
+from django.http import HttpResponse
 from cosmos.Workflow.models import Workflow, Batch, Node, NodeTag, WorkflowDAG
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from cosmos.Cosmos.helpers import groupby
@@ -122,6 +123,12 @@ def view_log(request,pid):
 def visualize(request,pid):
     workflow = Workflow.objects.get(pk=pid)
     return render_to_response('Workflow/visualize.html', { 'request':request,'workflowDAG': WorkflowDAG(workflow) }, context_instance=RequestContext(request))
+
+def visualize_as_img(request,pid):
+    workflow = Workflow.objects.get(pk=pid)
+    image_data = WorkflowDAG(workflow).as_img()
+    return HttpResponse(image_data, mimetype="image/svg+xml")
+
 
 @never_cache
 def analysis(request,pid):
