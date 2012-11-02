@@ -1,14 +1,21 @@
 from cosmos.Cosmos.helpers import parse_cmd
+from django.core.exceptions import ValidationError
 
 workflow = None
-settings = {}
 
 def merge_dicts(x,y):
     """
     Merges two dictionaries.  On duplicate keys, y's dictionary takes precedence.
     """
+    x = x.copy()
     for k,v in y.items(): x[k]=v
     return x
+
+def merge_mdicts(l):
+    """
+    Merges a list of dictionaries.  Right most keys take precedence
+    """
+    return reduce(merge_dicts,l)
 
 def dict2node_name(d):
     s = ' '.join([ '{0}-{1}'.format(k,v) for k,v in d.items() ])
@@ -51,8 +58,7 @@ class Step():
         'shortcut to combine with dict with kwargs and extra_parse_cmd_dict'
         #TODO throw an error if there are key conflicts
         d = merge_dicts(kwargs,dictnry)
-        d['settings'] = settings
-        d['self'] = self
+        if self not in d: d['self'] = self
         return parse_cmd(string,**d)
     
     
@@ -87,7 +93,7 @@ class Step():
             workflow.run_wait(self.batch)
         return self.batch 
     
-    def many2many(self,input_batch,group_by,*args,**kwargs):
+    def many2many(self,input_batch=None,input_batches=None,group_by,*args,**kwargs):
         """
         Used when the parallelization is complex enough that the command should specify it.  The func:`self.many2many_cmd` will be passed
         the entire input_batch rather than any nodes.
@@ -108,16 +114,35 @@ class Step():
                 workflow.run_wait(self.batch)
             return self.batch 
     
-    def one2one(self,input_batch,*args,**kwargs):
+    def one2one(self,input_batch=None,input_batches=None,*args,**kwargs):
+        """
+        :param input_batch: The input batch.  Required if input_batches is not set.  Do not set both input_batch and input_batches.
+        :param input_batches: A list of input batches.  Will iterate using the first batch the list, and pass a list of input_nodes all with the same tags to the one2one_cmd.  Optional.
+        """
+        #Validation
+        if input_batch == input_batches:
+            raise ValidationError('The parameter input_batch or input_batches is required.  Both cannot be used.')
         if not self.batch.successful:
             new_nodes = []
-            for n in input_batch.nodes:
-                r = self.one2one_cmd(input_node=n,*args,**kwargs)
+            multi_input = input_batches is not None
+            primary_input_batch = input_batches[0] if multi_input else input_batch
+            for n in primary_input_batch.nodes:
+                if multi_input:
+                    input_nodes = [ b.get_node_by(n.tags) for b in input_batches ]
+                    r = self.one2one_cmd(input_nodes=input_nodes,*args,**kwargs)
+                    pcmd_dict = {'pcmd_dict':r.setdefault('pcmd_dict',{})}
+                    pcmd_dict = merge_dicts({'input_nodes':input_nodes},pcmd_dict)
+                    parents = input_nodes
+                else:
+                    r = self.one2one_cmd(input_node=n,*args,**kwargs)
+                    pcmd_dict = {'pcmd_dict':r.setdefault('pcmd_dict',{})}
+                    pcmd_dict = merge_dicts({'input_node':n},pcmd_dict)
+                    parents = [n]
+                    
                 validate_dict_has_keys(r,['pcmd'])
-                pcmd_dict = r.setdefault('pcmd_dict',{})
-                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),input_node=n,tags=n.tags),
+                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=n.tags),
                                          tags = n.tags,
-                                         parents = [n])
+                                         parents = parents)
                 new_nodes.append(new_node)
             workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)

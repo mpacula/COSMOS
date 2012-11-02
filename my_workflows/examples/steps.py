@@ -16,26 +16,26 @@ class Echo(Step):
                 'new_tags': {'i':i}
             }
 class WordCount(Step):
-    outputs = {'txt','out.txt'}
+    outputs = {'txt':'out.txt'}
     
     def one2one_cmd(self,input_node,flags=""):
         return {
-                'pcmd': r"""wc {flags} "{input_node.output_paths[txt]}" > {{output_dir}}/{{outputs[txt]}} """,
-                'pcmd_dict': {},
+                'pcmd': r"""wc {flags} "{input_node.output_paths[txt]}" |cut -f1 -d" "> {{output_dir}}/{{outputs[txt]}} """,
                 }
                
 class Paste(Step):
     outputs = {'txt':'out.txt'}
     
-    def one2one_cmd(self,input_node):
+    def one2one_cmd(self,input_nodes):
         """
         Paste the input file with itself
+        
+        :param input_nodes: two input nodes to paste together
         """
         return {
                 'pcmd': r"""
-                            paste {input} {input} > {{output_dir}}/{{outputs[txt]}}
+                            paste {input_nodes[0].output_paths[txt]} {input_nodes[1].output_paths[txt]} > {{output_dir}}/{{outputs[txt]}}
                         """,
-                'pcmd_dict': {'input':input_node.output_paths['txt']}
                 }
     
 class Cat(Step):

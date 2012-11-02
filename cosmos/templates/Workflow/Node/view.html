@@ -15,8 +15,11 @@
         {%if node.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
         {{node}}
     </h1>
+<strong>Tags</strong>: 
+{% for k,v in node.tags.items %}
+<span class="label label-important">{{k}}:{{v}}</span>
+{% endfor %}
 </div>
-
 <dl class="dl-horizontal">
 <dt>Status</dt><dd>{{node.status}}</dd>
 <dt>Memory Requirement</dt><dd>{{node.memory_requirement}}</dd>
@@ -27,9 +30,12 @@
 <dt>Finished On</dt><dd>{{node.finished_on}}</dd>
 <dt>Pre Command</dt><dd><pre class="pre-scrollable">{{node.pre_command}}</pre></dd>
 <dt>Output Directory</dt><dd><code>{{node.output_dir}}</code></dd>
-{% for k,v in node.tags.items %}
-<dt>Tag: {{k}}</dt><dd>{{v}}</dd>
-{% endfor %}
+<dt>Outputs<strong></strong></dt>
+{% for key,val in node.output_paths.items %}
+<dd><em>{{key}}</em>: <a href="{% url jobAttempt_output node.get_successful_jobAttempt.id key%}"><code>{{val}}</code></a></dd>
+{% empty %}
+<dd>None</dd>
+{%endfor%}
 </dl>
 
 <h3>JobAttempts</h3>

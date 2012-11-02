@@ -63,6 +63,11 @@ class Workflow(models.Model):
         return NodeEdge.objects.filter(parent__in=self.nodes)
     
     @property
+    def node_tags(self):
+        """NodeTags in this Workflow"""
+        return NodeTag.objects.filter(node__in=self.nodes)
+    
+    @property
     def wall_time(self):
         """Time between thisworkflowh's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
@@ -598,17 +603,18 @@ class WorkflowDAG():
         for batch in self.workflow.batches:
             sg = G.add_subgraph(name="cluster_{0}".format(batch.name),label=batch.name,color='lightgrey')
             for n in batch.nodes:
-                sg.add_node(n,label=n.id)
+                sg.add_node(n,label=n.id,URL=n.url())
             #sg.set_attr()
             
             
     
         return G
     
-    def as_img(self):        
+    
+    def as_img(self,format="svg"):        
         g = self.createAGraph()
         g.layout(prog="dot")
-        return g.draw(format="svg")
+        return g.draw(format=format)
         
     def __str__(self):
         return self.createAGraph().to_string()
@@ -718,6 +724,11 @@ class Batch(models.Model):
     def node_edges(self):
         """Edges in this Batch"""
         return NodeEdge.objects.filter(parent__in=self.nodes)
+    
+    @property
+    def node_tags(self):
+        """NodeTags in this Batch"""
+        return NodeTag.objects.filter(node__in=self.nodes)
     
     @property
     def num_nodes(self):
@@ -926,6 +937,10 @@ class Batch(models.Model):
             os.system('rm -rf {0}'.format(self.output_dir))
         self.log.info('Bulk deleting JobAttempts...')
         JobAttempt.objects.filter(node_set__in = self.nodes).delete()
+        self.log.info('Bulk deleting NodeTags...')
+        self.node_tags.delete()
+        self.log.info('Bulk deleting NodeEdges...')
+        self.node_edges.delete()
         self.log.info('Bulk deleting Nodes...')
         self.nodes.delete()
         super(Batch, self).delete(*args, **kwargs)
@@ -1015,6 +1030,14 @@ class Node(models.Model):
     def parents(self):
         "This node's parents"
         return map(lambda n: n.parent, NodeEdge.objects.filter(child=self).all())
+
+    @property
+    def node_edges(self):
+        return NodeEdge.objects.filter(Q(parent=self)|Q(child=self))
+    
+    @property
+    def node_tags(self):
+        return NodeTag.objects.filter(node=self)
 
     @property
     def log(self):
@@ -1137,7 +1160,8 @@ class Node(models.Model):
         self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
         #todo delete stuff in output_paths that may be extra files
         for ja in self._jobAttempts.all(): ja.delete()
-        self.nodetags.delete()
+        self.node_tags.delete()
+        self.node_edges.delete
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         super(Node, self).delete(*args, **kwargs)

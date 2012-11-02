@@ -10,7 +10,7 @@
 <hr>
 {{workflowDAG.digraph.edges}}
 <hr>
-<img src="{% url 'visualize_as_img' workflowDAG.workflow.id %}">
+<embed src="{% url 'visualize_as_img' workflowDAG.workflow.id %}" type="image/svg+xml"></embed>
 <pre>
 {{workflowDAG}}
 </pre>
