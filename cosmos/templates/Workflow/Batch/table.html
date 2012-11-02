@@ -30,7 +30,7 @@
         <tr onclick="window.location.href = '{{batch.url}}';" style="cursor:pointer">
             <td>{{batch.order_in_workflow}}.</td>
             <td>[{{batch.id}}] <a href="{{batch.url}}"><strong>{{batch.name|underscore2space}}</strong></a></td>
-            <td>{{batch.get_all_tag_keywords_used|join:', '}}</td>
+            <td>{{batch2.get_all_tag_keywords_used|join:', '}}</td>
             <td>
                 {%with status=batch.status %}
                     {%if status == "successful"%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}

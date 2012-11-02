@@ -11,11 +11,22 @@ def merge_dicts(x,y):
     for k,v in y.items(): x[k]=v
     return x
 
-def merge_mdicts(l):
+def merge_mdicts(*args):
     """
-    Merges a list of dictionaries.  Right most keys take precedence
+    Merges dictionaries in *args.  Right most keys take precedence
     """
-    return reduce(merge_dicts,l)
+    return reduce(merge_dicts,args)
+
+
+def _unnest(self,a_list):
+    """
+    unnests a list
+    
+    .. example::
+    >>> _unnest([1,2,[3,4],[5]])
+    [1,2,3,4,5]
+    """
+    return [ item for items in a_list for item in items ]
 
 def dict2node_name(d):
     s = ' '.join([ '{0}-{1}'.format(k,v) for k,v in d.items() ])
@@ -63,129 +74,132 @@ class Step():
     
     
     
-    def add_node(self,pcmd,tags,parents):
+    def add_node(self,pcmd,pcmd_dict,tags,parents):
         """adds a node"""
-        return self.batch.add_node(name = dict2node_name(tags),
-                                    pcmd = pcmd,
+        return self.batch.add_node(name = '',
+                                   pcmd = self._parse_cmd2(pcmd,pcmd_dict,tags=tags),
                                     tags = tags,
-                                    parents = parents,
                                     save = False,
+                                    parents = parents,
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
         
-    def __x2many(self,*args,**kwargs):
-        """proxy for none2many and many2many"""
+    def __x2x(self,input_batches, input_type, output_type,group_by=None,*args,**kwargs):
+        """
+        proxy for all algorithms
         
-    def none2many(self,*args,**kwargs):
-        """Basically a many2many, without the input_batch"""
+        :param input_type: 'many' or 'one' or 'none'
+        :param ouput_type: 'many' or 'one'
+        """
+        if input_batches == None: input_batch_type = 'none'
+        elif len(input_batches) == 1: input_batch_type = 'one'
+        elif len(input_batches) == 2: input_batch_type = 'many'
+         
         if not self.batch.successful:
             new_nodes = []
-            for r in self.none2many_cmd(*args,**kwargs):
-                #Set defaults
-                validate_dict_has_keys(r,['pcmd','new_tags'])
-                pcmd_dict = r.setdefault('pcmd_dict',{})
-                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=r['new_tags']),
-                                         tags = r['new_tags'],
-                                         parents = [])
-                new_nodes.append(new_node)
+            
+            #submit to cmd
+            if output_type == 'many':
+                if input_type == 'none':
+                    gnrtr = self.none2many_cmd(*args,**kwargs)
+                    for r in gnrtr:
+                        validate_dict_has_keys(r,['pcmd','new_tags'])
+                        new_node = self.add_node(pcmd = r['pcmd'],
+                                                 pcmd_dict = merge_dicts(kwargs,r.setdefault('pcmd_dict',{})),
+                                                 tags = r['new_tags'],
+                                                 parents = [])
+                        new_nodes.append(new_node)
+                        
+                elif input_type == 'one':
+                    gnrtr = self.one2many_cmd(input_batches[0],*args,**kwargs)
+                    for r in gnrtr:
+                        validate_dict_has_keys(r,['pcmd','add_tags'])
+                        new_node = self.add_node(pcmd = r['pcmd'],
+                                                 pcmd_dict = merge_dicts(kwargs,r.setdefault('pcmd_dict',{})),
+                                                 tags = r['add_tags'],
+                                                 parents = input_batches[0])
+                        new_nodes.append(new_node)
+                        
+                elif input_type == 'many':
+                    pass
+                
+            elif output_type == 'one':
+                if input_type == 'one':
+                    for n in input_batches[0].nodes:
+                        r = self.one2one_cmd(input_node=n,*args,**kwargs)
+                        validate_dict_has_keys(r,['pcmd'])
+                        new_node = self.add_node(pcmd = r['pcmd'],
+                                                 pcmd_dict = merge_mdicts(kwargs,{'input_node':n},r.setdefault('pcmd_dict',{})),
+                                                 tags = n.tags,
+                                                 parents = [n])
+                        new_nodes.append(new_node)
+                elif input_type == 'many':
+                    for input_nodes,tags in input_batches[0].group_nodes_by(group_by):
+                        gnrtr = self.many2one_cmd(input_nodes,tags,*args,**kwargs)
+                        for r in gnrtr:
+                            validate_dict_has_keys(r,['pcmd'])
+                            new_node = self.add_node(pcmd = r['pcmd'],
+                                                     pcmd_dict = merge_mdicts(kwargs,{'tags':tags},r.setdefault('pcmd_dict',{})),
+                                                     tags = tags,
+                                                     parents = [input_nodes])
+                            new_nodes.append(new_node)
+            
             workflow.bulk_save_nodes(new_nodes)
             workflow.run_wait(self.batch)
         return self.batch 
+        
+    def none2many(self,*args,**kwargs):
+        """Basically a many2many, without the input_batch"""
+        return self.__x2x(input_batches=None,input_type='none',output_type='many',*args,**kwargs)
     
-    def many2many(self,input_batch=None,input_batches=None,group_by,*args,**kwargs):
+    def many2many(self,input_batch=None,input_batches=None,group_by=None,*args,**kwargs):
         """
         Used when the parallelization is complex enough that the command should specify it.  The func:`self.many2many_cmd` will be passed
         the entire input_batch rather than any nodes.
+        
+        :param group_by: Required.
         """
-        if not self.batch.successful:
-            new_nodes = []
-            for tags,input_nodes in input_batch.group_nodes_by(keys=group_by):
-                for r in self.many2many_cmd(input_nodes=input_nodes,tags=group_by,*args,**kwargs):
-                    #Set defaults
-                    validate_dict_has_keys(r,['pcmd','new_tags'])
-                    pcmd_dict = r.setdefault('pcmd_dict',{})
-                    tags = merge_dicts(r['new_tags'],group_by)
-                    new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=tags),
-                                             tags = tags,
-                                             parents = input_nodes)
-                    new_nodes.append(new_node)
-                workflow.bulk_save_nodes(new_nodes)
-                workflow.run_wait(self.batch)
-            return self.batch 
+        if input_batch == input_batches:
+            raise ValidationError('The parameter input_batch or input_batches is required.  Both cannot be used.')
+        
+        input_batches = input_batches if input_batches else [input_batch]
+        return self.__x2x(input_batches=input_batches,group_by=group_by,input_type='many',output_type='many',*args,**kwargs)
+        
     
     def one2one(self,input_batch=None,input_batches=None,*args,**kwargs):
         """
         :param input_batch: The input batch.  Required if input_batches is not set.  Do not set both input_batch and input_batches.
         :param input_batches: A list of input batches.  Will iterate using the first batch the list, and pass a list of input_nodes all with the same tags to the one2one_cmd.  Optional.
         """
-        #Validation
         if input_batch == input_batches:
             raise ValidationError('The parameter input_batch or input_batches is required.  Both cannot be used.')
-        if not self.batch.successful:
-            new_nodes = []
-            multi_input = input_batches is not None
-            primary_input_batch = input_batches[0] if multi_input else input_batch
-            for n in primary_input_batch.nodes:
-                if multi_input:
-                    input_nodes = [ b.get_node_by(n.tags) for b in input_batches ]
-                    r = self.one2one_cmd(input_nodes=input_nodes,*args,**kwargs)
-                    pcmd_dict = {'pcmd_dict':r.setdefault('pcmd_dict',{})}
-                    pcmd_dict = merge_dicts({'input_nodes':input_nodes},pcmd_dict)
-                    parents = input_nodes
-                else:
-                    r = self.one2one_cmd(input_node=n,*args,**kwargs)
-                    pcmd_dict = {'pcmd_dict':r.setdefault('pcmd_dict',{})}
-                    pcmd_dict = merge_dicts({'input_node':n},pcmd_dict)
-                    parents = [n]
-                    
-                validate_dict_has_keys(r,['pcmd'])
-                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=n.tags),
-                                         tags = n.tags,
-                                         parents = parents)
-                new_nodes.append(new_node)
-            workflow.bulk_save_nodes(new_nodes)
-            workflow.run_wait(self.batch)
-        return self.batch
+        
+        input_batches = input_batches if input_batches else [input_batch]
+        return self.__x2x(input_batches=input_batches,input_type='one',output_type='one',*args,**kwargs)
     
-    def many2one(self,input_batch,group_by,*args,**kwargs):
+    def many2one(self,input_batch=None,input_batches=None,group_by=None,*args,**kwargs):
         """
         
         :param group_by: a list of tag keywords with which to parallelize input by.  see the keys parameter in :func:`Workflow.models.Workflow.group_nodes_by`.  An empty list will simply place all nodes in the batch into one group.
         
         """
-        #TODO make sure there are no name conflicts in kwargs and 'input_batch' and 'group_by'
-        if not self.batch.successful:
-            new_nodes = []
-            for tags,input_nodes in input_batch.group_nodes_by(keys=group_by):
-                r = self.many2one_cmd(input_nodes=input_nodes,tags=tags,*args,**kwargs)
-                pcmd_dict = r.setdefault('pcmd_dict',{})
-                new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),tags=tags),
-                                         tags = tags,
-                                         parents = input_nodes)
-                new_nodes.append(new_node)
-            workflow.bulk_save_nodes(new_nodes)
-            workflow.run_wait(self.batch)
-        return self.batch
+        if input_batch == input_batches:
+            raise ValidationError('The parameter input_batch or input_batches is required.  Both cannot be used.')
+        
+        input_batches = input_batches if input_batches else [input_batch]
+        return self.__x2x(input_batches=input_batches,group_by=group_by,input_type='many',output_type='one',*args,**kwargs)
     
-    def one2many(self,input_batch,*args,**kwargs):
+    
+    def one2many(self,input_batch=None,input_batches=None,*args,**kwargs):
         """
         Used when one input node becomes multiple output nodes
         """
-        if not self.batch.successful:
-            new_nodes = []
-            for n in input_batch.nodes:
-                for r in self.one2many_cmd(input_node=n,*args,**kwargs):
-                    validate_dict_has_keys(r,['pcmd','add_tags'])
-                    pcmd_dict = r.setdefault('pcmd_dict',{})
-                    new_tags = merge_dicts(n.tags, r['add_tags'])
-                    new_node = self.add_node(pcmd = self._parse_cmd2(r['pcmd'],merge_dicts(kwargs,pcmd_dict),input_node=n,tags=n.tags),
-                                             tags = new_tags,
-                                             parents = [n])
-                    new_nodes.append(new_node)
-            workflow.bulk_save_nodes(new_nodes)
-            workflow.run_wait(self.batch)
-        return self.batch
+        if input_batch == input_batches:
+            raise ValidationError('The parameter input_batch or input_batches is required.  Both cannot be used.')
+        
+        input_batches = input_batches if input_batches else [input_batch]
+        return self.__x2x(input_batches=input_batches,input_type='one',output_type='one',*args,**kwargs)
     
     def none2many_cmd(self,*args,**kwargs):
         """

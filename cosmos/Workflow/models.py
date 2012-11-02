@@ -350,10 +350,10 @@ class Workflow(models.Model):
         
         ### Bulk add parents
         node_edges = []
-        for  d in filtered_data:
+        for d in filtered_data:
             for parent in d['parents']:
                 node_edges.append(NodeEdge(parent=parent,child=d['node'],tags=d['tags']))
-        self.log.info("Bulk adding {0} NodeEdges...".format(len(node_edges)))
+        self.log.info("Bulk adding {0} node edges...".format(len(node_edges)))
         NodeEdge.objects.bulk_create(node_edges)
         
         return
