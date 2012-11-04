@@ -28,13 +28,13 @@ class WordCount(Step):
 class Paste(Step):
     outputs = {'txt':'out.txt'}
     
-    def multi_one2one_cmd(self,input_nodes_dict):
+    def multi_one2one_cmd(self,input_node_dict):
         """
         Paste the input file with itself
         
         :param input_nodes: two input nodes to paste together
         """
-        inputs = ' '.join([ n.output_paths['txt'] for n in input_nodes_dict.values() ])
+        inputs = ' '.join([ n.output_paths['txt'] for n in input_node_dict.values() ])
         return {
                 'pcmd': r"""
                             paste {inputs} > {{output_dir}}/{{outputs[txt]}}

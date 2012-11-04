@@ -3,7 +3,7 @@ from cosmos.contrib import step
 import settings
 from settings import get_Picard_cmd, get_GATK_cmd
 
-step.settings = settings
+step.default_pcmd_dict = {'settings':settings }
 
 class BWA_Align(step.Step):
     outputs = {'sai':'aln.sai'}
@@ -21,7 +21,7 @@ class BWA_Align(step.Step):
                                {settings.bwa_path} aln -t {self.cpu_req} {settings.bwa_reference_fasta_path} {fastq_path} > {{output_dir}}/{{outputs[sai]}}
                             """,
                     'pcmd_dict': {'fastq_path':f['path'] },
-                    'new_tags': {'sample':f['sample'],
+                    'add_tags': {'sample':f['sample'],
                                 'lane': f['lane'],
                                 'fq_chunk': f['chunk'],
                                 'fq_pair': f['pair'],
@@ -74,7 +74,6 @@ class CleanSam(step.Step):
         }
 
 class MergeSamFiles(step.Step):
-    "Merges and Sorts"
     outputs = {'bam':'merged.bam'}
     mem_req = 3*1024
     
@@ -131,35 +130,23 @@ class RealignerTargetCreator(step.Step):
     outputs = {'targetIntervals':'target.intervals'}
     mem_req = 2.5*1024
     cpu_req = 1
-        
-    pcmd = r"""
-                {GATK_cmd} \
-                -T RealignerTargetCreator \
-                -R {settings.reference_fasta_path} \
-                -o {{output_dir}}/{{outputs[targetIntervals]}} \
-                --known {settings.indels_1000g_phase1_path} \
-                --known {settings.mills_path} \
-                -nt {self.cpu_req} \
-                -L {interval} 
-            """
-    
-#    def many2many_cmd(self,input_batch=None,intervals):
-#        """
-#        Used to generate the knowns only interval list.  Just ignore the input_batch.
-#        """
-#        for interval in intervals:
-#        yield {
-#            'pcmd': self.pcmd,
-#            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req)},
-#            'new_tags': {'mode':'KNOWNS_ONLY'}
-#         }    
-    
-    def one2many_cmd(self,input_node,intervals):
+
+    def multi_one2many_cmd(self,input_node_dict,intervals):
         for interval in intervals:
             yield {
-                'pcmd': self.pcmd.strip() + r""" \
-                                                -I {input_node.output_paths[bam]}""",
+                'pcmd': r"""
+                    {GATK_cmd} \
+                    -T RealignerTargetCreator \
+                    -R {settings.reference_fasta_path} \
+                    -I {input_bam}
+                    -o {{output_dir}}/{{outputs[targetIntervals]}} \
+                    --known {settings.indels_1000g_phase1_path} \
+                    --known {settings.mills_path} \
+                    -nt {self.cpu_req} \
+                    -L {interval}
+                """,
                 'pcmd_dict':{'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                             'input_bam': input_node_dict['MarkDuplicates'].output_paths['bam'],
                              'interval':interval},
                 'add_tags':{'interval':interval}
             }
@@ -169,7 +156,8 @@ class IndelRealigner(step.Step):
     mem_req = 2.5*1024
     cpu_req = 1 #-nt is not supported by this tool
     
-    def one2many_cmd(self,input_node,rtc_batch,intervals,model='USE_READS'):
+    def multi_one2one_cmd(self,input_node_dict,model='USE_READS'):
+        
         """
         Expects rtc_batch to have been split by the same intervals.
         
@@ -178,34 +166,27 @@ class IndelRealigner(step.Step):
         :param model: USE_READS or KNOWNS_ONLY
         """
         if model == 'KNOWNS_ONLY':
-            targetIntervals = rtc_batch.nodes[0].output_paths['intervals']
+            raise NotImplementedError()
             
-        for interval in intervals:
-            if model == 'USE_READS':
-                search_tags = input_node.tags
-                search_tags['interval'] = interval
-                rtc_node = rtc_batch.get_node_by(tags=search_tags)
-                targetIntervals = rtc_node.output_paths['targetIntervals']
-                
-            yield {
-                'pcmd': r"""
-                            {GATK_cmd} \
-                            -T IndelRealigner \
-                            -R {settings.reference_fasta_path} \
-                            -I {input_node.output_paths[bam]} \
-                            -o {{output_dir}}/{{outputs[bam]}} \
-                            -targetIntervals {targetIntervals} \
-                            -known {settings.indels_1000g_phase1_path} \
-                            -known {settings.mills_path} \
-                            -model {model} \
-                            -L {interval}
-                        """,
-                'pcmd_dict':{'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
-                             'model':model,
-                             'targetIntervals':targetIntervals,
-                             'interval':interval},
-                'add_tags': {'interval':interval}
-            }
+        return {
+            'pcmd': r"""
+                        {GATK_cmd} \
+                        -T IndelRealigner \
+                        -R {settings.reference_fasta_path} \
+                        -I {input_bam} \
+                        -o {{output_dir}}/{{outputs[bam]}} \
+                        -targetIntervals {targetIntervals} \
+                        -known {settings.indels_1000g_phase1_path} \
+                        -known {settings.mills_path} \
+                        -model {model} \
+                        -L {interval}
+                    """,
+            'pcmd_dict':{'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
+                         'model':model,
+                         'input_bam': input_node_dict['MarkDuplicates'].output_paths['bam'],
+                         'targetIntervals':input_node_dict['RealignerTargetCreator'].output_paths['targetIntervals'],
+                         'interval':input_node_dict['RealignerTargetCreator'].tags['interval']}
+        }
 
 class BaseQualityScoreRecalibration(step.Step):
     outputs = {'recal':'bqsr.recal'}
@@ -245,35 +226,27 @@ class PrintReads(step.Step):
         {GATK_cmd} \
         -T PrintReads \
         -R {settings.reference_fasta_path} \
-        -I {INPUTs} \
+        {INPUTs} \
         -o {{output_dir}}/{{outputs[bam]}}  \
         -BQSR {recal_file}
     """
     
-    def many2one_cmd(self,input_nodes,tags,bqsr_batch):
-        INPUTs = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_nodes ])
-        bqsr_node = bqsr_batch.get_node_by(tags)
+    def multi_many2one_cmd(self,input_nodes_dict):
+        INPUTs = ' '.join([ '-I {0}'.format(n.output_paths['bam']) for n in input_nodes_dict['IndelRealigner']])
         return {
             'pcmd': self.pcmd,
             'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
                           'INPUTs':INPUTs,
-                          'recal_file': bqsr_batch.get_node_by(tags=bqsr_node.tags).output_paths['recal']}
+                          'recal_file': input_nodes_dict['BaseQualityScoreRecalibration'][0].output_paths['recal']}
         }
     
-    def one2one_cmd(self,input_node,bqsr_batch):
-        return {
-            'pcmd': self.pcmd,
-            'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
-                          'INPUTs': "-I {0}".format(input_node.output_paths['bam']),
-                          'recal_file': bqsr_batch.get_node_by(tags=input_node.tags).output_paths['recal']}
-        }
     
 class UnifiedGenotyper(step.Step):
     outputs = {'vcf':'raw.vcf'}
     mem_req = 5.5*1024
     cpu_req = 6
     
-    def many2many_cmd(self,input_nodes,intervals):
+    def many2many_cmd(self,input_nodes,tags,intervals):
         """
         UnifiedGenotyper takes as input all bams [sample1.bam,sample2.bam...sample3.bam]
         
@@ -302,7 +275,7 @@ class UnifiedGenotyper(step.Step):
                                   'input_bams':input_bams,
                                   'interval':interval,
                                   'glm':glm},
-                    'new_tags':{'interval':interval,
+                    'add_tags':{'interval':interval,
                                 'glm':glm}
                 }
 
@@ -427,7 +400,7 @@ class ApplyRecalibration(step.Step):
     outputs = {'vcf':'recalibrated.vcf'}
     mem_req = 2*1024
     
-    def one2one_cmd(self,input_node,vqr_batch,haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'):
+    def multi_one2one_cmd(self,input_node_dict,haplotypeCaller_or_unifiedGenotyper='UnifiedGenotyper'):
         """
         
         :param input_node: the node with the raw vcf output files
@@ -437,14 +410,10 @@ class ApplyRecalibration(step.Step):
         ..note:: inbreedingcoeff is only calculated if there are more than 20 samples
         """
         #validation
-        glm = input_node.tags['glm']
-        print glm
-        if glm not in ['SNP','INDEL']:
-            raise ValidationError('invalid parameter')
-        if haplotypeCaller_or_unifiedGenotyper not in ['HaplotypeCaller','UnifiedGenotyper']:
-            raise ValidationError('invalid parameter')
+        raw_variants_node = input_node_dict['CombineVariants']
+        glm = raw_variants_node.tags['glm']
         
-        vqr_node = vqr_batch.get_node_by(tags=input_node.tags)
+        vqr_node = input_node_dict['VariantQualityRecalibration']
         
         if haplotypeCaller_or_unifiedGenotyper == 'UnifiedGenotyper':
             if glm == 'SNP': 
@@ -488,7 +457,7 @@ class ApplyRecalibration(step.Step):
         return {
             'pcmd': cmd,
             'pcmd_dict': {'GATK_cmd':get_GATK_cmd(mem_req=self.mem_req),
-                          'input_vcf':input_node.output_paths['vcf'],
+                          'input_vcf':raw_variants_node.output_paths['vcf'],
                          'input_tranches':vqr_node.output_paths['tranches'],
                          'input_recal':vqr_node.output_paths['recal'],}
         }
