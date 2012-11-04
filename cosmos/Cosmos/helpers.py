@@ -87,7 +87,7 @@ def parse_cmd(txt,**kwargs):
     txt = '\n'.join(x)
     try:
         s = txt.format(**kwargs)
-    except KeyError:
+    except (KeyError,TypeError):
         formatError(txt,kwargs)
     return s
 

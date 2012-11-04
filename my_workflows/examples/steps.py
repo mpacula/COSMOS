@@ -13,7 +13,7 @@ class Echo(Step):
                             echo "{input}" > {{output_dir}}/{{outputs[txt]}}
                         """, 
                 'pcmd_dict': {'input':text},
-                'new_tags': {'i':i}
+                'add_tags': {'i':i}
             }
 class WordCount(Step):
     outputs = {'txt':'out.txt'}
@@ -26,16 +26,18 @@ class WordCount(Step):
 class Paste(Step):
     outputs = {'txt':'out.txt'}
     
-    def one2one_cmd(self,input_nodes):
+    def multi_one2one_cmd(self,input_nodes_dict):
         """
         Paste the input file with itself
         
         :param input_nodes: two input nodes to paste together
         """
+        inputs = ' '.join([ n.output_paths['txt'] for n in input_nodes_dict.values() ])
         return {
                 'pcmd': r"""
-                            paste {input_nodes[0].output_paths[txt]} {input_nodes[1].output_paths[txt]} > {{output_dir}}/{{outputs[txt]}}
+                            paste {inputs} > {{output_dir}}/{{outputs[txt]}}
                         """,
+                'pcmd_dict': { 'inputs': inputs}
                 }
     
 class Cat(Step):

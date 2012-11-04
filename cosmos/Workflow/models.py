@@ -595,29 +595,52 @@ class Workflow(models.Model):
 class WorkflowDAG():
     def __init__(self,workflow):
         self.workflow = workflow
+        self.dag = self.createDiGraph()
         
-    def createAGraph(self):
+    def createAGraph(self,dag):
         G = pgv.AGraph(strict=False,directed=True)
-        G.add_edges_from([(ne.parent,ne.child) for ne in self.workflow.node_edges])
-        
-        for batch in self.workflow.batches:
-            sg = G.add_subgraph(name="cluster_{0}".format(batch.name),label=batch.name,color='lightgrey')
-            for n in batch.nodes:
+        G.add_edges_from(dag.edges())
+        for batch,nodes in helpers.groupby(dag.nodes(data=True),lambda x:x[1]['batch']):
+            sg = G.add_subgraph(name="cluster_{0}".format(batch),label=batch,color='lightgrey')
+            for n,attrs in nodes:
                 sg.add_node(n,label=n.id,URL=n.url())
-            #sg.set_attr()
             
-            
-    
         return G
     
+    def simple_dfs(self,node):
+        ss = self.dag.successors(node)
+        if len(ss) == 0: return [node]
+        if len(ss) == 1: return [node] + self.simple_dfs(ss[0])
+        if len(ss) == 2: return [node] + self.simple_dfs(ss[0]) + self.simple_dfs(ss[1])
+        
     
-    def as_img(self,format="svg"):        
-        g = self.createAGraph()
+    def get_simple_dag(self):
+        root = None
+        for node,degree in self.dag.in_degree_iter():
+            if degree == 0:
+                root = node
+                break
+        nodes = self.simple_dfs(root)
+        return self.dag.subgraph(nodes)
+    
+    def createDiGraph(self):
+        G = nx.DiGraph()
+        G.add_edges_from([(ne.parent,ne.child) for ne in self.workflow.node_edges])
+        for batch in self.workflow.batches:
+            batch_name = batch.name
+            for n in batch.nodes:
+                G.add_node(n,batch=batch_name)
+        return G
+    
+    def as_img(self,format="svg"):      
+        #g = self.createAGraph()
+        g = self.createAGraph(self.dag)
         g.layout(prog="dot")
         return g.draw(format=format)
         
     def __str__(self):
-        return self.createAGraph().to_string()
+        g = nx.to_agraph(self.dag)
+        return g.to_string()
     
         
 

@@ -32,10 +32,20 @@
 <dt>Output Directory</dt><dd><code>{{node.output_dir}}</code></dd>
 <dt>Outputs<strong></strong></dt>
 {% for key,val in node.output_paths.items %}
-<dd><em>{{key}}</em>: <a href="{% url jobAttempt_output node.get_successful_jobAttempt.id key%}"><code>{{val}}</code></a></dd>
+<dd><em>{{key}}</em>:
+<code>
+{%if node.sucessful%}
+    <a href="{% url jobAttempt_output node.get_successful_jobAttempt.id key%}">{{val}}</a>
+{%else %}
+    {{val}}
+{% endif %}
+</code>
+</dd>
 {% empty %}
 <dd>None</dd>
 {%endfor%}
+
+
 </dl>
 
 <h3>JobAttempts</h3>
