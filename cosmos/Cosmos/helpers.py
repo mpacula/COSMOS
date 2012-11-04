@@ -5,9 +5,26 @@ import logging
 import subprocess
 import itertools
 import pprint
-
+import sys
 import signal
 
+real_stdout = os.dup(1)
+real_stderr = os.dup(2)
+#devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
+devnull = os.open('/dev/null', os.O_WRONLY)
+def disable_stderr():
+    sys.stderr.flush()
+    os.dup2(devnull,2)
+def enable_stderr():
+    sys.stderr.flush()
+    os.dup2(real_stderr,2)
+def disable_stdout():
+    sys.stderr.flush()
+    os.dup2(devnull,1)
+def enable_stdout():
+    sys.stderr.flush()
+    os.dup2(real_stdout,1)
+    
 def confirm(prompt=None, default=False, timeout=0):
     """prompts for yes or no defaultonse from the user. Returns True for yes and
     False for no.

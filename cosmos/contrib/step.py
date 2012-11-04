@@ -137,7 +137,7 @@ class Step():
         for r in G:
             validate_dict_has_keys(r,['pcmd','add_tags'])
             new_node = self.__add_node_to_batch(pcmd = r['pcmd'],
-                                     pcmd_dict = merge_mdicts(self.kwargs,{'tags':tags},extra_pcmd_dict,r.setdefault('pcmd_dict',{})),
+                                     pcmd_dict = merge_mdicts(self.kwargs,{'tags':tags},r['add_tags'],extra_pcmd_dict,r.setdefault('pcmd_dict',{})),
                                      tags = merge_dicts(tags,r['add_tags']),
                                      parents = parents)
             self.new_nodes.append(new_node)

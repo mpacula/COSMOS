@@ -380,18 +380,20 @@ class Workflow(models.Model):
         super(Workflow, self).delete(*args, **kwargs)
                 
 
-
+    
     def _run_node(self,node):
         """
         Creates and submits and JobAttempt.
         
         :param node: the node to submit a JobAttempt for
         """
-        
-        node.batch.status = 'in_progress'
-        node.batch.save()
+        #TODO fix this slowness
+        if node.batch.status == 'no_attempt':
+            node.batch.status = 'in_progress'
+            node.batch.started_on = timezone.now()
+            node.batch.save()
         node.status = 'in_progress'
-        self.log.info('Running {0} from {1}'.format(node,node.batch))
+        self.log.info('Running {0}'.format(node))
         try:
             node.exec_command = node.pre_command.format(output_dir=node.job_output_dir,outputs = node.outputs)
         except KeyError:
@@ -455,26 +457,73 @@ class Workflow(models.Model):
                 self.save()
                 return False
     
-    def wait(self,batch=None,terminate_on_fail=False):
+            
+#    def wait(self,batch=None,terminate_on_fail=False):
+#        """
+#        Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
+#        if batch is omitted or set to None, all running nodes will be waited on.
+#        
+#        :param batch: (Batch) wait for all of a batch's nodes to finish
+#        :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
+#        """
+#        nodes = []
+#        if batch is None:
+#            self.log.info('Waiting on all nodes...')
+#        else:
+#            self.log.info('Waiting on batch {0}...'.format(batch))
+#        
+#        for jobAttempt in self.jobManager.yield_all_queued_jobs():
+#            node = jobAttempt.node
+#            #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,node,node.batch))
+#            nodes.append(node)
+#            if jobAttempt.successful:
+#                node._has_finished(jobAttempt)
+#            else:
+#                submitted_another_job = self._reattempt_node(node,jobAttempt)
+#                if not submitted_another_job:
+#                    node._has_finished(jobAttempt) #job has failed and out of reattempts
+#                    if terminate_on_fail:
+#                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
+#                        self.terminate()
+#            if batch and batch.is_done():
+#                break;
+#            
+#                    
+#        if batch is None: #no waiting on a batch
+#            self.log.info('All nodes for this wait have completed!')
+#        else:
+#            self.log.info('All nodes for the wait on {0} completed!'.format(batch))
+#        
+#        return nodes 
+
+
+    def run(self,terminate_on_fail=False):
         """
-        Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
-        if batch is omitted or set to None, all running nodes will be waited on.
+        Runs a workflow using the DAG of jobs
         
-        :param batch: (Batch) wait for all of a batch's nodes to finish
         :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
         """
-        nodes = []
-        if batch is None:
-            self.log.info('Waiting on all nodes...')
-        else:
-            self.log.info('Waiting on batch {0}...'.format(batch))
+        self.log.info("Generating DAG...")
+        wfDAG = WorkflowDAG(self)
+        self.log.info("Running DAG.")
         
+        ready_nodes = wfDAG.get_ready_nodes()
+        for n in ready_nodes:
+            wfDAG.queued_node(n)
+            self._run_node(n)
+        
+        finished_nodes = []
         for jobAttempt in self.jobManager.yield_all_queued_jobs():
             node = jobAttempt.node
             #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,node,node.batch))
-            nodes.append(node)
+            finished_nodes.append(node)
             if jobAttempt.successful:
                 node._has_finished(jobAttempt)
+                wfDAG.completed_node(node)
+                ready_nodes = wfDAG.get_ready_nodes()
+                for n in ready_nodes:
+                    wfDAG.queued_node(n)
+                    self._run_node(n)
             else:
                 submitted_another_job = self._reattempt_node(node,jobAttempt)
                 if not submitted_another_job:
@@ -482,24 +531,10 @@ class Workflow(models.Model):
                     if terminate_on_fail:
                         self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
                         self.terminate()
-            if batch and batch.is_done():
-                break;
-            
                     
-        if batch is None: #no waiting on a batch
-            self.log.info('All nodes for this wait have completed!')
-        else:
-            self.log.info('All nodes for the wait on {0} completed!'.format(batch))
-        
-        return nodes 
-
-    def run_wait(self, batch, terminate_on_fail=True):
-        """
-        Shortcut to run_batch(); wait(batch=batch,terminate_on_fail=terminate_on_fail);
-        """
-        self.run_batch(batch=batch)
-        return self.wait(batch=batch,terminate_on_fail=terminate_on_fail)
-
+        self.finished()
+        return finished_nodes
+    
     def finished(self,delete_unused_batches=False):
         """
         Call at the end of every workflow.
@@ -596,7 +631,20 @@ class WorkflowDAG():
     def __init__(self,workflow):
         self.workflow = workflow
         self.dag = self.createDiGraph()
+        self.dag_queue = self.dag.copy()
+        self.dag_queue.remove.nodes_from(workflow.nodes.filter(successful=False))
+        self.queued_nodes = []
+    
+    def queued_node(self,node):
+        self.queued_nodes.append(node)
+    
+    def completed_node(self,node):
+        self.dag_queue.remove_node(node)
         
+    def get_ready_nodes(self):
+        degree_0_nodes= map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
+        return filter(lambda x: x not in self.queued_nodes,degree_0_nodes)
+    
     def createAGraph(self,dag):
         G = pgv.AGraph(strict=False,directed=True)
         G.add_edges_from(dag.edges())
@@ -641,8 +689,6 @@ class WorkflowDAG():
     def __str__(self):
         g = nx.to_agraph(self.dag)
         return g.to_string()
-    
-        
 
 
 class Batch(models.Model):
@@ -656,6 +702,7 @@ class Batch(models.Model):
     order_in_workflow = models.IntegerField(null=True)
     status = models.CharField(max_length=200,choices=status_choices,default='no_attempt') 
     successful = models.BooleanField(default=False)
+    started_on = models.DateTimeField(null=True,default=None)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
@@ -731,7 +778,7 @@ class Batch(models.Model):
     @property
     def wall_time(self):
         """Time between this batch's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
-        return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
+        return self.started_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
     
     @property
     def output_dir(self):
@@ -1190,7 +1237,7 @@ class Node(models.Model):
         super(Node, self).delete(*args, **kwargs)
     
     def __str__(self):
-        return 'Node[{0}] {1}'.format(self.id,self.tags)
+        return 'Node[{0}] {1} {2}'.format(self.id,self.batch.name,self.tags)
 
 
 

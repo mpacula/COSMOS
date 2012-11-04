@@ -8,12 +8,14 @@ class Echo(Step):
         :param strings: the items to echo, one item per node
         """
         for i,text in enumerate(strings): 
+            sleep = 20 if i==0 else 1
             yield { 
                 'pcmd' : r"""
-                            echo "{input}" > {{output_dir}}/{{outputs[txt]}}
+                            echo "{input}" > {{output_dir}}/{{outputs[txt]}}; sleep {sleep}
                         """, 
                 'pcmd_dict': {'input':text},
-                'add_tags': {'i':i}
+                'add_tags': {'i':i,
+                             'sleep':sleep}
             }
 class WordCount(Step):
     outputs = {'txt':'out.txt'}
