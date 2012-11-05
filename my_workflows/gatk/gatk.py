@@ -10,7 +10,7 @@ import json
 samples=[]
 
 if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
-    WF = Workflow.start(name='GATK Test',restart=True)
+    WF = Workflow.start(name='GATK Test',restart=False)
     data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/test_data3',depth=1))
 #    WF = Workflow.start(name='GP 48Exomes with Simulated',default_queue='high_priority',restart=False)
 #    data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/48exomes',depth=2))
@@ -58,4 +58,4 @@ vqr = steps.VariantQualityRecalibration("Variant Quality Recalibration").one2one
 ar = steps.ApplyRecalibration("Apply Recalibration").multi_one2one([cv1,vqr])
 cv2 = steps.CombineVariants("Combine Variants2").many2one(ar,group_by=[])
     
-WF.finished(delete_unused_batches=True)
+WF.run()

@@ -1,5 +1,6 @@
 from cosmos.Cosmos.helpers import parse_cmd
 from django.core.exceptions import ValidationError
+import re
 
 workflow = None
 default_pcmd_dict = {}
@@ -55,10 +56,7 @@ class Step():
     new_nodes = []
     kwargs = {}
     
-    def __init__(self,name=None,hard_reset=False,**kwargs):
-        """
-        :param hard_reset: Deletes the old batch before creating this one  
-        """
+    def __init__(self,name=None,**kwargs):
         if workflow is None:
             raise Exception('Set the parameter step.workflow to your Workflow before adding steps.')
         
@@ -66,10 +64,8 @@ class Step():
             name = type(self)
         self.name = name 
         
-        if workflow.batches.filter(name=self.name).count() == 0 or hard_reset:
-            self.skip_add_node_checks = True
-        self.batch = workflow.add_batch(self.name,hard_reset=hard_reset)
-        
+        self.skip_add_node_checks = workflow.batches.filter(name = re.sub("\s","_",name)).count() == 0
+        self.batch = workflow.add_batch(self.name)
 
 
     def _parse_cmd2(self,string,dictnry,**kwargs):
@@ -86,7 +82,7 @@ class Step():
         return self.batch.add_node(name = '',
                                    pcmd = self._parse_cmd2(pcmd,pcmd_dict,tags=tags),
                                     tags = tags,
-                                    save = False,
+                                    save = not self.skip_add_node_checks,
                                     skip_checks = self.skip_add_node_checks,
                                     parents = parents,
                                     outputs = self.outputs,

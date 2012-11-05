@@ -26,7 +26,7 @@ class Workflow(models.Model):
     """
     name = models.CharField(max_length=250,unique=True)
     output_dir = models.CharField(max_length=250)
-    jobManager = models.OneToOneField(JobManager,null=True, related_name='workflow')
+    #jobManager = models.OneToOneField(JobManager,null=True, related_name='workflow')
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
@@ -44,9 +44,7 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
             raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__resume()'.format(self.name))
         #create jobmanager
-        if not hasattr(self,'jobManager') or self.jobManager is None:
-            self.jobManager = JobManager.objects.create()
-            self.jobManager.save()
+        self.jobManager = JobManager()
             
         check_and_create_output_dir(self.output_dir)
         
@@ -69,7 +67,7 @@ class Workflow(models.Model):
     
     @property
     def wall_time(self):
-        """Time between thisworkflowh's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
+        """Time between this workflowh's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
     
     @property
@@ -77,7 +75,8 @@ class Workflow(models.Model):
         """
         Sum(batch_wall_times).  Can be different from workflow.wall_time due to workflow stops and resumes.
         """
-        return reduce(lambda x,y: x+y, [b.wall_time for b in self.batches ])
+        times = map(lambda x: x['finished_on']-x['started_on'],Batch.objects.filter(workflow=self).values('finished_on','started_on'))
+        return reduce(lambda x,y: x+y, filter(lambda wt: wt,times))
     
     @property
     def batches(self):
@@ -204,13 +203,12 @@ class Workflow(models.Model):
         return wf
             
         
-    def add_batch(self, name, hard_reset=False):
+    def add_batch(self, name):
         """
         Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists,
         and it hasn't been added in this session yet, return the existing one.
         
         :parameter name: (str) The name of the batch, must be unique within this Workflow. Required.
-        :parameter hard_reset: (bool) Delete any batch with this name including all of its nodes, and return a new one. Optional.
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
@@ -227,16 +225,11 @@ class Workflow(models.Model):
         if batch_exists:
             old_batch = Batch.objects.get(workflow=self,name=name)
             _old_id = old_batch.id
-            if old_batch.status == 'failed':
-                if helpers.confirm('{0} has a status of failed.  Would you like to perform a hard_reset on it before proceeding? Answering no will proceed with the workflow with the batch left unchanged.  Unsuccessful nodes will be re-run.'.format(old_batch),default=True):
-                    old_batch.delete()
-            if hard_reset:
-                if helpers.confirm("Are you sure you want to do a hard reset on {0}?".format(old_batch),default=True,timeout=30):
-                    self.log.info("Doing a hard reset on {0}.".format(old_batch))
-                    old_batch.delete()
-                else:
-                    self.log.info("Exiting.")
-                    sys.exit(1)
+            if old_batch.status == 'failed' or old_batch.status == 'in_progress':
+                unadded_batches = list(self.batches.filter(order_in_workflow=None)) + [ old_batch ] #TODO filter using DAG, so that only dependent batches are deleted
+                unadded_batches_str = ', '.join(map(lambda x: x.__str__(), unadded_batches))
+                if helpers.confirm('{0} has a status of failed.  Would you like to restart the workflow from here?  Answering yes will delete the following batches: {1}. Answering no will only delete and re-run unsuccessful jobs.'.format(old_batch,unadded_batches_str),default=True):
+                    map(lambda b: b.delete(),unadded_batches)
                 
         b, created = Batch.objects.get_or_create(workflow=self,name=name,id=_old_id)
         if created:
@@ -323,6 +316,7 @@ class Workflow(models.Model):
         >>> nodes = [(batch.add_node(name='1'pcmd='cmd1',save=False),{},True,[]),(batch.add_node(name='2',pcmd='cmd2',save=False,{},True,[]))]
         >>> batch.bulk_add_nodes(nodes)
         """
+        
         ### Bulk add nodes
         self.log.info("Bulk adding {0} nodes...".format(len(data)))
         filtered_data = filter(lambda x: not x['node_exists'],data)
@@ -341,6 +335,7 @@ class Workflow(models.Model):
             os.mkdir(n.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
         
         ### Bulk add tags
+        #TODO validate that all tags have the same keyword
         nodetags = []
         for d in filtered_data:
             for k,v in d['tags'].items():
@@ -371,7 +366,7 @@ class Workflow(models.Model):
             self.log.info('Deleting directory {0}...'.format(self.output_dir))
             os.system('rm -rf {0}'.format(self.output_dir))
             
-        self.jobManager.delete()
+        #self.jobManager.delete()
         self.log.info('Bulk deleting JobAttempts...')
         JobAttempt.objects.filter(node_set__in = self.nodes).delete()
         self.log.info('Bulk deleting NodeTags...')
@@ -428,24 +423,24 @@ class Workflow(models.Model):
             self.jobManager.submit_job(jobAttempt)
             self.log.info('Submitted jobAttempt with drmaa jobid {0}.'.format(jobAttempt.drmaa_jobID))
         node.save()
-        self.jobManager.save()
+        #self.jobManager.save()
         return jobAttempt
 
-    def run_batch(self,batch):
-        """
-        Runs any unsuccessful nodes of a batch
-        """
-        self.log.info('Running batch {0}.'.format(batch))
-        
-        if batch.successful:
-            self.log.info('{0} has already been executed successfully, skip run.'.format(batch))
-            return
-        for node in batch.nodes:
-            if node.successful:
-                self.log.info('{0} has already been executed successfully, skip run.'.format(node))
-            else:
-                self.log.debug('{0} has not been executed successfully yet.'.format(node))
-                self._run_node(node)
+#    def run_batch(self,batch):
+#        """
+#        Runs any unsuccessful nodes of a batch
+#        """
+#        self.log.info('Running batch {0}.'.format(batch))
+#        
+#        if batch.successful:
+#            self.log.info('{0} has already been executed successfully, skip run.'.format(batch))
+#            return
+#        for node in batch.nodes:
+#            if node.successful:
+#                self.log.info('{0} has already been executed successfully, skip run.'.format(node))
+#            else:
+#                self.log.debug('{0} has not been executed successfully yet.'.format(node))
+#                self._run_node(node)
 
 
     def _reattempt_node(self,node,failed_jobAttempt):
@@ -578,9 +573,11 @@ class Workflow(models.Model):
         """
         Deletes any batches in the history that haven't been added yet
         """
-        if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0}?  All files will be deleted.".format(self),default=True,timeout=30):
+        if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0} (All files will be deleted)? Answering no will simply exit.".format(self),default=True,timeout=30):
             self.log.info('Restarting Workflow from here.')
             for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete()
+        else:
+            sys.exit(1)
     
     def get_nodes_by(self,batch=None,tags={},op="and"):
         """
@@ -644,50 +641,57 @@ class WorkflowManager():
         self.workflow = workflow
         self.dag = self.createDiGraph()
         self.dag_queue = self.dag.copy()
-        self.dag_queue.remove_nodes_from(workflow.nodes.filter(successful=True))
+        self.dag_queue.remove_nodes_from(map(lambda x: x['id'],workflow.nodes.filter(successful=True).values('id')))
         self.queued_nodes = []
     
     def queued_node(self,node):
-        self.queued_nodes.append(node)
+        self.queued_nodes.append(node.id)
     
     def completed_node(self,node):
-        self.dag_queue.remove_node(node)
+        self.dag_queue.remove_node(node.id)
         
     def get_ready_nodes(self):
         degree_0_nodes= map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
-        return filter(lambda x: x not in self.queued_nodes,degree_0_nodes)
+        return map(lambda n_id: Node.objects.get(pk=n_id),filter(lambda x: x not in self.queued_nodes,degree_0_nodes))
     
     def createDiGraph(self):
         G = nx.DiGraph()
         G.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.node_edges.values('parent','child')])
         for batch in self.workflow.batches:
             batch_name = batch.name
-            for n in batch.nodes.values('id','tags'):
-                G.add_node(n['id'],tags=dbsafe_decode(n['tags']),batch=batch_name)
+            for n in batch.nodes.values('id','tags','status'):
+                G.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],batch=batch_name)
         return G
     
     def createAGraph(self,dag):
-        G = pgv.AGraph(strict=False,directed=True)
+        G = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
+        G.node_attr['fontname']="Courier"
+        G.node_attr['fontsize']=8
         G.add_edges_from(dag.edges())
         for batch,nodes in helpers.groupby(dag.nodes(data=True),lambda x:x[1]['batch']):
             sg = G.add_subgraph(name="cluster_{0}".format(batch),label=batch,color='lightgrey')
             for n,attrs in nodes:
-                label = " \\n".join(map(lambda x: '{0[0]}: {0[1]}'.format(x),attrs['tags'].items()))
-                sg.add_node(n,label=label,URL='/Workflow/Node/{0}/'.format(n))
+                def truncate_val(kv):
+                    v = "{0}".format(kv[1])
+                    v = v if len(v) <10 else v[1:8]+'..'
+                    return "{0}: {1}".format(kv[0],v)
+                label = " \\n".join(map(truncate_val,attrs['tags'].items()))
+                status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
+                sg.add_node(n,label=label,URL='/Workflow/Node/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
             
         return G
     
-    def simple_dfs(self,node):
+    def simple_path(self,node):
         ss = self.dag.successors(node)
-        if len(ss) == 0: return [node]
-        if len(ss) == 1: return [node] + self.simple_dfs(ss[0])
-        if len(ss) > 1: return [node] + self.simple_dfs(ss[0]) + self.simple_dfs(ss[1])
+        if len(ss) == 0: return [node] + self.simple_path_up(node)[1:]
+        if len(ss) == 1: return [node] + self.simple_path(ss[0]) + self.simple_path_up(node)[1:]
+        if len(ss) > 1: return [node] + self.simple_path(ss[0]) + self.simple_path(ss[1]) + self.simple_path_up(node)[1:]
     
-    def simple_dfs_up(self,node):
+    def simple_path_up(self,node):
         ss = self.dag.predecessors(node)
         if len(ss) == 0: return [node]
-        if len(ss) == 1: return [node] + self.simple_dfs_up(ss[0])
-        if len(ss) > 1: return [node] + self.simple_dfs_up(ss[0]) + self.simple_dfs_up(ss[1])
+        if len(ss) == 1: return [node] + self.simple_path_up(ss[0])
+        if len(ss) > 1: return [node] + self.simple_path_up(ss[0]) + self.simple_path_up(ss[1])
     
     def get_simple_dag(self):
         root = None
@@ -695,20 +699,20 @@ class WorkflowManager():
             if degree == 0:
                 root = node
                 break
-        #nodes = self.simple_dfs(root)
-        #return self.dag.subgraph(nodes)
-        return nx.dfs_tree(self.dag,root)
+        nodes = self.simple_path(root)
+        return self.dag.subgraph(nodes)
+        #return self.dag.subgraph(nx.dfs_tree(self.dag,root).nodes())
     
     
     def as_img(self,format="svg"):      
-        g = self.createAGraph(self.dag)
-        #g = self.createAGraph(self.get_simple_dag())
+        #g = self.createAGraph(self.dag)
+        g = self.createAGraph(self.get_simple_dag())
         g.layout(prog="dot")
         return g.draw(format=format)
         
     def __str__(self): 
-        g = self.createAGraph(self.dag)
-        #g = nx.to_agraph(self.get_simple_dag())
+        #g = self.createAGraph(self.dag)
+        g = self.createAGraph(self.get_simple_dag())
         return g.to_string()
 
 
@@ -799,7 +803,7 @@ class Batch(models.Model):
     @property
     def wall_time(self):
         """Time between this batch's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
-        return self.started_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
+        return self.finished_on - self.started_on if self.finished_on else timezone.now().replace(microsecond=0) - self.started_on
     
     @property
     def output_dir(self):
@@ -833,7 +837,8 @@ class Batch(models.Model):
     
     def get_all_tag_keys_used(self):
         """Returns a set of all the keyword tags used on any node in this batch"""
-        return set(map(lambda x: x['key'],NodeTag.objects.filter(node__in=self.nodes).values('key').distinct()))
+        #return set(map(lambda x: x['key'],NodeTag.objects.filter(node__in=self.nodes).values('key').distinct()))
+        return self.nodes[0].tags.keys()
         
     def yield_node_resource_usage(self):
         """
@@ -871,16 +876,17 @@ class Batch(models.Model):
 #        if name == '' or name is None:
 #            raise ValidationError('name cannot be blank')
         if skip_checks and save:
-            raise ValidationError('Cannot have skip_checks=True and save=False when adding a node.')
+            raise ValidationError('Cannot have skip_checks cannot equal save when adding a node.')
 
         if pcmd == '' or pcmd is None:
             raise ValidationError('pre_command cannot be blank')
         
+        #TODO validate that this node has the same tag keys as all other nodes
+        
         node_kwargs = {
                        'batch':self,
-                       'name':None,
+                       'name':name,
                        'tags':tags,
-#                       'name':name,
                        'pre_command':pcmd,
                        'outputs':outputs,
                        'memory_requirement':mem_req,
@@ -911,22 +917,21 @@ class Batch(models.Model):
                 if node.outputs != outputs:
                     self.log.error("You can't change the outputs of an existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
         
-            if not node_exists and not save:
-                #if adding to a finished batch, set that batch's status to in_progress so new nodes are executed.  Skip if Node is not being saved.
+        if not node_exists:
+            if save:
+                #Create and save a node
+                node = Node.create(**node_kwargs)
+                for k,v in tags.items():
+                    NodeTag.objects.create(node=node,key=k,value=v) #this is faster than a node.tag, because node.tag also writes to node.tags
+                for n in parents:
+                    NodeEdge.objects.create(parent=n,child=node,tags=tags) #TODO think about what a NodeEdge tag is
+                self.log.info("Created {0} in {1}, and saved to the database.".format(node,self))
+                
                 batch = node.batch
                 if batch.is_done():
                     batch.status = 'in_progress'
                     batch.successful = False
                     batch.save()
-               
-        if not node_exists:
-            if save:
-                #Create and save a node
-                node = Node.create(**node_kwargs)
-                node.tag(**tags)
-                for n in parents:
-                    NodeEdge.objects.create(parent=n,child=node,tags=tags) #TODO think about what a NodeEdge tag is
-                self.log.info("Created {0} in {1}, and saved to the database.".format(node,self))
             else:
                 #Just instantiate a node
                 node = Node(**node_kwargs)
@@ -1046,7 +1051,6 @@ class NodeTag(models.Model):
     """
     A SQL row that duplicates the information of Node.tags that can be used for filtering, etc.
     """
-    "A keyword/value object used to describe a node."
     node = models.ForeignKey('Node')
     key = models.CharField(max_length=63)
     value = models.CharField(max_length=255)
@@ -1092,6 +1096,9 @@ class Node(models.Model):
     
     @staticmethod
     def create(*args,**kwargs):
+        """
+        Creates a node.
+        """
         node = Node.objects.create(*args,**kwargs)
         
         if Node.objects.filter(batch=node.batch,tags=node.tags).count() > 1:
@@ -1201,17 +1208,7 @@ class Node(models.Model):
         self.finished_on = timezone.now()
         self.save()
         
-        if self.batch._are_all_nodes_done(): self.batch._has_finished()    
- 
-#    def __tag(self,tags):
-#        """
-#        Tag this node with key value pairs.  Should only be called by Node.__init__
-#        
-#        :param tags: (dict) the node's tags
-#        """
-#        #TODO don't allow tags called things like 'status' or other node attributes
-#        for key,value in tags.items():
-#            NodeTag.objects.create(node=self,key=key,value=value)
+        if self.batch._are_all_nodes_done(): self.batch._has_finished()
         
     def tag(self,**kwargs):
         """
@@ -1226,14 +1223,8 @@ class Node(models.Model):
             if not created:
                 nodetag.value = value
             nodetag.save()
-
-#    @property            
-#    def tags(self):
-#        """
-#        The dictionary of this node's tags.
-#        """
-#        return dict([(x['key'],x['value']) for x in self.nodetag_set.all().values('key','value')])
-    
+            self.tags[key] = value
+            
     @models.permalink    
     def url(self):
         "This node's url."

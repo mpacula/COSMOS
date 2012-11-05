@@ -96,17 +96,17 @@ def groupby(iterable,fxn):
     return itertools.groupby(sorted(iterable,key=fxn),fxn)
 
 def parse_cmd(txt,**kwargs):
-    """removes empty lines and white space.
+    """removes empty lines and white spaces, and appends a \ to the end of every line.
     also .format()s with the **kwargs dictioanry"""
-    x = txt.split('\n')
-    x = map(lambda x: x.strip(),x)
-    x = filter(lambda x: not x == '',x)
-    txt = '\n'.join(x)
     try:
-        s = txt.format(**kwargs)
+        x = txt.format(**kwargs)
+        x = x.split('\n')
+        x = map(lambda x: re.sub(r"\\$",'',x.strip()).strip(),x)
+        x = filter(lambda x: not x == '',x)
+        x = ' \\\n'.join(x)
     except (KeyError,TypeError):
         formatError(txt,kwargs)
-    return s
+    return x
 
 
 def spinning_cursor(i):
