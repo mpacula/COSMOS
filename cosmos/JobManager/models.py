@@ -40,7 +40,7 @@ class JobAttempt(models.Model):
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
-    #jobManager = models.ForeignKey('JobManager',related_name='+')
+    jobManager = models.ForeignKey('JobManager',related_name='+')
     
     #job status and input fields
     queue_status = models.CharField(max_length=150, default="not_queued",choices = queue_status_choices)
@@ -301,20 +301,20 @@ class JobAttempt(models.Model):
         
         return "\n".join(out)
 
-class JobManager():
+class JobManager(models.Model):
     """
     Note there can only be one of these instantiated at a time
     """
-    #created_on = models.DateTimeField(null=True,default=None)
+    created_on = models.DateTimeField(null=True,default=None)
         
-#    @property
-#    def jobAttempts(self):
-#        "This JobManager's jobAttempts"
-#        return JobAttempt.objects.filter(jobManager=self)
+    @property
+    def jobAttempts(self):
+        "This JobManager's jobAttempts"
+        return JobAttempt.objects.filter(jobManager=self)
         
-#    def __init__(self,*args,**kwargs):
-#        kwargs['created_on'] = timezone.now()
-#        super(JobManager,self).__init__(*args,**kwargs)
+    def __init__(self,*args,**kwargs):
+        kwargs['created_on'] = timezone.now()
+        super(JobManager,self).__init__(*args,**kwargs)
             
 #    def close_session(self):
 #        #TODO delete all jobtemplates

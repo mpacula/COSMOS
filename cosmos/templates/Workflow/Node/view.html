@@ -22,6 +22,7 @@
 </div>
 <dl class="dl-horizontal">
 <dt>Status</dt><dd>{{node.status}}</dd>
+<dt>Parents</dt><dd>{{node.parents|join:', '}}</dd>
 <dt>Memory Requirement</dt><dd>{{node.memory_requirement}}</dd>
 <dt>File_size</dt><dd>{%if settings.show_node_file_sizes%}{{node.file_size}}{%else%}off{%endif%}</dd>
 <dt>Wall time</dt><dd>{{node.wall_time|format_time}}</dd>

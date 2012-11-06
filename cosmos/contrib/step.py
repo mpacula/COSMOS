@@ -56,6 +56,10 @@ class Step():
     new_nodes = []
     kwargs = {}
     
+    @property
+    def log(self):
+        return self.batch.workflow.log
+    
     def __init__(self,name=None,**kwargs):
         if workflow is None:
             raise Exception('Set the parameter step.workflow to your Workflow before adding steps.')
@@ -82,7 +86,7 @@ class Step():
         return self.batch.add_node(name = '',
                                    pcmd = self._parse_cmd2(pcmd,pcmd_dict,tags=tags),
                                     tags = tags,
-                                    save = not self.skip_add_node_checks,
+                                    save = False,
                                     skip_checks = self.skip_add_node_checks,
                                     parents = parents,
                                     outputs = self.outputs,
@@ -148,7 +152,12 @@ class Step():
         
         multiple_input_steps = True if input_steps and len(input_steps) > 1 else False
         if multiple_input_steps:
-            for input_step in input_steps: input_step.tag_keys_available = input_step.batch.get_all_tag_keys_used() #used by make_IND
+            try:
+                for input_step in input_steps: input_step.tag_keys_available = input_step.batch.get_all_tag_keys_used() #used by make_IND
+            except IndexError as e:
+                self.log.error("Input step has no tags.")
+                raise e
+                
         
         if not self.batch.successful:
             self.kwargs = kwargs

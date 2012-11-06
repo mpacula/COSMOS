@@ -10,6 +10,7 @@ from cosmos import session
 from django.utils import timezone
 import networkx as nx
 import pygraphviz as pgv
+from cosmos.contrib.step import _unnest
 
 status_choices=(
                 ('successful','Successful'),
@@ -26,7 +27,7 @@ class Workflow(models.Model):
     """
     name = models.CharField(max_length=250,unique=True)
     output_dir = models.CharField(max_length=250)
-    #jobManager = models.OneToOneField(JobManager,null=True, related_name='workflow')
+    jobManager = models.OneToOneField(JobManager,null=True, related_name='workflow')
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
@@ -43,8 +44,6 @@ class Workflow(models.Model):
         #Validate unique name
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
             raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__resume()'.format(self.name))
-        #create jobmanager
-        self.jobManager = JobManager()
             
         check_and_create_output_dir(self.output_dir)
         
@@ -197,9 +196,8 @@ class Workflow(models.Model):
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
         
-        wf = Workflow.objects.create(id=_wf_id,name=name, output_dir=output_dir, dry_run=dry_run, default_queue=default_queue)
+        wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue)
         wf.log.info('Created Workflow {0}.'.format(wf))
-        wf.save()
         return wf
             
         
@@ -366,7 +364,7 @@ class Workflow(models.Model):
             self.log.info('Deleting directory {0}...'.format(self.output_dir))
             os.system('rm -rf {0}'.format(self.output_dir))
             
-        #self.jobManager.delete()
+        self.jobManager.delete()
         self.log.info('Bulk deleting JobAttempts...')
         JobAttempt.objects.filter(node_set__in = self.nodes).delete()
         self.log.info('Bulk deleting NodeTags...')
@@ -681,17 +679,59 @@ class WorkflowManager():
             
         return G
     
-    def simple_path(self,node):
-        ss = self.dag.successors(node)
-        if len(ss) == 0: return [node] + self.simple_path_up(node)[1:]
-        if len(ss) == 1: return [node] + self.simple_path(ss[0]) + self.simple_path_up(node)[1:]
-        if len(ss) > 1: return [node] + self.simple_path(ss[0]) + self.simple_path(ss[1]) + self.simple_path_up(node)[1:]
-    
-    def simple_path_up(self,node):
-        ss = self.dag.predecessors(node)
-        if len(ss) == 0: return [node]
-        if len(ss) == 1: return [node] + self.simple_path_up(ss[0])
-        if len(ss) > 1: return [node] + self.simple_path_up(ss[0]) + self.simple_path_up(ss[1])
+#    def simple_path(self,head,vs):
+#        """
+#        node is the current node, vs is visited nodes
+#        """
+#        ss = self.dag.successors(head)
+#        vs.append(head)
+#        if len(ss) == 0: return [head] + self.simple_path_up(head,vs)
+#        if len(ss) == 1: return [head] + self.simple_path(ss[0],vs) + self.simple_path_up(head,vs)
+#        if len(ss) > 1: return [head] + self.simple_path(ss[0],vs) + self.simple_path(ss[1],vs) + self.simple_path_up(head,vs)
+#    
+#    def simple_path_up(self,tail,vs):
+#        ps = self.dag.predecessors(tail)
+#        ps = map(lambda n: (n,self.dag.node[n]),ps)
+#        ps = filter(lambda p: p[0] not in vs,ps) # TODO speedup by marking visited nodes instead of keeping what can become a huge list
+#        ps = [ ps.next()[0] for batch, ps in helpers.groupby(ps,lambda p: p[1]['batch']) ]
+#        return ps
+#        if len(ps) == 0: return [node]
+#        if len(ps) == 1: return [node,ps[0]]
+#        if len(ps) > 1: return [node,ps[0],ps[1]]
+        #if len(ps) > 2: return [node,ps[0],ps[1],ps[2]]
+#        if len(ps) == 1: return [node] + self.simple_path_up(ps)
+#        if len(ps) > 1: return [node] + self.simple_path_up(ps[0]) + self.simple_path_up(ps[1])
+    def simple_path(self,head,vnodes,vedges):
+        """
+        node is the current node, vs is visited nodes
+        """
+        ss = self.dag.successors(head)[0:3]
+        vnodes.append(head)
+        if len(ss) > 0:
+            vedges.append((head,ss[0]))
+            self.simple_path(ss[0],vnodes,vedges)
+        if len(ss) > 1:
+            vedges.append((head,ss[1]))
+            self.simple_path(ss[1],vnodes,vedges)
+        
+        ps = self.dag.predecessors(head)
+        ps = filter(lambda n: n not in vnodes,ps) #TODO might be slow
+        if len(ps) > 0:
+            vedges.append((ps[0],head))
+#        if len(ps) > 0:
+#            ps = map(lambda n: (n,self.dag.node[n]),ps) #append attr dict
+#            for batch, ps_b in helpers.groupby(ps,lambda p: p[1]['batch']):
+#                print batch
+#                print list(ps_b)
+#                print '*'*72
+#                try:
+#                    p = ps_b.next()
+#                    vedges.append((p[0],head))
+#                    vnodes.append(p[0])
+#                except StopIteration:
+#                    pass
+            
+        return vedges
     
     def get_simple_dag(self):
         root = None
@@ -699,20 +739,26 @@ class WorkflowManager():
             if degree == 0:
                 root = node
                 break
-        nodes = self.simple_path(root)
-        return self.dag.subgraph(nodes)
+        edges = self.simple_path(root,[],[])
+        g= nx.DiGraph()
+        nodes = set(_unnest(edges))
+        g.add_nodes_from(map(lambda n: (n,self.dag.node[n]),nodes))
+        g.add_edges_from(edges)
+        return g
         #return self.dag.subgraph(nx.dfs_tree(self.dag,root).nodes())
     
     
     def as_img(self,format="svg"):      
         #g = self.createAGraph(self.dag)
         g = self.createAGraph(self.get_simple_dag())
+        #g=nx.to_agraph(self.get_simple_dag())
         g.layout(prog="dot")
         return g.draw(format=format)
         
     def __str__(self): 
         #g = self.createAGraph(self.dag)
         g = self.createAGraph(self.get_simple_dag())
+        #g=nx.to_agraph(self.get_simple_dag())
         return g.to_string()
 
 
@@ -838,7 +884,10 @@ class Batch(models.Model):
     def get_all_tag_keys_used(self):
         """Returns a set of all the keyword tags used on any node in this batch"""
         #return set(map(lambda x: x['key'],NodeTag.objects.filter(node__in=self.nodes).values('key').distinct()))
-        return self.nodes[0].tags.keys()
+        try:
+            return self.nodes[0].tags.keys()
+        except IndexError:
+            return {}
         
     def yield_node_resource_usage(self):
         """
@@ -876,7 +925,7 @@ class Batch(models.Model):
 #        if name == '' or name is None:
 #            raise ValidationError('name cannot be blank')
         if skip_checks and save:
-            raise ValidationError('Cannot have skip_checks cannot equal save when adding a node.')
+            raise ValidationError('Cannot skip checks and save a node.')
 
         if pcmd == '' or pcmd is None:
             raise ValidationError('pre_command cannot be blank')
@@ -907,7 +956,7 @@ class Batch(models.Model):
                 node.delete()
             
             if node_exists and not node.successful:
-                self.log.info("{0} was unsuccessful last time, deleting old one and trying again".format(node))
+                self.log.info("{0} was unsuccessful last run.".format(node))
                 node.delete()
         
             #validation
@@ -1235,7 +1284,7 @@ class Node(models.Model):
         """
         Deletes this node and all files associated with it
         """
-        self.log.info('Deleting node {0} and its output directory {0}'.format(self.name,self.output_dir))
+        self.log.info('Deleting {0} and it\'s output directory {1}'.format(self,self.output_dir))
         #todo delete stuff in output_paths that may be extra files
         for ja in self._jobAttempts.all(): ja.delete()
         self.node_tags.delete()
