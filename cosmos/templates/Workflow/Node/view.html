@@ -35,7 +35,7 @@
 {% for key,val in node.output_paths.items %}
 <dd><em>{{key}}</em>:
 <code>
-{%if node.sucessful%}
+{%if node.successful%}
     <a href="{% url jobAttempt_output node.get_successful_jobAttempt.id key%}">{{val}}</a>
 {%else %}
     {{val}}

@@ -883,11 +883,12 @@ class Batch(models.Model):
     
     def get_all_tag_keys_used(self):
         """Returns a set of all the keyword tags used on any node in this batch"""
-        #return set(map(lambda x: x['key'],NodeTag.objects.filter(node__in=self.nodes).values('key').distinct()))
         try:
-            return self.nodes[0].tags.keys()
+            return self.nodes.all()[0].tags.keys()
         except IndexError:
             return {}
+        except AttributeError:
+            return set(map(lambda x: x['key'],NodeTag.objects.filter(node__in=self.nodes).values('key').distinct()))
         
     def yield_node_resource_usage(self):
         """
@@ -1295,6 +1296,4 @@ class Node(models.Model):
     
     def __str__(self):
         return 'Node[{0}] {1} {2}'.format(self.id,self.batch.name,self.tags)
-
-
 
