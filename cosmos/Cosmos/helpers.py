@@ -5,9 +5,26 @@ import logging
 import subprocess
 import itertools
 import pprint
-
+import sys
 import signal
 
+real_stdout = os.dup(1)
+real_stderr = os.dup(2)
+#devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
+devnull = os.open('/dev/null', os.O_WRONLY)
+def disable_stderr():
+    sys.stderr.flush()
+    os.dup2(devnull,2)
+def enable_stderr():
+    sys.stderr.flush()
+    os.dup2(real_stderr,2)
+def disable_stdout():
+    sys.stderr.flush()
+    os.dup2(devnull,1)
+def enable_stdout():
+    sys.stderr.flush()
+    os.dup2(real_stdout,1)
+    
 def confirm(prompt=None, default=False, timeout=0):
     """prompts for yes or no defaultonse from the user. Returns True for yes and
     False for no.
@@ -79,17 +96,17 @@ def groupby(iterable,fxn):
     return itertools.groupby(sorted(iterable,key=fxn),fxn)
 
 def parse_cmd(txt,**kwargs):
-    """removes empty lines and white space.
+    """removes empty lines and white spaces, and appends a \ to the end of every line.
     also .format()s with the **kwargs dictioanry"""
-    x = txt.split('\n')
-    x = map(lambda x: x.strip(),x)
-    x = filter(lambda x: not x == '',x)
-    txt = '\n'.join(x)
     try:
-        s = txt.format(**kwargs)
-    except KeyError:
+        x = txt.format(**kwargs)
+        x = x.split('\n')
+        x = map(lambda x: re.sub(r"\\$",'',x.strip()).strip(),x)
+        x = filter(lambda x: not x == '',x)
+        x = ' \\\n'.join(x)
+    except (KeyError,TypeError):
         formatError(txt,kwargs)
-    return s
+    return x
 
 
 def spinning_cursor(i):

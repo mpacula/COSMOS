@@ -3,7 +3,7 @@ import os,re,json,time,sys
 from picklefield.fields import PickledObjectField
 from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
-from cosmos.Cosmos.helpers import check_and_create_output_dir,spinning_cursor
+from cosmos.Cosmos.helpers import check_and_create_output_dir,spinning_cursor,enable_stderr,disable_stderr
 from cosmos import session
 from django.utils import timezone
 import drmaa
@@ -22,16 +22,6 @@ decode_drmaa_state = SortedDict([
         ]) #this is a sorted dictionary
 
 
-#real_stdout = os.dup(1)
-real_stderr = os.dup(2)
-#devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
-devnull = os.open('/dev/null', os.O_WRONLY)
-def disable_stderr():
-    sys.stderr.flush()
-    os.dup2(devnull,2)
-def enable_stderr():
-    sys.stderr.flush()
-    os.dup2(real_stderr,2)
   
 class JobStatusError(Exception):
     pass

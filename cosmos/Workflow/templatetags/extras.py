@@ -106,6 +106,6 @@ def format_memory_mb(mb):
 
 @register.filter
 def format_time(seconds):
-    if seconds == None or seconds == '': return ''
+    if seconds == None or seconds == '': return '0'
     return datetime.timedelta(seconds=int(seconds))
         

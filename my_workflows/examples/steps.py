@@ -3,31 +3,43 @@ from cosmos.contrib.step import Step
 class Echo(Step):
     outputs = {'txt':'out.txt'}
     
-    def none2many_cmd(self,input_batch=None,strings=[]):
+    def none2many_cmd(self,strings=[]):
         """
         :param strings: the items to echo, one item per node
         """
         for i,text in enumerate(strings): 
+            sleep = 20 if i==0 else 1
             yield { 
                 'pcmd' : r"""
-                            echo "{input}" > {{output_dir}}/{{outputs[txt]}}
+                            echo "{input}" > {{output_dir}}/{{outputs[txt]}}; sleep {sleep}
                         """, 
                 'pcmd_dict': {'input':text},
-                'new_tags': {'i':i}
+                'add_tags': {'i':i,
+                             'sleep':sleep}
             }
-        
+class WordCount(Step):
+    outputs = {'txt':'out.txt'}
+    
+    def one2one_cmd(self,input_node,flags=""):
+        return {
+                'pcmd': r"""wc {flags} "{input_node.output_paths[txt]}" |cut -f1 -d" "> {{output_dir}}/{{outputs[txt]}} """,
+                }
+               
 class Paste(Step):
     outputs = {'txt':'out.txt'}
     
-    def one2one_cmd(self,input_node):
+    def multi_one2one_cmd(self,input_node_dict):
         """
         Paste the input file with itself
+        
+        :param input_nodes: two input nodes to paste together
         """
+        inputs = ' '.join([ n.output_paths['txt'] for n in input_node_dict.values() ])
         return {
                 'pcmd': r"""
-                            paste {input} {input} > {{output_dir}}/{{outputs[txt]}}
+                            paste {inputs} > {{output_dir}}/{{outputs[txt]}}
                         """,
-                'pcmd_dict': {'input':input_node.output_paths['txt']}
+                'pcmd_dict': { 'inputs': inputs}
                 }
     
 class Cat(Step):

@@ -1,0 +1,155 @@
+import networkx as nx
+from cosmos.Cosmos.helpers import groupby
+import itertools as it
+
+def merge_dicts(*args):
+    """
+    Merges dictionaries in *args.  On duplicate keys, right most dict take precedence
+    """
+    def md(x,y):
+        x = x.copy()
+        for k,v in y.items(): x[k]=v
+        return x
+    return reduce(md,args)
+
+class Infix:
+    def __init__(self, function):
+        self.function = function
+    def __ror__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+    def __or__(self, other):
+        return self.function(other)
+    def __rlshift__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+    def __rshift__(self, other):
+        return self.function(other)
+    def __call__(self, value1, value2):
+        return self.function(value1, value2)
+    
+    
+#m = Infix(lambda x,y: 'map({0},{1})'.format(x,y)) #map
+#s = Infix(lambda x,y: 'split({0},{1})'.format(x,y)) #split
+#r = Infix(lambda x,y: 'reduce({0},{1})'.format(x,y)) #reduce
+
+G = nx.DiGraph()
+i = 0
+def get_id():
+    global i
+    i +=1
+    return i
+
+class Node():
+    def __init__(self,task):
+        self.task = task
+    def __str__(self):
+        return str(self.task)
+class Task:
+    tags = {}
+    
+    def __init__(self,tags={}):
+        self.id = get_id()
+        self.tags = tags
+    def __str__(self):
+        return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
+
+def _apply(input_nodes,task,add_tags={}):
+    for in_node in input_nodes:
+        new_node = task(merge_dicts(in_node.tags,add_tags))
+        G.add_edge(in_node,new_node)
+        yield new_node
+apply = Infix(_apply) #map
+        
+def _reduce(input_nodes,RHS):
+    keywords = RHS[0]
+    task = RHS[1]
+    for group_tags, input_node_group in groupby(input_nodes,lambda t: dict([(k,t.tags[k]) for k in keywords])):
+        new_node = task(tags=group_tags)
+        for input_node in input_node_group:
+            G.add_edge(input_node,new_node)
+        yield new_node
+reduce = Infix(_reduce)
+
+def _split(input_nodes,RHS):
+    splits = RHS[0]
+    splits = [ (key,val) for key,vals in splits for val in vals ]
+    task = RHS[1]
+    for input_node in input_nodes:
+        for new_tags in it.product(splits):
+            new_node = task(tags=dict(new_tags))
+            G.add_edge(input_node,new_node)
+            yield new_node
+split = Infix(_split)
+        
+def _reduce_and_split(input_nodes,RHS):
+    keywords = RHS[0]
+    splits = RHS[1]
+    splits = [ (key,val) for key,vals in splits for val in vals ]
+    task = RHS[2]
+    gnrtr = groupby(input_nodes,lambda t: dict([(k,t.tags[k]) for k in keywords])) if len(keywords) > 0 else [({},input_nodes)]
+    for group_tags, input_node_group in gnrtr:
+        for new_tags in it.product(splits):
+            new_node = task(merge_dicts(group_tags,new_tags))
+            for input_node in input_node_group:
+                G.add_edge(input_node,new_node)
+            yield new_node
+        
+ 
+reduce_split = Infix(_reduce_and_split)
+
+class ALN(Task):
+    def cmd(self,fastq):
+        return 'bwa aln {0}'.format(fastq)
+class SAMPE(Task):
+    def cmd(self,aln1,aln2):
+        return 'bwa sampe {aln1.fastq} {aln2.fastq} {aln1.sai} {aln2.sai}'.format(aln1=aln1,aln2=aln2)
+class IRTC(Task):
+    def cmd(self,input_bam):
+        return 'IRTC -L {interval}'.format(interval = self.tags['interval']) 
+class IR(Task):
+    def cmd(self,input_bam):
+        return 'IR -L {interval}'.format(interval = self.tags['interval']) 
+class UG(Task):
+    def cmd(self,input_file,glm,interval):
+        return 'UnifiedGenotyper -I {0} -glm {1} -L {2}'.format(input_file,glm,interval)
+class CV(Task):
+    def cmd(self,input_bams):
+        inputs = '-I '.join(input_bams)
+        return 'CombineVariants {inputs}'.format(inputs)
+
+IN = [
+    Task(tags={'sample':'A',
+    'fq_chunk':1,
+    'fq_pair':1}),
+    Task(tags={'sample':'A',
+    'fq_chunk':1,
+    'fq_pair':2}),
+    Task(tags={'sample':'A',
+    'fq_chunk':2,
+    'fq_pair':1}),
+    Task(tags={'sample':'A',
+    'fq_chunk':2,
+    'fq_pair':2}),
+    Task(tags={'sample':'B',
+    'fq_chunk':1,
+    'fq_pair':1}),
+    Task(tags={'sample':'B',
+    'fq_chunk':1,
+    'fq_pair':2}),
+]
+intervals = ('interval',[1,2,3,4])
+glm = ('glm',['SNP','INDEL'])
+
+g = IN \
+|apply| ALN \
+|reduce| (['sample','fq_chunk'],SAMPE) \
+|split| ([intervals],IRTC) \
+|apply| IR
+# \
+#|reduce_split| ([],[intervals], UG)
+
+list(g)
+AG= nx.to_agraph(G)
+AG.layout(prog="dot")
+AG.draw('/tmp/graph.svg',format='svg')
+print 'wrote to /tmp/graph.svg'
+    
