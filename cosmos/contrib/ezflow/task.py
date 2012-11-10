@@ -1,65 +1,75 @@
+import flow,re
+
 i = 0
 def get_id():
     global i
     i +=1
     return i
 
-class Input(object):
-
-    def __init__(self, file_type):
-        self.file_type = file_type
-
-    def __call__(self, f):
-        def wrapped_f(input_nodes,*args,**kwargs):
-            input_nodes.outs[self.format]
-            kwargs[self.file_type] = input_nodes
-            f(*args,**kwargs)
-        return wrapped_f
-
+class DefaultDict( dict ):
+    def __init__(self,*args,**kwargs):
+        return super(DefaultDict, self).__init__(*args,**kwargs) 
+    
+    def __getitem__(self, name):
+        try:
+            return super(DefaultDict, self).__getitem__(name)
+        except KeyError:
+            return "['{0}' NA]".format(name)
 class Task:
-    tags = {}
-    def map_cmd(self,input_nodes):
-        self.id
+    outputs = []
+    inputs = []
+    
+    def __init__(self,tags=DefaultDict(),outputs={}):
+        self.id = get_id()
+        self.tags = DefaultDict()
+        self.output_paths = DefaultDict()
+        for k,v in tags.items(): self.tags[k] = v 
+        for k,v in outputs.items():
+            self.set_output_path(k,v)
+    
+    @property
+    def parents(self):
+        return flow.DAG.predecessors(self)
+    
+    @property
+    def parent(self):
+        ps = flow.DAG.predecessors(self)
+        if len(ps) > 1:
+            raise Exception('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
+        elif len(ps) == 0:
+            raise Exception('{0} has no parents'.format(self))
+        else:
+            return ps[0]
+    @property
+    def label(self):
+        tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(re.sub('interval','chr',k),v) for k,v in self.tags.items() ]))
+        return "{0}{1}\\n{2}".format(self.__verbose_name__ if hasattr(self,'__verbose_name__') else self.__class__.__name__,tags,self.pcmd)
+        
+    @property
+    def pcmd(self):
+        return self.map_cmd()
+    
+    def map_cmd(self):
+        try:
+            if len(self.parents) > 1:
+                inputs = [ p.output_paths[self.inputs[0]] for p in self.parents ]
+                return self.cmd(inputs)
+            return self.cmd(self.parent.output_paths[self.inputs[0]])
+        except IndexError:
+            print "inputs for {0} are {1}".format(self,self.inputs)
+            raise
+        except TypeError:
+            print "{0}.map_cmd failed with TypeError".format(self)
+            raise
         
     def cmd(self,*args,**kwargs):
         raise NotImplementedError()
     
-    def __init__(self,tags={}):
-        self.id = get_id()
-        self.tags = tags
+    def set_output_path(self,name,path):
+        if name not in self.outputs:
+            raise Exception('Invalid output name')
+        self.output_paths[name] = path
+    
     def __str__(self):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
-
-
-class ALN(Task):
-    inputs = ['fastq']
-    outputs = ['fastq','sai']
-    @input('fastq')
-    def cmd(self,fastq):
-        return 'bwa aln $IN.fastq > $OUT.sai'.format(fastq)
-class SAMPE(Task):
-    outputs = ['sam']
-    def map_cmd(self,input_nodes):
-        "Expecting 2 input nodes"
-        ins = input_nodes
-        return self.cmd(ins[0].out['fastq'],ins[1].out['fastq'],ins[0].out['sai'],ins[1].out['sai'])
-    def cmd(self,fastq1,fastq2,aln1,aln2):
-        return 'bwa sampe {0} {1} {2} {3} > $OUT.sai'.format(fastq1,fastq2,aln1,aln2)
-class CLEAN_SAM(Task):
-    outputs=['bam']
-    @input('sam')
-    def cmd(self,sam):
-        return ''.format()
-class IRTC(Task):
-    def cmd(self,input_bam):
-        return 'IRTC -L {interval}'.format(interval = self.tags['interval']) 
-class IR(Task):
-    def cmd(self,input_bam):
-        return 'IR -L {interval}'.format(interval = self.tags['interval']) 
-class UG(Task):
-    def cmd(self,input_file,glm,interval):
-        return 'UnifiedGenotyper -I {0} -glm {1} -L {2}'.format(input_file,glm,interval)
-class CV(Task):
-    def cmd(self,input_bams):
-        inputs = '-I '.join(input_bams)
-        return 'CombineVariants {inputs}'.format(inputs)
+    

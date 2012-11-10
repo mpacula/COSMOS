@@ -653,21 +653,21 @@ class WorkflowManager():
         return map(lambda n_id: Node.objects.get(pk=n_id),filter(lambda x: x not in self.queued_nodes,degree_0_nodes))
     
     def createDiGraph(self):
-        G = nx.DiGraph()
-        G.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.node_edges.values('parent','child')])
+        DAG = nx.DiGraph()
+        DAG.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.node_edges.values('parent','child')])
         for batch in self.workflow.batches:
             batch_name = batch.name
             for n in batch.nodes.values('id','tags','status'):
-                G.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],batch=batch_name)
-        return G
+                DAG.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],batch=batch_name)
+        return DAG
     
     def createAGraph(self,dag):
-        G = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
-        G.node_attr['fontname']="Courier"
-        G.node_attr['fontsize']=8
-        G.add_edges_from(dag.edges())
+        DAG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
+        DAG.node_attr['fontname']="Courier"
+        DAG.node_attr['fontsize']=8
+        DAG.add_edges_from(dag.edges())
         for batch,nodes in helpers.groupby(dag.nodes(data=True),lambda x:x[1]['batch']):
-            sg = G.add_subgraph(name="cluster_{0}".format(batch),label=batch,color='lightgrey')
+            sg = DAG.add_subgraph(name="cluster_{0}".format(batch),label=batch,color='lightgrey')
             for n,attrs in nodes:
                 def truncate_val(kv):
                     v = "{0}".format(kv[1])
@@ -677,7 +677,7 @@ class WorkflowManager():
                 status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
                 sg.add_node(n,label=label,URL='/Workflow/Node/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
             
-        return G
+        return DAG
     
 #    def simple_path(self,head,vs):
 #        """
