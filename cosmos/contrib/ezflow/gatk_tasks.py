@@ -1,5 +1,8 @@
 from task import Task
-from decorators import pformat
+from decorators import pformat, fromtags, opoi
+
+def list2input(l):
+    return " -I ".join(l)
 
 class FASTQ(Task):
     __verbose_name__ = "Fastq Input"
@@ -7,24 +10,22 @@ class FASTQ(Task):
     outputs = ['fastq']
     
     def map_cmd(self):
-        return ''
+        return None
 
 class ALN(Task):
     __verbose_name__ = "Reference Alignment"
+    inputs = ['fastq']
+    outputs = ['sai']
     
-    outputs = ['fastq','sai']
-    
-    def map_cmd(self):
-        fastq = self.parent.output_paths['fastq']
-        return self.cmd(fastq)
-    
+    @opoi
+    @pformat
     def cmd(self,fastq):
-        return 'bwa aln {fastq} > $OUT.sai'.format(fastq=fastq)
+        return 'bwa aln {fastq} > $OUT.sai'
     
 class SAMPE(Task):
     __verbose_name__ = "Paired End Mapping"
     
-    outputs = ['sam']
+    inputs = ['sam']
     outputs = ['bam']
     
     def map_cmd(self):
@@ -42,13 +43,9 @@ class CLEAN_SAM(Task):
     inputs = ['sam']
     outputs=['bam']
     
-    def map_cmd(self):
-        sams = [ p.output_paths['bam'] for p in self.parents ]
-        return self.cmd(sams)
-    
     @pformat
     def cmd(self,sams):
-        return 'cleansam {sams} -o $OUT.bam'
+        return 'cleansam {0} -o $OUT.bam'.format(list2input(sams))
     
 class IRTC(Task):
     __verbose_name__ = "Indel Realigner Target Creator"
@@ -56,13 +53,10 @@ class IRTC(Task):
     inputs = ['bam']
     outputs = ['targets']
     
-    def map_cmd(self):
-        bams = [ p.output_paths['bam'] for p in self.parents ]
-        return self.cmd(bams,self.tags['interval'])
-    
+    @fromtags('interval')
     @pformat
     def cmd(self,input_bams,interval):
-        return 'IRTC -I {{input_bams}} -L {{interval}} > $OUT.targets'.format(' -I '.join(input_bams))
+        return 'IRTC -I {0} -L {{interval}} > $OUT.targets'.format(list2input(input_bams))
     
 class IR(Task):
     __verbose_name__ = "Indel Realigner"
@@ -71,10 +65,9 @@ class IR(Task):
     
     def map_cmd(self):
         input_bam = self.parent.parent.output_paths['bam']
-        return self.cmd(input_bam,self.tags['interval'],self.parent.output_paths['targets'])
+        return self.cmd(input_bam,self.parent.output_paths['targets'],interval=self.tags['interval'])
     
-    @pformat
-    def cmd(self,input_bam,interval,targets):
+    def cmd(self,input_bam,targets,interval):
         return 'IR -I {input_bam} -L {interval} -t {targets}'
     
 class BQSR(Task):
@@ -82,13 +75,9 @@ class BQSR(Task):
     inputs = ['bam']
     outputs = ['recal']
     
-    def map_cmd(self):
-        bams = [ p.output_paths['bam'] for p in self.parents ]
-        return self.cmd(bams,self.tags['interval'])
-    
     @pformat
-    def cmd(self,input_bams,interval):
-        return 'BQSR -I {0} -L {{interval}} > $OUT.recal'.format(' -I '.join(input_bams))
+    def cmd(self,input_bams):
+        return 'BQSR -I {0} > $OUT.recal'.format(' -I '.join(input_bams))
     
 class PR(Task):
     __verbose_name__ = "Apply BQSR"
@@ -96,25 +85,22 @@ class PR(Task):
     outputs = ['bam']
     
     def map_cmd(self):
-        bams = [ p.output_paths['bam'] for p in self.parent.parents ]
-        return self.cmd(bams,self.tags['interval'])
+        input_bams = [p.output_paths['bam'] for p in self.parent.parents ] 
+        return self.cmd(input_bams,self.parent.output_paths['recal'])
     
-    @pformat
-    def cmd(self,input_bam,interval):
-        return 'IR -I {input_bam} -L {interval}'
+    def cmd(self,input_bams,recal):
+        return 'PrintReads -I {0} -r {{recal}}'.format(list2input(input_bams))
     
     
 class UG(Task):
     __verbose_name__ = "Unified Genotyper"
     inputs = ['bam']
     outputs = ['vcf']
-    def map_cmd(self):
-        bams = [ p.output_paths['bam'] for p in self.parents ]
-        return self.cmd(bams,self.tags['glm'],self.tags['interval'])
     
+    @fromtags('interval','glm')
     @pformat
     def cmd(self,input_bams,glm,interval):
-        return 'UnifiedGenotyper -I {0} -glm {{glm}} -L {{interval}}'.format(' -I '.join(input_bams))
+        return 'UnifiedGenotyper -I {0} -glm {{glm}} -L {{interval}}'.format(list2input(input_bams))
     
 class CV(Task):
     __verbose_name__ = "Combine Variants"
@@ -122,16 +108,15 @@ class CV(Task):
     inputs = ['vcf']
     outputs = ['vcf']
     
-    @pformat
     def cmd(self,input_vcfs):
-        ins = '-I '.join(input_vcfs)
-        return 'CombineVariants {ins}'.format(ins=ins)
+        return 'CombineVariants {ins}'.format(ins=list2input(input_vcfs))
     
 class VQSR(Task):
     __verbose_name__ = "Variant Quality Score Recalibration"
     inputs = ['vcf']
     outputs = ['recal']
     
+    @opoi
     @pformat
     def cmd(self,input_vcf):
         return 'vqsr {input_vcf} > $OUT.recal'
@@ -142,6 +127,7 @@ class Apply_VQSR(Task):
     inputs = ['vcf','recal']
     outputs = ['vcf']
     
+    @opoi
     @pformat
     def cmd(self,input_vcf,recal):
         return 'apply vqsr {input_vcf} {recal} > $OUT.vcf'
@@ -151,39 +137,46 @@ class ANNOVAR(Task):
     inputs = ['vcf']
     outputs = ['tsv']
     
-    @pformat
-    def cmd(self,input_vcf):
-        return ''
+    @fromtags('database')
+    @opoi
+    def cmd(self,input_vcf,database):
+        return 'annovar {input_vcf} {database}'
     
 class PROCESS_ANNOVAR(Task):
     __verbose_name__ = "Process Annovar"
     inputs = ['tsv']
     outputs = ['tsv']
     
+    @opoi
+    @pformat
     def cmd(self,input_tsv):
-        return ''
+        return 'genomekey {input_tsv}'
     
 class MERGE_ANNOTATIONS(Task):
     __verbose_name__ = "Merge Annotations"
     inputs = ['tsv']
     outputs = ['tsv']
     
-    def cmd(self,input_tsv):
-        return ''
+    def cmd(self,input_tsvs):
+        return 'genomekey merge {0}'.format(','.join(input_tsvs))
     
 class SQL_DUMP(Task):
     __verbose_name__ = "SQL Dump"
     inputs = ['tsv']
     inputs = ['sql']
     
+    @opoi
+    @pformat
     def cmd(self,input_tsv):
-        return ''
+        return 'sql dump {input_tsv}'
     
 class ANALYSIS(Task):
     __verbose_name__ = "Filtration And Analysis"
     inputs = ['sql']
     outputs = ['analysis']
     
+    @opoi
+    @pformat
     def cmd(self,input_sql):
-        return ''
+        return 'analyze {input_sql}'
     
