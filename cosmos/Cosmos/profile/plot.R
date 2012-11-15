@@ -7,6 +7,6 @@ library(ggplot2)
 df = read.csv(input_file_path)
 
 png(file=output_file_path, width=800, height=600,res=100)
-Batch = df$batch
-qplot(df$avg_rss_mem/1024/1024, df$wall_time/60, colour = Batch, xlab="Memory (GB)",ylab="Time (min)",main="Wall Time vs Average Memory")
+Stage = df$stage
+qplot(df$avg_rss_mem/1024/1024, df$wall_time/60, colour = Stage, xlab="Memory (GB)",ylab="Time (min)",main="Wall Time vs Average Memory")
 dev.off()

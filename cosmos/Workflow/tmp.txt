@@ -1,4 +1,4 @@
-        {% for j in node.jobAttempts %}
+        {% for j in task.jobAttempts %}
             <li style="list-style-type:none">
                 {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
                 {%if j.queue_status == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
@@ -9,5 +9,5 @@
                 <a href="{{j.url}}">{{ j }}</a>
             </li>
         {% empty %}
-          No job attempts in this node.
+          No job attempts in this task.
         {% endfor %}

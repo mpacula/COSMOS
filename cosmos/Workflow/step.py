@@ -7,9 +7,9 @@ def merge_dicts(x,y):
     for k,v in y.items(): x[k]=v
     return x
 
-def dict2node_name(d):
+def dict2task_name(d):
     s = ' '.join([ '{0}-{1}'.format(k,v) for k,v in d.items() ])
-    if s == '': return 'node'
+    if s == '': return 'task'
     return s
 
 class StepError(Exception):
@@ -28,7 +28,7 @@ class Step():
     
     def __init__(self,name=None,hard_reset=False,**kwargs):
         """
-        :param hard_reset: Deletes the old batch before creating this one  
+        :param hard_reset: Deletes the old stage before creating this one  
         """
         if workflow is None:
             raise Exception('Set the parameter step.workflow to your Workflow before adding steps.')
@@ -37,7 +37,7 @@ class Step():
             name = type(self)
         self.name = name 
         
-        self.batch = workflow.add_batch(self.name,hard_reset=hard_reset)
+        self.stage = workflow.add_stage(self.name,hard_reset=hard_reset)
 
 
     def _parse_cmd2(self,string,dictnry,**kwargs):
@@ -48,81 +48,81 @@ class Step():
         d['self'] = self
         return parse_cmd(string,**d)
     
-    def one2one(self,input_batch,*args,**kwargs):
-        if not self.batch.successful:
-            for n in input_batch.nodes:
-                r = self.one2one_cmd(input_node=n,*args,**kwargs)
+    def one2one(self,input_stage,*args,**kwargs):
+        if not self.stage.successful:
+            for n in input_stage.tasks:
+                r = self.one2one_cmd(input_task=n,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                self.batch.add_node(name = n.name,
-                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
+                self.stage.add_task(name = n.name,
+                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_task=n,tags=n.tags),
                                     tags = n.tags,
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
-            workflow.run_wait(self.batch)
-        return self.batch
+            workflow.run_wait(self.stage)
+        return self.stage
     
-    def many2one(self,input_batch,group_by=[],*args,**kwargs):
+    def many2one(self,input_stage,group_by=[],*args,**kwargs):
         """
         
-        :param group_by: a list of tag keywords with which to parallelize input by.  see the keys parameter in :func:`Workflow.models.Workflow.group_nodes_by`.  An empty list will simply place all nodes in the batch into one group.
+        :param group_by: a list of tag keywords with which to parallelize input by.  see the keys parameter in :func:`Workflow.models.Workflow.group_tasks_by`.  An empty list will simply place all tasks in the stage into one group.
         
         """
-        #TODO make sure there are no name conflicts in kwargs and 'input_batch' and 'group_by'
-        if not self.batch.successful:
-            for tags,input_nodes in input_batch.group_nodes_by(keys=group_by):
-                r = self.many2one_cmd(input_nodes=input_nodes,tags=tags,*args,**kwargs)
+        #TODO make sure there are no name conflicts in kwargs and 'input_stage' and 'group_by'
+        if not self.stage.successful:
+            for tags,input_tasks in input_stage.group_tasks_by(keys=group_by):
+                r = self.many2one_cmd(input_tasks=input_tasks,tags=tags,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                self.batch.add_node(name = dict2node_name(tags),
+                self.stage.add_task(name = dict2task_name(tags),
                                     pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
                                     tags = tags,
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
-            workflow.run_wait(self.batch)
-        return self.batch
+            workflow.run_wait(self.stage)
+        return self.stage
     
-    def one2many(self,input_batch,*args,**kwargs):
+    def one2many(self,input_stage,*args,**kwargs):
         """
-        Used when one input node becomes multiple output nodes
+        Used when one input task becomes multiple output tasks
         """
-        if not self.batch.successful:
-            for n in input_batch.nodes:
-                for r in self.one2many_cmd(input_node=n,*args,**kwargs):
+        if not self.stage.successful:
+            for n in input_stage.tasks:
+                for r in self.one2many_cmd(input_task=n,*args,**kwargs):
                     validate_dict_has_keys(r,['pcmd','add_tags'])
                     pcmd_dict = r.setdefault('pcmd_dict',{})
                     new_tags = merge_dicts(n.tags, r['add_tags'])
-                    self.batch.add_node(name = dict2node_name(new_tags),
-                                        pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_node=n,tags=n.tags),
+                    self.stage.add_task(name = dict2task_name(new_tags),
+                                        pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_task=n,tags=n.tags),
                                         tags = new_tags,
                                         outputs = self.outputs,
                                         mem_req = self.mem_req,
                                         cpu_req = self.cpu_req)
-            workflow.run_wait(self.batch)
-        return self.batch
+            workflow.run_wait(self.stage)
+        return self.stage
     
-    def many2many(self,input_batch,*args,**kwargs):
+    def many2many(self,input_stage,*args,**kwargs):
         """
         Used when the parallelization is complex enough that the command should specify it.  The func:`self.many2many_cmd` will be passed
-        the entire input_batch rather than any nodes.
+        the entire input_stage rather than any tasks.
         """
-        if not self.batch.successful:
-            for r in self.many2many_cmd(input_batch=input_batch,*args,**kwargs):
+        if not self.stage.successful:
+            for r in self.many2many_cmd(input_stage=input_stage,*args,**kwargs):
                 #Set defaults
                 validate_dict_has_keys(r,['pcmd','new_tags'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                name = r.setdefault('name',dict2node_name(r['new_tags']))
-                self.batch.add_node(name = name,
-                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_batch=input_batch,tags=r['new_tags']),
+                name = r.setdefault('name',dict2task_name(r['new_tags']))
+                self.stage.add_task(name = name,
+                                    pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_stage=input_stage,tags=r['new_tags']),
                                     tags = r['new_tags'],
                                     outputs = self.outputs,
                                     mem_req = self.mem_req,
                                     cpu_req = self.cpu_req)
-            workflow.run_wait(self.batch)
-        return self.batch
+            workflow.run_wait(self.stage)
+        return self.stage
     
     
-    def one2one_cmd(self,input_node,*args,**kwargs):
+    def one2one_cmd(self,input_task,*args,**kwargs):
         """
         The command to run
         
@@ -130,7 +130,7 @@ class Step():
         """
         raise NotImplementedError()
     
-    def many2one_cmd(self,input_nodes,tags,*args,**kwargs):
+    def many2one_cmd(self,input_tasks,tags,*args,**kwargs):
         """"
         The command to run
         
@@ -138,7 +138,7 @@ class Step():
         """
         raise NotImplementedError()
     
-    def one2many_cmd(self,input_node,*args,**kwargs):
+    def one2many_cmd(self,input_task,*args,**kwargs):
         """
         The command to run
         
@@ -146,7 +146,7 @@ class Step():
         """
         raise NotImplementedError()
     
-    def many2many_cmd(self,input_batch,*args,**kwargs):
+    def many2many_cmd(self,input_stage,*args,**kwargs):
         """
         The command to run
         

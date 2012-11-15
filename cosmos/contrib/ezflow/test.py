@@ -1,5 +1,6 @@
 import re 
-print re.search('\..+$','/path/to.fastq').group(0)
+print re.search('\$OUT\.([\w]+)','asdf $OUT.sai fsd').groups()
+
 
         
         

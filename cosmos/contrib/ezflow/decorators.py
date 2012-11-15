@@ -130,15 +130,17 @@ def cosmos_format(s,d):
         print >> sys.stderr, "\tWith: {0}".format(pprint.pformat(d))
         raise
 
+class PFormatError(Exception): pass
+
 @decorator.decorator
 def pformat(func,*args,**kwargs):
     callargs = getcallargs(func,*args,**kwargs)
     if 'self' in callargs: del callargs['self']
+    r = func(*args,**kwargs)
     try:
-        r = func(*args,**kwargs)
+        return cosmos_format(r,callargs)
     except TypeError as e:
-        raise TypeError("{0} - callargs = {1}".format(e,callargs))
-    return cosmos_format(r,callargs)
+        raise PFormatError("{0} - callargs = {1}".format(e,callargs))
     
 
 #class X(object):
@@ -172,7 +174,7 @@ def fromtags(*tags):
         except KeyError:
             print "@fromtags Error: {0} does not exist in {1}.tags which is {2}".format(t,instance,instance.tags)
             raise
-        return fxn(**callargs)
+        return pformat(fxn)(**callargs)
     
     return wrapped
 
@@ -203,7 +205,7 @@ def opoi(func,*args,**kwargs):
         callargs[first_arg] = callargs[first_arg][0]
     except IndexError as e:
         raise DecException("{0}. - Does the command have at least one input? args = {1} kwargs = {2}".format(e, args, kwargs))
-    return func(**callargs)
+    return pformat(func)(**callargs)
 
 #class X(object):
 #    def x(self,paramA,param1):

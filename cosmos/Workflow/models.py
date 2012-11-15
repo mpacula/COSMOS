@@ -22,7 +22,7 @@ status_choices=(
 
 class Workflow(models.Model):
     """   
-    This is the master object.  It contains a list of :class:`Batch` which represent a pool of jobs that have no dependencies on each other
+    This is the master object.  It contains a list of :class:`Stage` which represent a pool of jobs that have no dependencies on each other
     and can be executed at the same time. 
     """
     name = models.CharField(max_length=250,unique=True)
@@ -50,19 +50,19 @@ class Workflow(models.Model):
         self.log, self.log_path = get_workflow_logger(self) 
         
     @property
-    def nodes(self):
-        """Nodes in this Workflow"""
-        return Node.objects.filter(batch__in=self.batch_set.all())
+    def tasks(self):
+        """Tasks in this Workflow"""
+        return Task.objects.filter(stage__in=self.stage_set.all())
     
     @property
-    def node_edges(self):
+    def task_edges(self):
         """Edges in this Workflow"""
-        return NodeEdge.objects.filter(parent__in=self.nodes)
+        return TaskEdge.objects.filter(parent__in=self.tasks)
     
     @property
-    def node_tags(self):
-        """NodeTags in this Workflow"""
-        return NodeTag.objects.filter(node__in=self.nodes)
+    def task_tags(self):
+        """TaskTags in this Workflow"""
+        return TaskTag.objects.filter(task__in=self.tasks)
     
     @property
     def wall_time(self):
@@ -70,17 +70,17 @@ class Workflow(models.Model):
         return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
     
     @property
-    def total_batch_wall_time(self):
+    def total_stage_wall_time(self):
         """
-        Sum(batch_wall_times).  Can be different from workflow.wall_time due to workflow stops and resumes.
+        Sum(stage_wall_times).  Can be different from workflow.wall_time due to workflow stops and resumes.
         """
-        times = map(lambda x: x['finished_on']-x['started_on'],Batch.objects.filter(workflow=self).values('finished_on','started_on'))
+        times = map(lambda x: x['finished_on']-x['started_on'],Stage.objects.filter(workflow=self).values('finished_on','started_on'))
         return reduce(lambda x,y: x+y, filter(lambda wt: wt,times))
     
     @property
-    def batches(self):
-        """Batches in this Workflow"""
-        return self.batch_set.all()
+    def stages(self):
+        """Stagees in this Workflow"""
+        return self.stage_set.all()
     
     @property
     def file_size(self):
@@ -135,7 +135,7 @@ class Workflow(models.Model):
     @staticmethod
     def __resume(name=None,dry_run=False, default_queue=None):
         """
-        Resumes a workflow from the last failed node.
+        Resumes a workflow from the last failed task.
         
         :param name: (str) A unique name for this workflow
         :param dry_run: (bool) Don't actually execute jobs. Optional.
@@ -152,7 +152,7 @@ class Workflow(models.Model):
         
         wf.save()
         wf.log.info('Resuming workflow.')
-        Batch.objects.filter(workflow=wf).update(order_in_workflow=None)
+        Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
         
         return wf
 
@@ -201,35 +201,35 @@ class Workflow(models.Model):
         return wf
             
         
-    def add_batch(self, name):
+    def add_stage(self, name):
         """
-        Adds a batch to this workflow.  If a batch with this name (in this Workflow) already exists,
+        Adds a stage to this workflow.  If a stage with this name (in this Workflow) already exists,
         and it hasn't been added in this session yet, return the existing one.
         
-        :parameter name: (str) The name of the batch, must be unique within this Workflow. Required.
+        :parameter name: (str) The name of the stage, must be unique within this Workflow. Required.
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
-        self.log.info("Adding batch {0}.".format(name))
+        self.log.info("Adding stage {0}.".format(name))
         #determine order in workflow
-        m = Batch.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
+        m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
         if m is None:
             order_in_workflow = 1
         else:
             order_in_workflow = m+1
         
-        batch_exists = Batch.objects.filter(workflow=self,name=name).count()>0
+        stage_exists = Stage.objects.filter(workflow=self,name=name).count()>0
         _old_id = None
-        if batch_exists:
-            old_batch = Batch.objects.get(workflow=self,name=name)
-            _old_id = old_batch.id
-            if old_batch.status == 'failed' or old_batch.status == 'in_progress':
-                unadded_batches = list(self.batches.filter(order_in_workflow=None)) + [ old_batch ] #TODO filter using DAG, so that only dependent batches are deleted
-                unadded_batches_str = ', '.join(map(lambda x: x.__str__(), unadded_batches))
-                if helpers.confirm('{0} has a status of failed.  Would you like to restart the workflow from here?  Answering yes will delete the following batches: {1}. Answering no will only delete and re-run unsuccessful jobs.'.format(old_batch,unadded_batches_str),default=True):
-                    map(lambda b: b.delete(),unadded_batches)
+        if stage_exists:
+            old_stage = Stage.objects.get(workflow=self,name=name)
+            _old_id = old_stage.id
+            if old_stage.status == 'failed' or old_stage.status == 'in_progress':
+                unadded_stages = list(self.stages.filter(order_in_workflow=None)) + [ old_stage ] #TODO filter using DAG, so that only dependent stages are deleted
+                unadded_stages_str = ', '.join(map(lambda x: x.__str__(), unadded_stages))
+                if helpers.confirm('{0} has a status of failed.  Would you like to restart the workflow from here?  Answering yes will delete the following stages: {1}. Answering no will only delete and re-run unsuccessful jobs.'.format(old_stage,unadded_stages_str),default=True):
+                    map(lambda b: b.delete(),unadded_stages)
                 
-        b, created = Batch.objects.get_or_create(workflow=self,name=name,id=_old_id)
+        b, created = Stage.objects.get_or_create(workflow=self,name=name,id=_old_id)
         if created:
             self.log.info('Creating {0} from scratch.'.format(b))
         else:
@@ -245,7 +245,7 @@ class Workflow(models.Model):
         Deletes objects that are stale from the database.  This should only happens when the program exists ungracefully.
         """
         #TODO implement a catch all exception so that this never happens.  i think i can only do this if scripts are not run directly
-        for ja in JobAttempt.objects.filter(node_set=None): ja.delete()
+        for ja in JobAttempt.objects.filter(task_set=None): ja.delete()
         
     
     def terminate(self):
@@ -263,17 +263,17 @@ class Workflow(models.Model):
             cmd = 'qdel {0}'.format(jid)
             os.system(cmd)
         
-        #this basically a bulk node._has_finished and jobattempt.hasFinished
+        #this basically a bulk task._has_finished and jobattempt.hasFinished
         self.log.info("Marking all terminated JobAttempts as failed.")
         jobAttempts.update(queue_status='completed',finished_on = timezone.now())
-        nodes = Node.objects.filter(_jobAttempts__in=jids)
+        tasks = Task.objects.filter(_jobAttempts__in=jids)
 
-        self.log.info("Marking all terminated Nodes as failed.")
-        nodes.update(status = 'failed',finished_on = timezone.now())
+        self.log.info("Marking all terminated Tasks as failed.")
+        tasks.update(status = 'failed',finished_on = timezone.now())
         
-        self.log.info("Marking all terminated Batches as failed.")
-        batches = Batch.objects.filter(pk__in=nodes.values('batch').distinct())
-        batches.update(status = 'failed',finished_on = timezone.now())
+        self.log.info("Marking all terminated Stagees as failed.")
+        stages = Stage.objects.filter(pk__in=tasks.values('stage').distinct())
+        stages.update(status = 'failed',finished_on = timezone.now())
         
         self.finished()
         
@@ -281,73 +281,73 @@ class Workflow(models.Model):
         sys.exit(1)
     
     def get_all_tag_keys_used(self):
-        """Returns a set of all the keyword tags used on any node in this workflow"""
-        return set([ d['key'] for d in NodeTag.objects.filter(node__in=self.nodes).values('key') ])
+        """Returns a set of all the keyword tags used on any task in this workflow"""
+        return set([ d['key'] for d in TaskTag.objects.filter(task__in=self.tasks).values('key') ])
     
     def save_resource_usage_as_csv(self,filename):
         """Save resource usage to filename"""
         import csv
         profile_fields = JobAttempt.profile_fields_as_list()
-        keys = ['batch'] + list(self.get_all_tag_keys_used()) + profile_fields
+        keys = ['stage'] + list(self.get_all_tag_keys_used()) + profile_fields
         f = open(filename, 'wb')
         dict_writer = csv.DictWriter(f, keys)
         dict_writer.writer.writerow(keys)
-        for batch_resources in self.yield_batch_resource_usage():
-            dict_writer.writerows(batch_resources)
+        for stage_resources in self.yield_stage_resource_usage():
+            dict_writer.writerows(stage_resources)
 
-    def yield_batch_resource_usage(self):
+    def yield_stage_resource_usage(self):
         """
-        :yields: A dict of all resource usage, tags, and the name of the batch of every node
+        :yields: A dict of all resource usage, tags, and the name of the stage of every task
         """
-        for batch in self.batches:
-            dicts = [ dict(nru) for nru in batch.yield_node_resource_usage() ]
-            for d in dicts: d['batch'] = re.sub('_',' ',batch.name)
+        for stage in self.stages:
+            dicts = [ dict(nru) for nru in stage.yield_task_resource_usage() ]
+            for d in dicts: d['stage'] = re.sub('_',' ',stage.name)
             yield dicts
     
     @transaction.commit_on_success
-    def bulk_save_nodes(self,data):
+    def bulk_save_tasks(self,data):
         """
-        Does a bulk insert to speedup adding lots of nodes.  Will filter out any None values in the nodes_and_tags list.
+        Does a bulk insert to speedup adding lots of tasks.  Will filter out any None values in the tasks_and_tags list.
         
-        :param data: (list of {Node,dict,bool,parent_nodes)}) ie: [(node1,tags1,node_exists,parents),(node2,tags2,node_exists,parent_nodes),...]
+        :param data: (list of {Task,dict,bool,parent_tasks)}) ie: [(task1,tags1,task_exists,parents),(task2,tags2,task_exists,parent_tasks),...]
         
-        >>> nodes = [(batch.add_node(name='1'pcmd='cmd1',save=False),{},True,[]),(batch.add_node(name='2',pcmd='cmd2',save=False,{},True,[]))]
-        >>> batch.bulk_add_nodes(nodes)
+        >>> tasks = [(stage.add_task(name='1'pcmd='cmd1',save=False),{},True,[]),(stage.add_task(name='2',pcmd='cmd2',save=False,{},True,[]))]
+        >>> stage.bulk_add_tasks(tasks)
         """
         
-        ### Bulk add nodes
-        self.log.info("Bulk adding {0} nodes...".format(len(data)))
-        filtered_data = filter(lambda x: not x['node_exists'],data)
+        ### Bulk add tasks
+        self.log.info("Bulk adding {0} tasks...".format(len(data)))
+        filtered_data = filter(lambda x: not x['task_exists'],data)
         if len(filtered_data) == 0:
             return []
         
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
-        m = Node.objects.all().aggregate(models.Max('id'))['id__max']
+        m = Task.objects.all().aggregate(models.Max('id'))['id__max']
         id_start =  m + 1 if m else 1
-        for i,d in enumerate(filtered_data): d['node'].id = id_start + i
+        for i,d in enumerate(filtered_data): d['task'].id = id_start + i
         
-        Node.objects.bulk_create(map(lambda d: d['node'], filtered_data))
+        Task.objects.bulk_create(map(lambda d: d['task'], filtered_data))
         #create output directories
-        for n in map(lambda d: d['node'], filtered_data):
+        for n in map(lambda d: d['task'], filtered_data):
             os.mkdir(n.output_dir)
             os.mkdir(n.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
         
         ### Bulk add tags
         #TODO validate that all tags have the same keyword
-        nodetags = []
+        tasktags = []
         for d in filtered_data:
             for k,v in d['tags'].items():
-                nodetags.append(NodeTag(node=d['node'],key=k,value=v))
-        self.log.info("Bulk adding {0} node tags...".format(len(nodetags)))
-        NodeTag.objects.bulk_create(nodetags)
+                tasktags.append(TaskTag(task=d['task'],key=k,value=v))
+        self.log.info("Bulk adding {0} task tags...".format(len(tasktags)))
+        TaskTag.objects.bulk_create(tasktags)
         
         ### Bulk add parents
-        node_edges = []
+        task_edges = []
         for d in filtered_data:
             for parent in d['parents']:
-                node_edges.append(NodeEdge(parent=parent,child=d['node'],tags=d['tags']))
-        self.log.info("Bulk adding {0} node edges...".format(len(node_edges)))
-        NodeEdge.objects.bulk_create(node_edges)
+                task_edges.append(TaskEdge(parent=parent,child=d['task'],tags=d['tags']))
+        self.log.info("Bulk adding {0} task edges...".format(len(task_edges)))
+        TaskEdge.objects.bulk_create(task_edges)
         
         return
             
@@ -366,15 +366,15 @@ class Workflow(models.Model):
             
         self.jobManager.delete()
         self.log.info('Bulk deleting JobAttempts...')
-        JobAttempt.objects.filter(node_set__in = self.nodes).delete()
-        self.log.info('Bulk deleting NodeTags...')
-        self.node_tags.delete()
-        self.log.info('Bulk deleting NodeEdges...')
-        self.node_edges.delete()
-        self.log.info('Bulk deleting Nodes...')
-        self.nodes.delete()
-        self.log.info('Deleting Batches...'.format(self.name))
-        self.batches.delete()
+        JobAttempt.objects.filter(task_set__in = self.tasks).delete()
+        self.log.info('Bulk deleting TaskTags...')
+        self.task_tags.delete()
+        self.log.info('Bulk deleting TaskEdges...')
+        self.task_edges.delete()
+        self.log.info('Bulk deleting Tasks...')
+        self.tasks.delete()
+        self.log.info('Deleting Stagees...'.format(self.name))
+        self.stages.delete()
         self.log.info('{0} Deleted.'.format(self))
         
         
@@ -386,246 +386,246 @@ class Workflow(models.Model):
                 
 
     
-    def _run_node(self,node):
+    def _run_task(self,task):
         """
         Creates and submits and JobAttempt.
         
-        :param node: the node to submit a JobAttempt for
+        :param task: the task to submit a JobAttempt for
         """
         #TODO fix this slowness
-        if node.batch.status == 'no_attempt':
-            node.batch.status = 'in_progress'
-            node.batch.started_on = timezone.now()
-            node.batch.save()
-        node.status = 'in_progress'
-        self.log.info('Running {0}'.format(node))
+        if task.stage.status == 'no_attempt':
+            task.stage.status = 'in_progress'
+            task.stage.started_on = timezone.now()
+            task.stage.save()
+        task.status = 'in_progress'
+        self.log.info('Running {0}'.format(task))
         try:
-            node.exec_command = node.pre_command.format(output_dir=node.job_output_dir,outputs = node.outputs)
+            task.exec_command = task.pre_command.format(output_dir=task.job_output_dir,outputs = task.outputs)
         except KeyError:
-            helpers.formatError(node.pre_command,{'output_dir':node.job_output_dir,'outputs': node.outputs})
+            helpers.formatError(task.pre_command,{'output_dir':task.job_output_dir,'outputs': task.outputs})
                 
         #create command.sh that gets executed
         
-        jobAttempt = self.jobManager.add_jobAttempt(command=node.exec_command,
-                                     drmaa_output_dir=os.path.join(node.output_dir,'drmaa_out/'),
+        jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
+                                     drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
                                      jobName="",
                                      drmaa_native_specification=get_drmaa_ns(DRM=session.settings.DRM,
-                                                                             mem_req=node.memory_requirement,
-                                                                             cpu_req=node.cpu_requirement,
+                                                                             mem_req=task.memory_requirement,
+                                                                             cpu_req=task.cpu_requirement,
                                                                              queue=self.default_queue))
         
-        node._jobAttempts.add(jobAttempt)
+        task._jobAttempts.add(jobAttempt)
         if self.dry_run:
             self.log.info('Dry Run: skipping submission of job {0}.'.format(jobAttempt))
         else:
             self.jobManager.submit_job(jobAttempt)
             self.log.info('Submitted jobAttempt with drmaa jobid {0}.'.format(jobAttempt.drmaa_jobID))
-        node.save()
+        task.save()
         #self.jobManager.save()
         return jobAttempt
 
-#    def run_batch(self,batch):
+#    def run_stage(self,stage):
 #        """
-#        Runs any unsuccessful nodes of a batch
+#        Runs any unsuccessful tasks of a stage
 #        """
-#        self.log.info('Running batch {0}.'.format(batch))
+#        self.log.info('Running stage {0}.'.format(stage))
 #        
-#        if batch.successful:
-#            self.log.info('{0} has already been executed successfully, skip run.'.format(batch))
+#        if stage.successful:
+#            self.log.info('{0} has already been executed successfully, skip run.'.format(stage))
 #            return
-#        for node in batch.nodes:
-#            if node.successful:
-#                self.log.info('{0} has already been executed successfully, skip run.'.format(node))
+#        for task in stage.tasks:
+#            if task.successful:
+#                self.log.info('{0} has already been executed successfully, skip run.'.format(task))
 #            else:
-#                self.log.debug('{0} has not been executed successfully yet.'.format(node))
-#                self._run_node(node)
+#                self.log.debug('{0} has not been executed successfully yet.'.format(task))
+#                self._run_task(task)
 
 
-    def _reattempt_node(self,node,failed_jobAttempt):
+    def _reattempt_task(self,task,failed_jobAttempt):
         """
-        Reattempt running a node.
+        Reattempt running a task.
         
-        :param node: (Node) the node to reattempt
-        :param failed_jobAttempt: (bool) the previously failed jobAttempt of the node
+        :param task: (Task) the task to reattempt
+        :param failed_jobAttempt: (bool) the previously failed jobAttempt of the task
         :returns: (bool) True if another jobAttempt was submitted, False if the max jobAttempts has already been reached
         """
-        numAttempts = node.jobAttempts.count()
-        if not node.successful: #ReRun jobAttempt
+        numAttempts = task.jobAttempts.count()
+        if not task.successful: #ReRun jobAttempt
             if numAttempts < self.max_reattempts:
-                self.log.warning("JobAttempt {0} of node {1} failed, on attempt # {2}, so deleting failed output files and retrying".format(failed_jobAttempt, node,numAttempts))
-                os.system('rm -rf {0}/*'.format(node.job_output_dir))
-                self._run_node(node)
+                self.log.warning("JobAttempt {0} of task {1} failed, on attempt # {2}, so deleting failed output files and retrying".format(failed_jobAttempt, task,numAttempts))
+                os.system('rm -rf {0}/*'.format(task.job_output_dir))
+                self._run_task(task)
                 return True
             else:
-                self.log.warning("Node {0} has reached max_reattempts of {0}.  This node has failed".format(self, self.max_reattempts))
+                self.log.warning("Task {0} has reached max_reattempts of {0}.  This task has failed".format(self, self.max_reattempts))
                 self.status = 'failed'
                 self.save()
                 return False
     
             
-#    def wait(self,batch=None,terminate_on_fail=False):
+#    def wait(self,stage=None,terminate_on_fail=False):
 #        """
-#        Waits for all executing nodes to finish.  Returns an array of the nodes that finished.
-#        if batch is omitted or set to None, all running nodes will be waited on.
+#        Waits for all executing tasks to finish.  Returns an array of the tasks that finished.
+#        if stage is omitted or set to None, all running tasks will be waited on.
 #        
-#        :param batch: (Batch) wait for all of a batch's nodes to finish
-#        :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
+#        :param stage: (Stage) wait for all of a stage's tasks to finish
+#        :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the tasks of this stage fail `max_job_attempts` times
 #        """
-#        nodes = []
-#        if batch is None:
-#            self.log.info('Waiting on all nodes...')
+#        tasks = []
+#        if stage is None:
+#            self.log.info('Waiting on all tasks...')
 #        else:
-#            self.log.info('Waiting on batch {0}...'.format(batch))
+#            self.log.info('Waiting on stage {0}...'.format(stage))
 #        
 #        for jobAttempt in self.jobManager.yield_all_queued_jobs():
-#            node = jobAttempt.node
-#            #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,node,node.batch))
-#            nodes.append(node)
+#            task = jobAttempt.task
+#            #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
+#            tasks.append(task)
 #            if jobAttempt.successful:
-#                node._has_finished(jobAttempt)
+#                task._has_finished(jobAttempt)
 #            else:
-#                submitted_another_job = self._reattempt_node(node,jobAttempt)
+#                submitted_another_job = self._reattempt_task(task,jobAttempt)
 #                if not submitted_another_job:
-#                    node._has_finished(jobAttempt) #job has failed and out of reattempts
+#                    task._has_finished(jobAttempt) #job has failed and out of reattempts
 #                    if terminate_on_fail:
-#                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
+#                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
 #                        self.terminate()
-#            if batch and batch.is_done():
+#            if stage and stage.is_done():
 #                break;
 #            
 #                    
-#        if batch is None: #no waiting on a batch
-#            self.log.info('All nodes for this wait have completed!')
+#        if stage is None: #no waiting on a stage
+#            self.log.info('All tasks for this wait have completed!')
 #        else:
-#            self.log.info('All nodes for the wait on {0} completed!'.format(batch))
+#            self.log.info('All tasks for the wait on {0} completed!'.format(stage))
 #        
-#        return nodes 
+#        return tasks 
 
 
     def run(self,terminate_on_fail=False):
         """
         Runs a workflow using the DAG of jobs
         
-        :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the nodes of this batch fail `max_job_attempts` times
+        :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the tasks of this stage fail `max_job_attempts` times
         """
         self.log.info("Generating DAG...")
         wfDAG = WorkflowManager(self)
         self.log.info("Running DAG.")
         
-        ready_nodes = wfDAG.get_ready_nodes()
-        for n in ready_nodes:
-            wfDAG.queued_node(n)
-            self._run_node(n)
+        ready_tasks = wfDAG.get_ready_tasks()
+        for n in ready_tasks:
+            wfDAG.queued_task(n)
+            self._run_task(n)
         
-        finished_nodes = []
+        finished_tasks = []
         for jobAttempt in self.jobManager.yield_all_queued_jobs():
-            node = jobAttempt.node
-            #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,node,node.batch))
-            finished_nodes.append(node)
+            task = jobAttempt.task
+            #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
+            finished_tasks.append(task)
             if jobAttempt.successful:
-                node._has_finished(jobAttempt)
-                wfDAG.completed_node(node)
-                ready_nodes = wfDAG.get_ready_nodes()
-                for n in ready_nodes:
-                    wfDAG.queued_node(n)
-                    self._run_node(n)
+                task._has_finished(jobAttempt)
+                wfDAG.completed_task(task)
+                ready_tasks = wfDAG.get_ready_tasks()
+                for n in ready_tasks:
+                    wfDAG.queued_task(n)
+                    self._run_task(n)
             else:
-                submitted_another_job = self._reattempt_node(node,jobAttempt)
+                submitted_another_job = self._reattempt_task(task,jobAttempt)
                 if not submitted_another_job:
-                    node._has_finished(jobAttempt) #job has failed and out of reattempts
+                    task._has_finished(jobAttempt) #job has failed and out of reattempts
                     if terminate_on_fail:
-                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(node))
+                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
                         self.terminate()
                     
         self.finished()
-        return finished_nodes
+        return finished_tasks
     
-    def finished(self,delete_unused_batches=False):
+    def finished(self,delete_unused_stages=False):
         """
         Call at the end of every workflow.
         If there any left over jobs that have not been collected,
         It will wait for all of them them
         
-        :param delete_unused_batches: (bool) Any batches and their output_dir from previous workflows that weren't loaded since the last create, __resume, or __restart, using add_batch() are deleted.
+        :param delete_unused_stages: (bool) Any stages and their output_dir from previous workflows that weren't loaded since the last create, __resume, or __restart, using add_stage() are deleted.
         
         """
-        self._check_and_wait_for_leftover_nodes()
+        self._check_and_wait_for_leftover_tasks()
         
         self.log.debug("Cleaning up workflow")
-        if delete_unused_batches:
-            self.log.info("Deleting unused batches")
-            for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete() #these batches weren't used again after a __restart
+        if delete_unused_stages:
+            self.log.info("Deleting unused stages")
+            for b in Stage.objects.filter(workflow=self,order_in_workflow=None): b.delete() #these stages weren't used again after a __restart
             
         self.finished_on = timezone.now()
         self.save()
         self.log.info('Finished.')
         
-    def _check_and_wait_for_leftover_nodes(self):
-        """Checks and waits for any leftover nodes"""
-        if self.nodes.filter(status='in_progress').count()>0:
-            self.log.warning("There are left over nodes in the queue, waiting for them to finish")
+    def _check_and_wait_for_leftover_tasks(self):
+        """Checks and waits for any leftover tasks"""
+        if self.tasks.filter(status='in_progress').count()>0:
+            self.log.warning("There are left over tasks in the queue, waiting for them to finish")
             self.wait()
                
     
     def restart_from_here(self):
         """
-        Deletes any batches in the history that haven't been added yet
+        Deletes any stages in the history that haven't been added yet
         """
         if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0} (All files will be deleted)? Answering no will simply exit.".format(self),default=True,timeout=30):
             self.log.info('Restarting Workflow from here.')
-            for b in Batch.objects.filter(workflow=self,order_in_workflow=None): b.delete()
+            for b in Stage.objects.filter(workflow=self,order_in_workflow=None): b.delete()
         else:
             sys.exit(1)
     
-    def get_nodes_by(self,batch=None,tags={},op="and"):
+    def get_tasks_by(self,stage=None,tags={},op="and"):
         """
-        Returns the list of nodes that are tagged by the keys and vals in tags dictionary
+        Returns the list of tasks that are tagged by the keys and vals in tags dictionary
         
         :param op: (str) either 'and' or 'or' as the logic to filter tags with
         :param tags: (dict) tags to filter for
-        :returns: (queryset) a queryset of the filtered nodes
+        :returns: (queryset) a queryset of the filtered tasks
         
-        >>> node.get_nodes_by(op='or',tags={'color':'grey','color':'orange'})
-        >>> node.get_nodes_by(op='and',tags={'color':'grey','shape':'square'})
+        >>> task.get_tasks_by(op='or',tags={'color':'grey','color':'orange'})
+        >>> task.get_tasks_by(op='and',tags={'color':'grey','shape':'square'})
         """
         
         if op == 'or':
             raise NotImplemented('sorry')
         
-        if batch:
-            nodes = batch.nodes
+        if stage:
+            tasks = stage.tasks
         else:
-            nodes = self.nodes
+            tasks = self.tasks
             
         if tags == {}:
-            return nodes    
+            return tasks    
         else:    
             for k,v in tags.items():
-                nodes = nodes.filter(nodetag__key=k, nodetag__value=v)
+                tasks = tasks.filter(tasktag__key=k, tasktag__value=v)
                 
-            return nodes
+            return tasks
 
-    def get_node_by(self,tags={},batch=None,op="and"):
+    def get_task_by(self,tags={},stage=None,op="and"):
         """
-        Returns the list of nodes that are tagged by the keys and vals in tags dictionary.
+        Returns the list of tasks that are tagged by the keys and vals in tags dictionary.
         
-        :raises Exception: if more or less than one node is returned
+        :raises Exception: if more or less than one task is returned
         
         :param op: (str) Choose either 'and' or 'or' as the logic to filter tags with
         :param tags: (dict) A dictionary of tags you'd like to filter for
-        :returns: (queryset) a queryset of the filtered nodes
+        :returns: (queryset) a queryset of the filtered tasks
         
-        >>> node.get_node_by(op='or',tags={'color':'grey','color':'orange'})
-        >>> node.get_node_by(op='and',tags={'color':'grey','color':'orange'})
+        >>> task.get_task_by(op='or',tags={'color':'grey','color':'orange'})
+        >>> task.get_task_by(op='and',tags={'color':'grey','color':'orange'})
         """
     
-        nodes = self.get_nodes_by(batch=batch,op=op,tags=tags) #there's just one group of nodes with this tag combination
-        n = nodes.count()
+        tasks = self.get_tasks_by(stage=stage,op=op,tags=tags) #there's just one group of tasks with this tag combination
+        n = tasks.count()
         if n>1:
-            raise Exception("More than one node with tags {0} in {1}".format(tags,batch))
+            raise Exception("More than one task with tags {0} in {1}".format(tags,stage))
         elif n == 0:
-            raise Exception("No nodes with with tags {0}.".format(tags))
-        return nodes[0]
+            raise Exception("No tasks with with tags {0}.".format(tags))
+        return tasks[0]
     
     def __str__(self):
         return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
@@ -639,26 +639,26 @@ class WorkflowManager():
         self.workflow = workflow
         self.dag = self.createDiGraph()
         self.dag_queue = self.dag.copy()
-        self.dag_queue.remove_nodes_from(map(lambda x: x['id'],workflow.nodes.filter(successful=True).values('id')))
-        self.queued_nodes = []
+        self.dag_queue.remove_tasks_from(map(lambda x: x['id'],workflow.tasks.filter(successful=True).values('id')))
+        self.queued_tasks = []
     
-    def queued_node(self,node):
-        self.queued_nodes.append(node.id)
+    def queued_task(self,task):
+        self.queued_tasks.append(task.id)
     
-    def completed_node(self,node):
-        self.dag_queue.remove_node(node.id)
+    def completed_task(self,task):
+        self.dag_queue.remove_task(task.id)
         
-    def get_ready_nodes(self):
-        degree_0_nodes= map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
-        return map(lambda n_id: Node.objects.get(pk=n_id),filter(lambda x: x not in self.queued_nodes,degree_0_nodes))
+    def get_ready_tasks(self):
+        degree_0_tasks= map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
+        return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks))
     
     def createDiGraph(self):
         DAG = nx.DiGraph()
-        DAG.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.node_edges.values('parent','child')])
-        for batch in self.workflow.batches:
-            batch_name = batch.name
-            for n in batch.nodes.values('id','tags','status'):
-                DAG.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],batch=batch_name)
+        DAG.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.task_edges.values('parent','child')])
+        for stage in self.workflow.stages:
+            stage_name = stage.name
+            for n in stage.tasks.values('id','tags','status'):
+                DAG.add_task(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name)
         return DAG
     
     def createAGraph(self,dag):
@@ -666,22 +666,22 @@ class WorkflowManager():
         DAG.node_attr['fontname']="Courier"
         DAG.node_attr['fontsize']=8
         DAG.add_edges_from(dag.edges())
-        for batch,nodes in helpers.groupby(dag.nodes(data=True),lambda x:x[1]['batch']):
-            sg = DAG.add_subgraph(name="cluster_{0}".format(batch),label=batch,color='lightgrey')
-            for n,attrs in nodes:
+        for stage,tasks in helpers.groupby(dag.tasks(data=True),lambda x:x[1]['stage']):
+            sg = DAG.add_subgraph(name="cluster_{0}".format(stage),label=stage,color='lightgrey')
+            for n,attrs in tasks:
                 def truncate_val(kv):
                     v = "{0}".format(kv[1])
                     v = v if len(v) <10 else v[1:8]+'..'
                     return "{0}: {1}".format(kv[0],v)
                 label = " \\n".join(map(truncate_val,attrs['tags'].items()))
                 status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
-                sg.add_node(n,label=label,URL='/Workflow/Node/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
+                sg.add_task(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
             
         return DAG
     
 #    def simple_path(self,head,vs):
 #        """
-#        node is the current node, vs is visited nodes
+#        task is the current task, vs is visited tasks
 #        """
 #        ss = self.dag.successors(head)
 #        vs.append(head)
@@ -691,43 +691,43 @@ class WorkflowManager():
 #    
 #    def simple_path_up(self,tail,vs):
 #        ps = self.dag.predecessors(tail)
-#        ps = map(lambda n: (n,self.dag.node[n]),ps)
-#        ps = filter(lambda p: p[0] not in vs,ps) # TODO speedup by marking visited nodes instead of keeping what can become a huge list
-#        ps = [ ps.next()[0] for batch, ps in helpers.groupby(ps,lambda p: p[1]['batch']) ]
+#        ps = map(lambda n: (n,self.dag.task[n]),ps)
+#        ps = filter(lambda p: p[0] not in vs,ps) # TODO speedup by marking visited tasks instead of keeping what can become a huge list
+#        ps = [ ps.next()[0] for stage, ps in helpers.groupby(ps,lambda p: p[1]['stage']) ]
 #        return ps
-#        if len(ps) == 0: return [node]
-#        if len(ps) == 1: return [node,ps[0]]
-#        if len(ps) > 1: return [node,ps[0],ps[1]]
-        #if len(ps) > 2: return [node,ps[0],ps[1],ps[2]]
-#        if len(ps) == 1: return [node] + self.simple_path_up(ps)
-#        if len(ps) > 1: return [node] + self.simple_path_up(ps[0]) + self.simple_path_up(ps[1])
-    def simple_path(self,head,vnodes,vedges):
+#        if len(ps) == 0: return [task]
+#        if len(ps) == 1: return [task,ps[0]]
+#        if len(ps) > 1: return [task,ps[0],ps[1]]
+        #if len(ps) > 2: return [task,ps[0],ps[1],ps[2]]
+#        if len(ps) == 1: return [task] + self.simple_path_up(ps)
+#        if len(ps) > 1: return [task] + self.simple_path_up(ps[0]) + self.simple_path_up(ps[1])
+    def simple_path(self,head,vtasks,vedges):
         """
-        node is the current node, vs is visited nodes
+        task is the current task, vs is visited tasks
         """
         ss = self.dag.successors(head)[0:3]
-        vnodes.append(head)
+        vtasks.append(head)
         if len(ss) > 0:
             vedges.append((head,ss[0]))
-            self.simple_path(ss[0],vnodes,vedges)
+            self.simple_path(ss[0],vtasks,vedges)
         if len(ss) > 1:
             vedges.append((head,ss[1]))
-            self.simple_path(ss[1],vnodes,vedges)
+            self.simple_path(ss[1],vtasks,vedges)
         
         ps = self.dag.predecessors(head)
-        ps = filter(lambda n: n not in vnodes,ps) #TODO might be slow
+        ps = filter(lambda n: n not in vtasks,ps) #TODO might be slow
         if len(ps) > 0:
             vedges.append((ps[0],head))
 #        if len(ps) > 0:
-#            ps = map(lambda n: (n,self.dag.node[n]),ps) #append attr dict
-#            for batch, ps_b in helpers.groupby(ps,lambda p: p[1]['batch']):
-#                print batch
+#            ps = map(lambda n: (n,self.dag.task[n]),ps) #append attr dict
+#            for stage, ps_b in helpers.groupby(ps,lambda p: p[1]['stage']):
+#                print stage
 #                print list(ps_b)
 #                print '*'*72
 #                try:
 #                    p = ps_b.next()
 #                    vedges.append((p[0],head))
-#                    vnodes.append(p[0])
+#                    vtasks.append(p[0])
 #                except StopIteration:
 #                    pass
             
@@ -735,17 +735,17 @@ class WorkflowManager():
     
     def get_simple_dag(self):
         root = None
-        for node,degree in self.dag.in_degree_iter():
+        for task,degree in self.dag.in_degree_iter():
             if degree == 0:
-                root = node
+                root = task
                 break
         edges = self.simple_path(root,[],[])
         g= nx.DiGraph()
-        nodes = set(_unnest(edges))
-        g.add_nodes_from(map(lambda n: (n,self.dag.node[n]),nodes))
+        tasks = set(_unnest(edges))
+        g.add_tasks_from(map(lambda n: (n,self.dag.task[n]),tasks))
         g.add_edges_from(edges)
         return g
-        #return self.dag.subgraph(nx.dfs_tree(self.dag,root).nodes())
+        #return self.dag.subgraph(nx.dfs_tree(self.dag,root).tasks())
     
     
     def as_img(self,format="svg"):      
@@ -762,11 +762,11 @@ class WorkflowManager():
         return g.to_string()
 
 
-class Batch(models.Model):
+class Stage(models.Model):
     """
     A group of jobs that can be run independently.  See `Embarassingly Parallel <http://en.wikipedia.org/wiki/Embarrassingly_parallel>`_ .
     
-    .. note:: A Batch should not be directly instantiated, use :py:func:`Workflow.models.Workflow.add_batch` to create a new batch.
+    .. note:: A Stage should not be directly instantiated, use :py:func:`Workflow.models.Workflow.add_stage` to create a new stage.
     """
     name = models.CharField(max_length=200)
     workflow = models.ForeignKey(Workflow)
@@ -780,15 +780,15 @@ class Batch(models.Model):
     
     def __init__(self,*args,**kwargs):
         kwargs['created_on'] = timezone.now()
-        super(Batch,self).__init__(*args,**kwargs)
+        super(Stage,self).__init__(*args,**kwargs)
         
         validate_not_null(self.workflow)
         check_and_create_output_dir(self.output_dir)
         
-        validate_name(self.name,'Batch_Name')
+        validate_name(self.name,self.name)
         #validate unique name
-        if Batch.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
-            raise ValidationError("Batch names must be unique within a given Workflow. The name {0} already exists.".format(self.name))
+        if Stage.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
+            raise ValidationError("Stage names must be unique within a given Workflow. The name {0} already exists.".format(self.name))
 
     @property
     def log(self):
@@ -797,10 +797,10 @@ class Batch(models.Model):
     @property
     def percent_done(self):
         """
-        Percent of nodes that have completed
+        Percent of tasks that have completed
         """
-        done = Node.objects.filter(batch=self,successful=True).count()
-        total = self.num_nodes
+        done = Task.objects.filter(stage=self,successful=True).count()
+        total = self.num_tasks
         status = self.status
         if total == 0 or done == 0:
             if status == 'in_progress' or status == 'failed':
@@ -811,129 +811,127 @@ class Batch(models.Model):
 
     def get_sjob_stat(self,field,statistic):
         """
-        Aggregates a node successful job's field using a statistic
-        :param field: (str) name of a nodes's field.  ex: wall_time or avg_rss_mem
+        Aggregates a task successful job's field using a statistic
+        :param field: (str) name of a tasks's field.  ex: wall_time or avg_rss_mem
         :param statistic: (str) choose from ['Avg','Sum','Max','Min','Count']
         
-        >>> batch.get_stat('wall_time','Avg')
+        >>> stage.get_stat('wall_time','Avg')
         120
         """
         if statistic not in ['Avg','Sum','Max','Min','Count']:
             raise ValidationError('Statistic {0} not supported'.format(statistic))
         aggr_fxn = getattr(models, statistic)
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
-        return JobAttempt.objects.filter(successful=True,node_set__in = Node.objects.filter(batch=self)).aggregate(aggr_fxn(field))[aggr_field]
+        return JobAttempt.objects.filter(successful=True,task_set__in = Task.objects.filter(stage=self)).aggregate(aggr_fxn(field))[aggr_field]
     
-    def get_node_stat(self,field,statistic):
+    def get_task_stat(self,field,statistic):
         """
-        Aggregates a node's field using a statistic
-        :param field: (str) name of a nodes's field.  ex: cpu_req, mem_req
+        Aggregates a task's field using a statistic
+        :param field: (str) name of a tasks's field.  ex: cpu_req, mem_req
         :param statistic: (str) choose from ['Avg','Sum','Max','Min','Count']
         
-        >>> batch.get_stat('cpu_requirement','Avg')
+        >>> stage.get_stat('cpu_requirement','Avg')
         120
         """
         if statistic not in ['Avg','Sum','Max','Min','Count']:
             raise ValidationError('Statistic {0} not supported'.format(statistic))
         aggr_fxn = getattr(models, statistic)
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
-        r = Node.objects.filter(batch=self).aggregate(aggr_fxn(field))[aggr_field]
+        r = Task.objects.filter(stage=self).aggregate(aggr_fxn(field))[aggr_field]
         return int(r) if r else r
         
 
     @property
     def file_size(self):
-        "Size of the batch's output_dir"
+        "Size of the stage's output_dir"
         return folder_size(self.output_dir)
     
     @property
     def wall_time(self):
-        """Time between this batch's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
+        """Time between this stage's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.started_on if self.finished_on else timezone.now().replace(microsecond=0) - self.started_on
     
     @property
     def output_dir(self):
-        "Absolute path to this batch's output_dir"
+        "Absolute path to this stage's output_dir"
         return os.path.join(self.workflow.output_dir,self.name)
     
     @property
-    def nodes(self):
-        "Queryset of this batch's nodes"
-        return Node.objects.filter(batch=self)
+    def tasks(self):
+        "Queryset of this stage's tasks"
+        return Task.objects.filter(stage=self)
     
     @property
-    def node_edges(self):
-        """Edges in this Batch"""
-        return NodeEdge.objects.filter(parent__in=self.nodes)
+    def task_edges(self):
+        "Edges in this Stage"
+        return TaskEdge.objects.filter(parent__in=self.tasks)
     
     @property
-    def node_tags(self):
-        """NodeTags in this Batch"""
-        return NodeTag.objects.filter(node__in=self.nodes)
+    def task_tags(self):
+        "TaskTags in this Stage"
+        return TaskTag.objects.filter(task__in=self.tasks)
     
     @property
-    def num_nodes(self):
-        "The number of nodes in this batch"
-        return Node.objects.filter(batch=self).count()
+    def num_tasks(self):
+        "The number of tasks in this stage"
+        return Task.objects.filter(stage=self).count()
     
     @property
-    def num_nodes_successful(self):
-        "Number of successful nodes in this batch"
-        return Node.objects.filter(batch=self,successful=True).count()
+    def num_tasks_successful(self):
+        "Number of successful tasks in this stage"
+        return Task.objects.filter(stage=self,successful=True).count()
     
     def get_all_tag_keys_used(self):
-        """Returns a set of all the keyword tags used on any node in this batch"""
+        """Returns a set of all the keyword tags used on any task in this stage"""
         try:
-            return self.nodes.all()[0].tags.keys()
+            return self.tasks.all()[0].tags.keys()
         except IndexError:
             return {}
         except AttributeError:
-            return set(map(lambda x: x['key'],NodeTag.objects.filter(node__in=self.nodes).values('key').distinct()))
+            return set(map(lambda x: x['key'],TaskTag.objects.filter(task__in=self.tasks).values('key').distinct()))
         
-    def yield_node_resource_usage(self):
+    def yield_task_resource_usage(self):
         """
-        :yields: (list of tuples) tuples contain resource usage and tags of all nodes.  The first element is the name, the second is the value.
+        :yields: (list of tuples) tuples contain resource usage and tags of all tasks.  The first element is the name, the second is the value.
         """
         #TODO rework with time fields
-        for node in self.nodes: 
-            sja = node.get_successful_jobAttempt()
+        for task in self.tasks: 
+            sja = task.get_successful_jobAttempt()
             if sja: 
-                yield [jru for jru in sja.resource_usage_short] + node.tags.items() #add in tags to resource usage tuples
+                yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
         
-    def add_node(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, parents=[], save=True, skip_checks=False, mem_req=0, cpu_req=1, time_limit=None):
+    def add_task(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, parents=[], save=True, skip_checks=False, mem_req=0, cpu_req=1, time_limit=None):
         """
-        Adds a node to the batch.  If the node with this name (in this Batch) already exists and was successful, just return the existing one.
-        If the existing node was unsuccessful, delete it and all of its output files, and return a new node.
-        
-        :param name: (str) The name of the node.  Must be unique within this batch. All spaces are converted to underscores.  Required.
-        :param pcmd: (str) The preformatted command to execute.  Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
+        Adds a task to the batch. If the task with this name (in this Batch) already exists and was successful, just return the existing one.
+        If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
+        :param name: (str) The name of the task. Must be unique within this batch. All spaces are converted to underscores. Required.
+        :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
-        :param hard_reset: (bool) Deletes this node and all associated files and start it fresh. Optional.
-        :param tags: (dict) A dictionary keys and values to tag the node with.  These tags can later be used by methods such as :py:meth:`~Workflow.models.Batch.group_nodes_by` and :py:meth:`~Workflow.models.Batch.get_nodes_by` Optional.
-        :param save: (bool) If False, will not save the node to the database.  Used in concert with :method:`Workflow.bulk_save_nodes`
-        :param skip_checks: (bool) If True, will assume the node doesn't exist.  If the node actually does exist, there will likely be a crash later on.
-        :param parents: (list) A list of parent nodes that this node is dependent on.  This is optional and only used by the DAG functionality.
-        :param mem_req: (int) How much memory to reserve for this node in MB. Optional.
-        :param cpu_req: (int) How many CPUs to reserve for this node. Optional.
+        :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
+        :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.Batch.group_tasks_by` and :py:meth:`~Workflow.models.Batch.get_tasks_by` Optional.
+        :param save: (bool) If False, will not save the task to the database. Meant to be used in concert with :method:`Workflow.bulk_save_tasks`
+        :param skip_checks: (bool) If True, will assume the task doesn't exist. If the task actually does exist, there will likely be a crash later on.
+        :param parents: (list) A list of parent tasks that this task is dependent on. This is optional and only used by the DAG functionality.
+        :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
+        :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
         :param time_limit: (datetime.time) Not implemented.
-        
-        :returns: If save=True, an instance of a Node.   If save=False, returns (node,tags) where node is a Node, tags is a dict, and node_exists is a bool.
+        :returns: If save=True, an instance of a Task. If save=False, returns (task,tags) where task is a Task, tags is a dict, and task_exists is a bool.
         """
-        #validation
-        
-#        name = re.sub("\s","_",name) #user convenience
-#        
-#        if name == '' or name is None:
-#            raise ValidationError('name cannot be blank')
+                #validation
+                
+        # name = re.sub("\s","_",name) #user convenience
+        #
+        # if name == '' or name is None:
+        # raise ValidationError('name cannot be blank')
         if skip_checks and save:
-            raise ValidationError('Cannot skip checks and save a node.')
+            raise ValidationError('Cannot skip checks and save a task.')
 
         if pcmd == '' or pcmd is None:
             raise ValidationError('pre_command cannot be blank')
         
-        #TODO validate that this node has the same tag keys as all other nodes
+        #TODO validate that this task has the same tag keys as all other tasks
         
-        node_kwargs = {
+        task_kwargs = {
                        'batch':self,
                        'name':name,
                        'tags':tags,
@@ -944,193 +942,193 @@ class Batch(models.Model):
                        'time_limit':time_limit
                        }
         if skip_checks:
-            node_exists = False
+            task_exists = False
         else:
-            node_exists = Node.objects.filter(batch=self,tags=tags).count() > 0
-            if node_exists:
-                node = Node.objects.get(batch=self,tags=tags)
+            task_exists = Task.objects.filter(batch=self,tags=tags).count() > 0
+            if task_exists:
+                task = Task.objects.get(batch=self,tags=tags)
         
             #delete if hard_reset
             if hard_reset:
-                if not node_exists:
-                    raise ValidationError("Cannot hard_reset node with name {0} as it doesn't exist.".format(name))
-                node.delete()
+                if not task_exists:
+                    raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
+                task.delete()
             
-            if node_exists and not node.successful:
-                self.log.info("{0} was unsuccessful last run.".format(node))
-                node.delete()
+            if task_exists and not task.successful:
+                self.log.info("{0} was unsuccessful last run.".format(task))
+                task.delete()
         
             #validation
-            if node_exists and node.successful:  
-                if node.pre_command != pcmd:
-                    self.log.error("You can't change the pcmd of a existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
-                if node.outputs != outputs:
-                    self.log.error("You can't change the outputs of an existing successful node (keeping the one from history).  Use hard_reset=True if you really want to do this.")
+            if task_exists and task.successful:
+                if task.pre_command != pcmd:
+                    self.log.error("You can't change the pcmd of a existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
+                if task.outputs != outputs:
+                    self.log.error("You can't change the outputs of an existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
         
-        if not node_exists:
+        if not task_exists:
             if save:
-                #Create and save a node
-                node = Node.create(**node_kwargs)
+                #Create and save a task
+                task = Task.create(**task_kwargs)
                 for k,v in tags.items():
-                    NodeTag.objects.create(node=node,key=k,value=v) #this is faster than a node.tag, because node.tag also writes to node.tags
+                    TaskTag.objects.create(task=task,key=k,value=v) #this is faster than a task.tag, because task.tag also writes to task.tags
                 for n in parents:
-                    NodeEdge.objects.create(parent=n,child=node,tags=tags) #TODO think about what a NodeEdge tag is
-                self.log.info("Created {0} in {1}, and saved to the database.".format(node,self))
+                    TaskEdge.objects.create(parent=n,child=task,tags=tags) #TODO think about what a TaskEdge tag is
+                self.log.info("Created {0} in {1}, and saved to the database.".format(task,self))
                 
-                batch = node.batch
+                batch = task.batch
                 if batch.is_done():
                     batch.status = 'in_progress'
                     batch.successful = False
                     batch.save()
             else:
-                #Just instantiate a node
-                node = Node(**node_kwargs)
+                #Just instantiate a task
+                task = Task(**task_kwargs)
                 
         if save:
-            return node
+            return task
         else:
-            return {'node':node,'tags':tags,'parents':parents,'node_exists':node_exists}
+            return {'task':task,'tags':tags,'parents':parents,'task_exists':task_exists}
 
 
     def is_done(self):
         """
-        :returns: True if this batch is finished successfully or failed, else False
+        :returns: True if this stage is finished successfully or failed, else False
         """
         return self.status == 'successful' or self.status == 'failed'
 
-    def _are_all_nodes_done(self):
+    def _are_all_tasks_done(self):
         """
-        :returns: True if all nodes have succeeded or failed in this batch, else False
+        :returns: True if all tasks have succeeded or failed in this stage, else False
         """
-        return self.nodes.filter(Q(status = 'successful') | Q(status='failed')).count() == self.nodes.count()
+        return self.tasks.filter(Q(status = 'successful') | Q(status='failed')).count() == self.tasks.count()
         
     def _has_finished(self):
         """
-        Executed when this batch has completed running.
+        Executed when this stage has completed running.
         All it does is sets status as either failed or successful
         """
-        num_nodes = Node.objects.filter(batch=self).count()
-        num_nodes_successful = self.num_nodes_successful
-        num_nodes_failed = Node.objects.filter(batch=self,status='failed').count()
-        if num_nodes_successful == num_nodes:
+        num_tasks = Task.objects.filter(stage=self).count()
+        num_tasks_successful = self.num_tasks_successful
+        num_tasks_failed = Task.objects.filter(stage=self,status='failed').count()
+        if num_tasks_successful == num_tasks:
             self.successful = True
             self.status = 'successful'
-            self.log.info('Batch {0} successful!'.format(self))
-        elif num_nodes_failed + num_nodes_successful == num_nodes:
+            self.log.info('Stage {0} successful!'.format(self))
+        elif num_tasks_failed + num_tasks_successful == num_tasks:
             self.status='failed'
-            self.log.warning('Batch {0} failed!'.format(self))
+            self.log.warning('Stage {0} failed!'.format(self))
         else:
             #jobs are not done so this shouldn't happen
-            raise Exception('Batch._has_finished() called, but not all nodes are completed.')
+            raise Exception('Stage._has_finished() called, but not all tasks are completed.')
         
         self.finished_on = timezone.now()
         self.save()
     
-    def get_nodes_by(self,tags={},op='and'):
+    def get_tasks_by(self,tags={},op='and'):
         """
-        An alias for :func:`Workflow.get_nodes_by` with batch=self
+        An alias for :func:`Workflow.get_tasks_by` with stage=self
         
-        :returns: a queryset of filtered nodes
+        :returns: a queryset of filtered tasks
         """
-        return self.workflow.get_nodes_by(batch=self, tags=tags, op=op)
+        return self.workflow.get_tasks_by(stage=self, tags=tags, op=op)
     
-    def get_node_by(self,tags={},op='and'):
+    def get_task_by(self,tags={},op='and'):
         """
-        An alias for :func:`Workflow.get_node_by` with batch=self
+        An alias for :func:`Workflow.get_task_by` with stage=self
         
-        :returns: a queryset of filtered nodes
+        :returns: a queryset of filtered tasks
         """
-        return self.workflow.get_node_by(batch=self, op=op, tags=tags)
+        return self.workflow.get_task_by(stage=self, op=op, tags=tags)
                 
-    def group_nodes_by(self,keys=[]):
+    def group_tasks_by(self,keys=[]):
         """
-        Yields nodes, grouped by tags in keys.  Groups will be every unique set of possible values of tags.
-        For example, if you had nodes tagged by color, and shape, and you ran func:`batch.group_nodes_by`(['color','shape']),
-        this function would yield the group of nodes that exist in the various combinations of `colors` and `shapes`.
-        So for example one of the yields might be (({'color':'orange'n'shape':'circle'}), [ orange_circular_nodes ])
+        Yields tasks, grouped by tags in keys.  Groups will be every unique set of possible values of tags.
+        For example, if you had tasks tagged by color, and shape, and you ran func:`stage.group_tasks_by`(['color','shape']),
+        this function would yield the group of tasks that exist in the various combinations of `colors` and `shapes`.
+        So for example one of the yields might be (({'color':'orange'n'shape':'circle'}), [ orange_circular_tasks ])
         
         :param keys: The keys of the tags you want to group by.
-        :yields: (a dictionary of this group's unique tags, nodes in this group).
+        :yields: (a dictionary of this group's unique tags, tasks in this group).
         
-        .. note:: a missing tag is considered as None and thus placed into a 'None' group with other untagged nodes.  You should generally try to avoid this scenario and have all nodes tagged by the keywords you're grouping by.
+        .. note:: a missing tag is considered as None and thus placed into a 'None' group with other untagged tasks.  You should generally try to avoid this scenario and have all tasks tagged by the keywords you're grouping by.
         """
         if keys == []:
-            yield {},self.nodes
+            yield {},self.tasks
         else:
-            node_tag_values = NodeTag.objects.filter(node__in=self.nodes, key__in=keys).values() #get this batch's tags
-            #filter out any nodes without all keys
+            task_tag_values = TaskTag.objects.filter(task__in=self.tasks, key__in=keys).values() #get this stage's tags
+            #filter out any tasks without all keys
             
-            node_id2tags = {}
-            for node_id, ntv in helpers.groupby(node_tag_values,lambda x: x['node_id']):
-                node_tags = dict([ (n['key'],n['value']) for n in ntv ])
-                node_id2tags[node_id] = node_tags
+            task_id2tags = {}
+            for task_id, ntv in helpers.groupby(task_tag_values,lambda x: x['task_id']):
+                task_tags = dict([ (n['key'],n['value']) for n in ntv ])
+                task_id2tags[task_id] = task_tags
             
-            for tags,node_id_and_tags_tuple in helpers.groupby(node_id2tags.items(),lambda x: x[1]):
-                node_ids = [ x[0] for x in node_id_and_tags_tuple ]
-                yield tags, Node.objects.filter(pk__in=node_ids)
+            for tags,task_id_and_tags_tuple in helpers.groupby(task_id2tags.items(),lambda x: x[1]):
+                task_ids = [ x[0] for x in task_id_and_tags_tuple ]
+                yield tags, Task.objects.filter(pk__in=task_ids)
     
     def delete(self, *args, **kwargs):
         """
-        Bulk deletes this batch and all files associated with it.
+        Bulk deletes this stage and all files associated with it.
         """
-        self.log.info('Deleting Batch {0}.'.format(self.name))
+        self.log.info('Deleting Stage {0}.'.format(self.name))
         if os.path.exists(self.output_dir):
             self.log.info('Deleting directory {0}...'.format(self.output_dir))
             os.system('rm -rf {0}'.format(self.output_dir))
         self.log.info('Bulk deleting JobAttempts...')
-        JobAttempt.objects.filter(node_set__in = self.nodes).delete()
-        self.log.info('Bulk deleting NodeTags...')
-        self.node_tags.delete()
-        self.log.info('Bulk deleting NodeEdges...')
-        self.node_edges.delete()
-        self.log.info('Bulk deleting Nodes...')
-        self.nodes.delete()
-        super(Batch, self).delete(*args, **kwargs)
+        JobAttempt.objects.filter(task_set__in = self.tasks).delete()
+        self.log.info('Bulk deleting TaskTags...')
+        self.task_tags.delete()
+        self.log.info('Bulk deleting TaskEdges...')
+        self.task_edges.delete()
+        self.log.info('Bulk deleting Tasks...')
+        self.tasks.delete()
+        super(Stage, self).delete(*args, **kwargs)
         self.log.info('{0} Deleted.'.format(self))
     
     @models.permalink    
     def url(self):
-        "The URL of this batch"
-        return ('batch_view',[str(self.id)])
+        "The URL of this stage"
+        return ('stage_view',[str(self.id)])
         
     def __str__(self):
-        return 'Batch[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
+        return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
             
 
-class NodeTag(models.Model):
+class TaskTag(models.Model):
     """
-    A SQL row that duplicates the information of Node.tags that can be used for filtering, etc.
+    A SQL row that duplicates the information of Task.tags that can be used for filtering, etc.
     """
-    node = models.ForeignKey('Node')
+    task = models.ForeignKey('Task')
     key = models.CharField(max_length=63)
     value = models.CharField(max_length=255)
     
     
     def __str__(self):
-        return "NodeTag[self.id] {self.key}: {self.value} for Node[{node.id}]".format(self=self,node=self.node)
+        return "TaskTag[self.id] {self.key}: {self.value} for Task[{task.id}]".format(self=self,task=self.task)
 
-class NodeEdge(models.Model):
-    parent = models.ForeignKey('Node',related_name='parent_edge_set')
-    child = models.ForeignKey('Node',related_name='child_edge_set')
-    tags = PickledObjectField(null=True,default={})
+class TaskEdge(models.Model):
+    parent = models.ForeignKey('Task',related_name='parent_edge_set')
+    child = models.ForeignKey('Task',related_name='child_edge_set')
+#    tags = PickledObjectField(null=True,default={})
     "The keys associated with the relationship.  ex, the group_by parameter of a many2one" 
     
     
     def __str__(self):
         return "{0.parent}->{0.child}".format(self)
 
-class Node(models.Model):
+class Task(models.Model):
     """
     The object that represents the command line that gets executed.
     """
-    _jobAttempts = models.ManyToManyField(JobAttempt,related_name='node_set')
+    _jobAttempts = models.ManyToManyField(JobAttempt,related_name='task_set')
     pre_command = models.TextField(help_text='preformatted command.  almost always will contain the special string {output} which will later be replaced by the proper output path')
     exec_command = models.TextField(help_text='the actual command that was executed',null=True)
     name = models.CharField(max_length=255,null=True)
     memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=0,null=True)
     cpu_requirement = models.SmallIntegerField(help_text="Number of CPUs to reserve for this job",default=1)
     time_limit = models.TimeField(help_text="Maximum time for a job to run",default=None,null=True)
-    batch = models.ForeignKey(Batch,null=True)
+    stage = models.ForeignKey(Stage,null=True)
     successful = models.BooleanField(null=False)
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     outputs = PickledObjectField(null=True) #dictionary of outputs
@@ -1142,61 +1140,61 @@ class Node(models.Model):
     
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
-        super(Node,self).__init__(*args, **kwargs)
+        super(Task,self).__init__(*args, **kwargs)
     
     @staticmethod
     def create(*args,**kwargs):
         """
-        Creates a node.
+        Creates a task.
         """
-        node = Node.objects.create(*args,**kwargs)
+        task = Task.objects.create(*args,**kwargs)
         
-        if Node.objects.filter(batch=node.batch,tags=node.tags).count() > 1:
-            node.delete()
-            raise ValidationError("Nodes belonging to a batch with the same tags detected! tags: {0}".format(node.tags))
+        if Task.objects.filter(stage=task.stage,tags=task.tags).count() > 1:
+            task.delete()
+            raise ValidationError("Tasks belonging to a stage with the same tags detected! tags: {0}".format(task.tags))
         
-        check_and_create_output_dir(node.output_dir)
-        check_and_create_output_dir(node.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
+        check_and_create_output_dir(task.output_dir)
+        check_and_create_output_dir(task.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
             
-        #Create node tags    
-        if type(node.tags) == dict:
-            for key,value in node.tags.items():
-                NodeTag.objects.create(node=node,key=key,value=value)
+        #Create task tags    
+        if type(task.tags) == dict:
+            for key,value in task.tags.items():
+                TaskTag.objects.create(task=task,key=key,value=value)
                 
-        return node
+        return task
     
     @property
     def workflow(self):
-        "This node's workflow"
-        return self.batch.workflow
+        "This task's workflow"
+        return self.stage.workflow
 
     @property
     def parents(self):
-        "This node's parents"
-        return map(lambda n: n.parent, NodeEdge.objects.filter(child=self).all())
+        "This task's parents"
+        return map(lambda n: n.parent, TaskEdge.objects.filter(child=self).all())
 
     @property
-    def node_edges(self):
-        return NodeEdge.objects.filter(Q(parent=self)|Q(child=self))
+    def task_edges(self):
+        return TaskEdge.objects.filter(Q(parent=self)|Q(child=self))
     
     @property
-    def node_tags(self):
-        return NodeTag.objects.filter(node=self)
+    def task_tags(self):
+        return TaskTag.objects.filter(task=self)
 
     @property
     def log(self):
-        "This node's workflow's log"
+        "This task's workflow's log"
         return self.workflow.log
 
     @property
     def file_size(self,human_readable=True):
-        "Node filesize"
+        "Task filesize"
         return folder_size(self.output_dir,human_readable=human_readable)
     
     @property
     def output_dir(self):
-        "Node output dir"
-        return os.path.join(self.batch.output_dir,str(self.id))
+        "Task output dir"
+        return os.path.join(self.stage.output_dir,str(self.id))
     
     @property
     def job_output_dir(self):
@@ -1205,7 +1203,7 @@ class Node(models.Model):
     
     @property
     def output_paths(self):
-        "Dict of this node's outputs appended to this node's output_dir."
+        "Dict of this task's outputs appended to this task's output_dir."
         r = {}
         for key,val in self.outputs.items():
             r[key] = os.path.join(self.job_output_dir,val)
@@ -1213,23 +1211,23 @@ class Node(models.Model):
     
     @property
     def jobAttempts(self):
-        "Queryset of this node's jobAttempts."
+        "Queryset of this task's jobAttempts."
         return self._jobAttempts.all().order_by('id')
     
     @property
     def wall_time(self):
-        "Node's wall_time"
+        "Task's wall_time"
         return self.get_successful_jobAttempt().wall_time if self.successful else None
     
     def numAttempts(self):
-        "This node's number of job attempts."
+        "This task's number of job attempts."
         return self._jobAttempts.count()
     
     def get_successful_jobAttempt(self):
         """
-        Get this node's successful job attempt.
+        Get this task's successful job attempt.
         
-        :return: this node's successful job attempt.  If there were no successful job attempts, returns None
+        :return: this task's successful job attempt.  If there were no successful job attempts, returns None
         """
         jobs = self._jobAttempts.filter(successful=True)
         if len(jobs) == 1:
@@ -1242,10 +1240,10 @@ class Node(models.Model):
 
     def _has_finished(self,jobAttempt):
         """
-        Executed whenever this node finishes by the workflow.
+        Executed whenever this task finishes by the workflow.
         
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
-        Will also run self.batch._has_finished() if all nodes in the batch are done.
+        Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
         if self._jobAttempts.filter(successful=True).count():
             self.status = 'successful'
@@ -1258,42 +1256,42 @@ class Node(models.Model):
         self.finished_on = timezone.now()
         self.save()
         
-        if self.batch._are_all_nodes_done(): self.batch._has_finished()
+        if self.stage._are_all_tasks_done(): self.stage._has_finished()
         
     def tag(self,**kwargs):
         """
-        Tag this node with key value pairs.  If the key already exists, its value will be overwritten.
+        Tag this task with key value pairs.  If the key already exists, its value will be overwritten.
         
-        >>> node.tag(color="blue",shape="circle")
+        >>> task.tag(color="blue",shape="circle")
         """
-        #TODO don't allow tags called things like 'status' or other node attributes
+        #TODO don't allow tags called things like 'status' or other task attributes
         for key,value in kwargs.items():
             value = str(value)
-            nodetag, created = NodeTag.objects.get_or_create(node=self,key=key,defaults= {'value':value})
+            tasktag, created = TaskTag.objects.get_or_create(task=self,key=key,defaults= {'value':value})
             if not created:
-                nodetag.value = value
-            nodetag.save()
+                tasktag.value = value
+            tasktag.save()
             self.tags[key] = value
             
     @models.permalink    
     def url(self):
-        "This node's url."
-        return ('node_view',[str(self.id)])
+        "This task's url."
+        return ('task_view',[str(self.id)])
 
 
     def delete(self, *args, **kwargs):
         """
-        Deletes this node and all files associated with it
+        Deletes this task and all files associated with it
         """
         self.log.info('Deleting {0} and it\'s output directory {1}'.format(self,self.output_dir))
         #todo delete stuff in output_paths that may be extra files
         for ja in self._jobAttempts.all(): ja.delete()
-        self.node_tags.delete()
-        self.node_edges.delete
+        self.task_tags.delete()
+        self.task_edges.delete
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
-        super(Node, self).delete(*args, **kwargs)
+        super(Task, self).delete(*args, **kwargs)
     
     def __str__(self):
-        return 'Node[{0}] {1} {2}'.format(self.id,self.batch.name,self.tags)
+        return 'Task[{0}] {1} {2}'.format(self.id,self.stage.name,self.tags)
 

@@ -21,11 +21,11 @@ You can then interactively investigate and perform all sorts of operations.  Thi
    
    >>> workflow = all_workflows[2]
    
-   >>> batch = workflow.batches[3]
+   >>> stage = workflow.stages[3]
    
-   >>> batch.file_size
+   >>> stage.file_size
    
-   >>> batch.nodes[3].get_successful_jobAttempt().queue_status
+   >>> stage.tasks[3].get_successful_jobAttempt().queue_status
    
 
 Interactive Workflow
@@ -37,8 +37,8 @@ You can even run a workflow:
 
    >>> import cosmos_session
    >>> wf = Workflow.create("interactive workflow")
-   >>> b = wf.add_batch("batch1")
-   >>> b.add_node("hi","echo \"hello world\" > {output_dir}/out")
+   >>> b = wf.add_stage("stage1")
+   >>> b.add_task("hi","echo \"hello world\" > {output_dir}/out")
    >>> wf.run_and_wait(b)
    >>> wf.finished()
    

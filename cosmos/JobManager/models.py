@@ -28,7 +28,7 @@ class JobStatusError(Exception):
        
 class JobAttempt(models.Model):
     """
-    An attempt at running a node.
+    An attempt at running a task.
     """
     queue_status_choices = (
         ('not_queued','JobAttempt has not been submitted to the JobAttempt Queue yet'),
@@ -132,9 +132,9 @@ class JobAttempt(models.Model):
         super(JobAttempt,self).__init__(*args,**kwargs)
         
     @property
-    def node(self):
-        "This job's node"
-        return self.node_set.get()
+    def task(self):
+        "This job's task"
+        return self.task_set.get()
 
     @staticmethod
     def profile_fields_as_list():

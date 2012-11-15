@@ -15,8 +15,8 @@ class WorkflowDAG(object):
         AG.node_attr['fontname']="Courier-Bold"
         AG.node_attr['fontsize']=12
             
-        for node,data in self.G.nodes(data=True):
-            AG.add_node(node,label=node.label)
+        for task,data in self.G.nodes(data=True):
+            AG.add_node(task,label=task.label)
         AG.add_edges_from(self.G.edges())
         AG.layout(prog="dot")
         AG.draw('/tmp/graph.svg',format='svg')
@@ -31,10 +31,17 @@ class WorkflowDAG(object):
         """
         for task in self.G.node:
             task.parameters = params.get(task.stage_name,{'stage_name':task.stage_name})
+            
+    def add_to_workflow(self,WF):
+        for stage_name, nodes in groupby(self.G.node,lambda x: x.stage_name):
+            print stage_name
+            print list(nodes)
+        #print self.G.in_degree().items()
+        #degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.G.in_degree().items()))
+        #print degree_0_tasks
 
 
-class FlowException(Exception):
-    pass
+class FlowException(Exception):pass
 
 
 def merge_dicts(*args):
@@ -61,56 +68,58 @@ class Infix:
     def __call__(self, value1, value2):
         return self.function(value1, value2)
     
+WF = None
 
-def _apply(input_nodes,task):
-    for in_node in input_nodes:
-        DAG = in_node.DAG
-        new_node = task(DAG=DAG,tags=in_node.tags)
-        DAG.G.add_edge(in_node,new_node)
-        yield new_node
+def _apply(input_tasks,Task_CLS):
+    #TODO validate that Task_CLS.stage_name is unique in all infix operations
+    for input_task in input_tasks:
+        DAG = input_task.DAG
+        new_task = Task_CLS(DAG=DAG,tags=input_task.tags)
+        DAG.G.add_edge(input_task,new_task)
+        yield new_task
 Apply = Infix(_apply) #map
 
-def _reduce(input_nodes,RHS):
+def _reduce(input_tasks,RHS):
     try:
         if len(RHS) != 2 or type(RHS[0]) != list:
             raise FlowException('Invalid Right Hand Side of reduce')
     except Exception:
         raise FlowException('Invalid Right Hand Side of reduce')
     keywords = RHS[0]
-    task = RHS[1]
-    for tags, input_node_group in groupby(input_nodes,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-        input_node_group = list(input_node_group)
-        DAG = input_node_group[0].DAG
-        new_node = task(DAG=DAG,tags=tags)
-        for input_node in input_node_group:
-            DAG.G.add_edge(input_node,new_node)
-        yield new_node
+    Task_CLS = RHS[1]
+    for tags, input_task_group in groupby(input_tasks,lambda t: dict([(k,t.tags[k]) for k in keywords])):
+        input_task_group = list(input_task_group)
+        DAG = input_task_group[0].DAG
+        new_task = Task_CLS(DAG=DAG,tags=tags)
+        for input_task in input_task_group:
+            DAG.G.add_edge(input_task,new_task)
+        yield new_task
 Reduce = Infix(_reduce)
 
-def _split(input_nodes,RHS):
+def _split(input_tasks,RHS):
     splits = [ list(it.product([split[0]],split[1])) for split in RHS[0] ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
-    task = RHS[1]
-    for input_node in input_nodes:
-        DAG = input_node.DAG
+    Task_CLS = RHS[1]
+    for input_task in input_tasks:
+        DAG = input_task.DAG
         for new_tags in it.product(*splits):
-            tags = tags=merge_dicts(dict(input_node.tags),dict(new_tags))
-            new_node = task(DAG=DAG,tags=tags)
-            DAG.G.add_edge(input_node,new_node)
-            yield new_node
+            tags = tags=merge_dicts(dict(input_task.tags),dict(new_tags))
+            new_task = Task_CLS(DAG=DAG,tags=tags) 
+            DAG.G.add_edge(input_task,new_task)
+            yield new_task
 Split = Infix(_split)
 
-def _reduce_and_split(input_nodes,RHS):
+def _reduce_and_split(input_tasks,RHS):
     keywords = RHS[0]
     splits = [ list(it.product([split[0]],split[1])) for split in RHS[1] ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
-    task = RHS[2]
-    for group_tags,input_node_group in groupby(input_nodes,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-        input_node_group = list(input_node_group)
-        DAG = input_node_group[0].DAG
+    Task_CLS = RHS[2]
+    for group_tags,input_task_group in groupby(input_tasks,lambda t: dict([(k,t.tags[k]) for k in keywords])):
+        input_task_group = list(input_task_group)
+        DAG = input_task_group[0].DAG
         for new_tags in it.product(*splits):
-            new_node = task(DAG=DAG,tags=merge_dicts(group_tags,dict(new_tags)))
-            for input_node in input_node_group:
-                DAG.G.add_edge(input_node,new_node)
-            yield new_node
+            new_task = Task_CLS(DAG=DAG,tags=merge_dicts(group_tags,dict(new_tags)))
+            for input_task in input_task_group:
+                DAG.G.add_edge(input_task,new_task)
+            yield new_task
 ReduceSplit = Infix(_reduce_and_split)
 
 

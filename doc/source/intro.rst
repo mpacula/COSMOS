@@ -7,8 +7,8 @@ advantage of a compute cluster, and provides a web interface to monitor, debug, 
 Python Library
 ______________
 
-* Submit batches of jobs to a cluster in parallel (support for :term:`DRMAA` enabled :term:`DRMS` such as SGE, LSF, PBS/Torque, and Condor)
-* Wait for batches to finish before proceeding to the next step
+* Submit stages of jobs to a cluster in parallel (support for :term:`DRMAA` enabled :term:`DRMS` such as SGE, LSF, PBS/Torque, and Condor)
+* Wait for stages to finish before proceeding to the next step
 * Keep track of job outputs
 * Written in python which is easy to learn, powerful, and popular.  A programmer with limited experience can write begin writing Cosmos workflows right away.
 
