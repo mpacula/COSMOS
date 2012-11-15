@@ -1,0 +1,10 @@
+TaskFile class to memoize tasks
+    sha1sum
+    dag outputs commands with actual path to file? Nah.
+    	/path/to/file should be unique, so cosmos should be able to backtrack to the TaskFile record and find the right node to submit to
+      
+replace step.py with dag.py
+
+Upgrade to gatk 2.2
+Run validation data from pacbio data
+

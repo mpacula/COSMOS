@@ -3,16 +3,39 @@ import pygraphviz as pgv
 from cosmos.Cosmos.helpers import groupby
 from cosmos.util.typecheck import accepts, returns
 import itertools as it
+import sys
 
-DAG = nx.DiGraph()
+class WorkflowDAG(object):
+    
+    def __init__(self):
+        self.G = nx.DiGraph()
+        
+    def create_dag_img(self):
+        AG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
+        AG.node_attr['fontname']="Courier-Bold"
+        AG.node_attr['fontsize']=12
+            
+        for node,data in self.G.nodes(data=True):
+            AG.add_node(node,label=node.label)
+        AG.add_edges_from(self.G.edges())
+        AG.layout(prog="dot")
+        AG.draw('/tmp/graph.svg',format='svg')
+        print 'wrote to /tmp/graph.svg'
+        
+    def describe(self,generator):
+        return list(generator)
+        
+    def set_parameters(self,params):
+        """
+        Sets the parameters of every task in the dag
+        """
+        for task in self.G.node:
+            task.parameters = params.get(task.stage_name,{'stage_name':task.stage_name})
+
 
 class FlowException(Exception):
     pass
 
-
-
-def run(g):
-    return list(g)
 
 def merge_dicts(*args):
     """
@@ -41,11 +64,11 @@ class Infix:
 
 def _apply(input_nodes,task):
     for in_node in input_nodes:
-        new_node = task(in_node.tags)
-        DAG.add_edge(in_node,new_node)
+        DAG = in_node.DAG
+        new_node = task(DAG=DAG,tags=in_node.tags)
+        DAG.G.add_edge(in_node,new_node)
         yield new_node
 Apply = Infix(_apply) #map
-        
 
 def _reduce(input_nodes,RHS):
     try:
@@ -56,25 +79,25 @@ def _reduce(input_nodes,RHS):
     keywords = RHS[0]
     task = RHS[1]
     for tags, input_node_group in groupby(input_nodes,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-        new_node = task(tags=tags)
+        input_node_group = list(input_node_group)
+        DAG = input_node_group[0].DAG
+        new_node = task(DAG=DAG,tags=tags)
         for input_node in input_node_group:
-            DAG.add_edge(input_node,new_node)
+            DAG.G.add_edge(input_node,new_node)
         yield new_node
 Reduce = Infix(_reduce)
-
 
 def _split(input_nodes,RHS):
     splits = [ list(it.product([split[0]],split[1])) for split in RHS[0] ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     task = RHS[1]
     for input_node in input_nodes:
+        DAG = input_node.DAG
         for new_tags in it.product(*splits):
             tags = tags=merge_dicts(dict(input_node.tags),dict(new_tags))
-            new_node = task(tags=tags)
-            DAG.add_edge(input_node,new_node)
+            new_node = task(DAG=DAG,tags=tags)
+            DAG.G.add_edge(input_node,new_node)
             yield new_node
 Split = Infix(_split)
-
-
 
 def _reduce_and_split(input_nodes,RHS):
     keywords = RHS[0]
@@ -82,24 +105,13 @@ def _reduce_and_split(input_nodes,RHS):
     task = RHS[2]
     for group_tags,input_node_group in groupby(input_nodes,lambda t: dict([(k,t.tags[k]) for k in keywords])):
         input_node_group = list(input_node_group)
+        DAG = input_node_group[0].DAG
         for new_tags in it.product(*splits):
-            new_node = task(merge_dicts(group_tags,dict(new_tags)))
+            new_node = task(DAG=DAG,tags=merge_dicts(group_tags,dict(new_tags)))
             for input_node in input_node_group:
-                DAG.add_edge(input_node,new_node)
+                DAG.G.add_edge(input_node,new_node)
             yield new_node
 ReduceSplit = Infix(_reduce_and_split)
 
-def create_dag_img():
-    global DAG
-    AG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
-    AG.node_attr['fontname']="Courier-Bold"
-    AG.node_attr['fontsize']=12
-        
-    for node,data in DAG.nodes(data=True):
-        AG.add_node(node,label=node.label)
-    AG.add_edges_from(DAG.edges())
-    AG.layout(prog="dot")
-    AG.draw('/tmp/graph.svg',format='svg')
-    print 'wrote to /tmp/graph.svg'
 
     
