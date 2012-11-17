@@ -7,20 +7,20 @@ ________________
 You should actually avoid using STDOUT to store the output of your jobs, and redirect it to a file.  Cosmos helps you keep track
 of these output files using a dictionary you pass to :py:meth:`Stage.add_task()` using the output parameter.  Time to really dig into the add_task() api:
 
-.. automethod:: Workflow.models.Stage.add_task
+.. automethod:: cosmos.Workflow.models.Stage.add_task
    :noindex:
 
 Understanding the add_task parameters are vital.  The two most complicated parameters are *pcmd* and *outputs*.  Cosmos automatically creates and output directory
 tree for each Workflow, Stage, and Task.  You can access this system output_path by using *'{output_dir}'* in your pcmd.  Cosmos will also keep track of output directories for you.  Use the
-*outputs* parameter to pass in a dictionary of output files.  You can then access the outputs directionary later by using :py:data:`Workflow.models.Task.outputs`, or access the full path to those output files
-using :py:data:`Workflow.models.Task.output_paths`
+*outputs* parameter to pass in a dictionary of output files.  You can then access the outputs directionary later by using :py:data:`cosmos.Workflow.models.Task.outputs`, or access the full path to those output files
+using :py:data:`cosmos.Workflow.models.Task.output_paths`
 
 
 .. code-block:: python
    :linenos:
 
    import cosmos.session
-   from Workflow.models import Workflow
+   from cosmos.Workflow.models import Workflow
    import os
    
    WF = Workflow.start('My Advanced Workflow')

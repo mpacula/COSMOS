@@ -6,16 +6,16 @@ ________________________
 
 
 #. **Workflow** (:doc:`API </API/Workflow>`)
-      .. autoclass:: Workflow.models.Workflow
+      .. autoclass:: cosmos.Workflow.models.Workflow
          :noindex:
 #. **Stage** (:doc:`API </API/Workflow>`)
-      .. autoclass:: Workflow.models.Stage
+      .. autoclass:: cosmos.Workflow.models.Stage
          :noindex:
 #. **Task** (:doc:`API </API/Workflow>`)
-      .. autoclass:: Workflow.models.Task
+      .. autoclass:: cosmos.Workflow.models.Task
          :noindex:
 #. **JobAttempt** (:doc:`API </API/JobManager>`)   
-      .. autoclass:: JobManager.models.JobAttempt
+      .. autoclass:: cosmos.JobManager.models.JobAttempt
          :noindex:
 
 
@@ -29,7 +29,7 @@ The simplest workflow you could have.  Edit :file:`firstflow.py`, and put the fo
 
    # These two lines go at the beggining of every workflow
    import cosmos.session
-   from Workflow.models import Workflow
+   from cosmos.Workflow.models import Workflow
    
    # Create workflow
    my_workflow = Workflow.start('My First Workflow')
@@ -58,13 +58,13 @@ _________________
 
 First, get familiar with the APIs of these functions, especially their first few parameters:
 
-.. automethod:: Workflow.models.Workflow.start
+.. automethod:: cosmos.Workflow.models.Workflow.start
    :noindex:
 
-.. automethod:: Workflow.models.Workflow.add_stage
+.. automethod:: cosmos.Workflow.models.Workflow.add_stage
    :noindex:
    
-.. automethod:: Workflow.models.Stage.add_task
+.. automethod:: cosmos.Workflow.models.Stage.add_task
    :noindex:
 
 So with the code changes below, Cosmos will resume the workflow and skip the first stage since it was already successful.  It will then
@@ -74,7 +74,7 @@ run 5 jobs in the second stage.
    :linenos:
 
    import cosmos.session
-   from Workflow.models import Workflow
+   from cosmos.Workflow.models import Workflow
    import os
    
    WF = Workflow.start('My First Workflow')

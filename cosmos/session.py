@@ -12,8 +12,7 @@ try:
     settings = importlib.import_module(os.environ['COSMOS_SETTINGS_MODULE'])
 except ImportError:
     print >> sys.stderr, "ERROR!! The file {} in the COSMOS_SETTINGS_MODULE environment variable could not be imported.".format(os.environ['COSMOS_SETTINGS_MODULE'])
-    sys.exit(1)    
-    
+    sys.exit(1)
     
 if 'COSMOS_HOME_PATH' not in os.environ:
     print >>sys.stderr, 'please set the environment variable COSMOS_HOME_PATH'

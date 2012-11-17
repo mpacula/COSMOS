@@ -1,5 +1,5 @@
 Workflow
 ========
 
-.. automodule:: Workflow.models
+.. automodule:: cosmos.Workflow.models
    :members:
