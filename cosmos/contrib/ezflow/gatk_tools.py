@@ -1,17 +1,14 @@
-from tool import Tool
+from tool import Tool,cmd_inputs
 from decorators import fromtags, opoi
 
 def list2input(l):
     return " -I ".join(map(lambda x: str(x),l))
 
 class FASTQ(Tool):
+    NOOP = True
+    
     __verbose__ = "Fastq Input"
     outputs = ['fastq']
-    NOOP = True
-
-    
-    def map_cmd(self):
-        return str(self.output_taskFiles['fastq'])
 
 class ALN(Tool):
     __verbose__ = "Reference Alignment"
@@ -29,12 +26,15 @@ class SAMPE(Tool):
     outputs = ['sam']
     
     def map_cmd(self):
-        "Expecting 2 input EZTasks"
+        "Expecting 2 parents"
         ps = self.parents
-        return self.middleware_cmd(ps[0].parent.get_output('fastq'),ps[1].parent.get_output('fastq'),ps[0].get_output('sai'),ps[1].get_output('sai'))
+        return cmd_inputs(fastq1=ps[0].parent.get_output('fastq'),
+                      fastq2=ps[1].parent.get_output('fastq'),
+                      sai1=ps[0].get_output('sai'),
+                      sai2=ps[1].get_output('sai'))
     
-    def cmd(self,fastq1,fastq2,aln1,aln2,params):
-        return 'bwa sampe {fastq1} {fastq2} {aln1} {aln2} -q {params[q]} > $OUT.sam'
+    def cmd(self,fastq1,fastq2,sai1,sai2,params):
+        return 'bwa sampe {fastq1} {fastq2} {sai1} {sai2} > $OUT.sam'
     
 class CLEAN_SAM(Tool):
     __verbose__ = "Sam Cleaning"
@@ -63,7 +63,9 @@ class IR(Tool):
     
     def map_cmd(self):
         input_bam = self.parent.parent.get_output('bam')
-        return self.middleware_cmd(input_bam,self.parent.get_output('targets'),interval=self.tags['interval'])
+        return cmd_inputs(input_bam = input_bam,
+                      targets = self.parent.get_output('targets'),
+                      interval = self.tags['interval'])
     
     def cmd(self,input_bam,targets,interval):
         return 'IR -I {input_bam} -L {interval} -t {targets}'
@@ -83,7 +85,8 @@ class PR(Tool):
     
     def map_cmd(self):
         input_bams = [p.get_output('bam') for p in self.parent.parents ] 
-        return self.middleware_cmd(input_bams,self.parent.get_output('recal'))
+        return cmd_inputs(input_bams = input_bams,
+                      recal = self.parent.get_output('recal'))
     
     def cmd(self,input_bams,recal):
         return 'PrintReads -I {0} -r {{recal}}'.format(list2input(input_bams))
@@ -124,7 +127,7 @@ class Apply_VQSR(Tool):
     
     def map_cmd(self):
         input_vcf = self.parent.get_output('recal') 
-        return self.middleware_cmd(input_vcf,self.parent.parent.get_output('vcf'))
+        return cmd_inputs(input_vcf,self.parent.parent.get_output('vcf'))
     
     def cmd(self,input_vcf,recal):
         return 'apply vqsr {input_vcf} {recal} > $OUT.vcf'

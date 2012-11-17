@@ -149,6 +149,7 @@ def pformat(func,*args,**kwargs):
 #        return "p1={p1} p2={p2}"
 #print X().x('val1','val2')
 
+class FromTagsError(Exception):pass
 def fromtags(*tags):
     """
     Fills in a method's parameter's value with the keys from the method's instance's tags listed.
@@ -172,8 +173,7 @@ def fromtags(*tags):
         try:
             for t in tags: callargs[t] = instance.tags[t]
         except KeyError:
-            print "@fromtags Error: {0} does not exist in {1}.tags which is {2}".format(t,instance,instance.tags)
-            raise
+            raise FromTagsError("@fromtags Error: {0} does not exist in {1}.tags which is {2}".format(t,instance,instance.tags))
         return pformat(fxn)(**callargs)
     
     return wrapped

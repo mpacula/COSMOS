@@ -1,7 +1,9 @@
-import dag,re
-from decorators import pformat
-import types, inspect
+from decorators import pformat, getcallargs
+import dag
+import re
 import hashlib
+import types
+import inspect
 
 i = 0
 def get_id():
@@ -10,6 +12,9 @@ def get_id():
     return i
 
 files = []
+
+def cmd_inputs(*args,**kwargs):
+    return args,kwargs
 
 class ExpectedError(Exception): pass
 class ToolError(Exception): pass
@@ -62,7 +67,7 @@ class Tool(object):
     If initialized with a single argument, it becomes a factory that produces a class who's stage_name is that argument.
     Otherwise, intialize with keyword arguments to make it behave like a regular class.
     
-    :property stage_name: (str) The name of this Tool's stage.  Defaults to Tool.__verbose__
+    :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
     :property DAG: The DAG that is keeping track of this Tool
     :property id: A unique identifier.  Useful for debugging.
     :property output_taskFiles: This Tool's TaskFiles
@@ -71,14 +76,15 @@ class Tool(object):
     :property outputs: a list of output names, must be specified by user
     """
     NOOP = False #set to True if this Task should never actually be submitted to the Cosmos Workflow
-    #stage_name
     
-    def __init__(self,DAG,tags={},output_taskFiles=[]):
+    def __init__(self,DAG,stage_name,tags={},output_taskFiles=[]):
         """
+        :param stage_name: (str) The name of the stage this tool belongs to. Required.
         :param output_taskFiles: A list, or a dict of TaskFiles.  if a list, it will be converted to a dict who's keywords are the TaskFiles' fmt. 
         
         .. note:: because of the special __new__, Task must be constructed using keyword in the parameters only.
         """
+        self.stage_name = stage_name
         self.output_taskFiles = {}
         if not hasattr(self,'__verbose__'): self.__verbose__ = self.stage_name
         self.DAG = DAG
@@ -108,13 +114,14 @@ class Tool(object):
 #        elif len(r) > 1:
 #            raise ExpectedError('More than one output with ext {0}'.format(0))
          
-    def __new__(cls,stage_name=None,*args,**kwargs):
-        if stage_name:
-            cls.stage_name = stage_name
-            return cls
-        else:
-            cls.stage_name = cls.__name__
-            return super(Tool, cls).__new__(cls, *args, **kwargs)
+#    def __new__(cls,stage_name=None,*args,**kwargs):
+#        if stage_name:
+#            cls2 = cls.__class__.copy()
+#            cls2.stage_name = stage_name
+#            return cls2
+#        else:
+#            if hasattr(cls,'stage_name'): cls.stage_name = cls.__name__
+#            return super(Tool, cls).__new__(cls, *args, **kwargs)
             
 #    def __getattribute__(self, name):
 #        if name == 'cmd':
@@ -144,34 +151,48 @@ class Tool(object):
         
     @property
     def pcmd(self):
-        return self.map_cmd()
-    
+        if self.NOOP:
+            return ''
+        inputs = self.map_cmd()
+        try:
+            return self.middleware_cmd(*inputs[0],**inputs[1])
+        except IndexError:
+            raise ToolError("map_cmd returned bad inputs, it returned {0}".format(inputs))
+
     def map_cmd(self):
         try:
             inputs = [ p.get_output(self.inputs[0]) for p in self.parents ]
         except GetOutputError as e:
             raise GetOutputError("{0} tried to access a non-existant output file '{1}' in {2}".format(self,self.inputs[0],p))
-        empty_parameter_values = [None] * len(inspect.getargspec(self.cmd)[0][2:]) #this will become the parameter config
-        return self.middleware_cmd(inputs,*empty_parameter_values)
+        return cmd_inputs(inputs)
         
     def middleware_cmd(self,*args,**kwargs):
         """
         Stuff that happens inbetween map_cmd() and cmd()
+        :param *args: input file parameters
+        :param **kwargs: Named input file parameters
         """
         decorated = pformat(self.cmd.im_func) #decorate with pformat
         decorated = types.MethodType(decorated,self,self.__class__) #rebind to self
+        
         if 'params' in inspect.getargspec(decorated)[0]:
-            r = decorated(params=self.parameters,*args,**kwargs)
-        else:
+            kwargs['params'] = self.parameters
+        
+        #these arguments should be filled in later by decorators like from_tags
+        empty_parameter_values = [None] * (len(inspect.getargspec(decorated)[0]) - 1 - len(args) - len(kwargs)) #-1 is for self
+        args = args + tuple(empty_parameter_values)
+        try:
             r = decorated(*args,**kwargs)
-        m = re.search('\$OUT\.([\w]+)',r)
+            m = re.search('\$OUT\.([\w]+)',r)
+        except TypeError:
+            raise ToolError('TypeError calling {0}.cmd, args: {1}, kwargs: {2}.  Available args are: {3}'.format(self.__class__.__name__,args,kwargs,inspect.getargspec(decorated)[0]))
         if m:
             for out_name in m.groups():
                 r = re.sub('\$OUT\.[\w]+',str(self.output_taskFiles[out_name]),r)
         return r
         
     def cmd(self,*args,**kwargs):
-        raise NotImplementedError()
+        raise NotImplementedError("{0}.cmd is not implemented.".format(self.__class__.__name__))
     
     def set_output_path(self,name,path):
         if name not in self.outputs:
