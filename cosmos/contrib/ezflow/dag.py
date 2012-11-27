@@ -2,9 +2,7 @@ from cosmos.Cosmos.helpers import groupby
 import itertools as it
 import networkx as nx
 import pygraphviz as pgv
-import decorator
-from cosmos.Workflow.models import TaskError
-
+from cosmos.Workflow.models import Task,TaskError
 
 class TaskDAG(object):
     
@@ -12,7 +10,6 @@ class TaskDAG(object):
         self.G = nx.DiGraph()
         
     def create_dag_img(self):
-        print 'hello'
         AG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
         AG.node_attr['fontname']="Courier-Bold"
         AG.node_attr['fontsize']=12
@@ -35,39 +32,45 @@ class TaskDAG(object):
             task.parameters = params.get(task.stage_name,{})
             
     def add_to_workflow(self,WF):
+        OPnodes = filter(lambda x: not x.NOOP,self.G.node.keys())
+        OPedges = filter(lambda x: not x[0].NOOP and not x[1].NOOP,self.G.edges())
         
         for stage_name, nodes in groupby(self.G.node.items(),lambda t: t[0].stage_name):
             stage = WF.add_stage(stage_name)
             for n in nodes:
                 n[1]['stage'] = stage
         
-        #bulk save task_files
-        
+        #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs
+        taskfiles = list(it.chain(*[ n.output_files.values() for n in self.G.node ]))
+        WF.bulk_save_task_files(taskfiles)
         
         #bulk save tasks
         for node,attrs in self.G.node.items():
             if not node.NOOP:
                 node._task_instance = self.__add_task_to_stage(WF,attrs['stage'],node)
         
-        tasks = [ node._task_instance for node,attrs in filter(lambda x: not x[0].NOOP, self.G.node.items()) ]
+        tasks = [ node._task_instance for node in OPnodes ]
         WF.bulk_save_tasks(tasks)
         
+        ### Bulk add task->output_taskfile relationships
+        ThroughModel = Task._output_files.through
+        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=out.id) for n in OPnodes for out in n.output_files.values() ]
+        ThroughModel.objects.bulk_create(rels)
+        
         #bulk save edges
-        task_edges = [ (parent._task_instance,child._task_instance) for parent,child in filter(lambda x: not x[0].NOOP and not x[1].NOOP,self.G.edges()) ]
-        WF.bulk_save_task_edges(task_edges)   
-        
-        
+        task_edges = [ (parent._task_instance,child._task_instance) for parent,child in OPedges ]
+        WF.bulk_save_task_edges(task_edges)
     
     def __add_task_to_stage(self,workflow,stage,task):
         """adds a task"""
         try:
             return stage.new_task(name = '',
-                               pcmd = task.pcmd,
-                                tags = task.tags,
-                                inputs = None,
-                                outputs = None,
-                                mem_req = task.mem_req,
-                                cpu_req = task.cpu_req)
+                                  pcmd = task.pcmd,
+                                  tags = task.tags,
+                                  input_files = task.input_files,
+                                  output_files = task.output_files,
+                                  mem_req = task.mem_req,
+                                  cpu_req = task.cpu_req)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e,task))
             

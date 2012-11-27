@@ -24,6 +24,30 @@ status_choices=(
 class TaskError(Exception): pass
 class WorkflowError(Exception): pass
 
+
+class TaskFile(models.Model):
+    """
+    Task File
+    """
+    name = models.CharField(max_length=50,null=False)
+    fmt = models.CharField(max_length=10,null=True) #file format
+    path = models.CharField(max_length=250,null=True)
+    
+
+    def __init__(self,*args,**kwargs):
+        if 'fmt' not in kwargs and 'path' in kwargs:
+            kwargs['fmt'] = re.search('\.(.+?)$',kwargs['path']).group(1)
+        if 'name' not in kwargs and 'fmt' in kwargs:
+            kwargs['name'] = kwargs['fmt']
+        return super(TaskFile,self).__init__(*args,**kwargs)
+        
+    @property
+    def sha1sum(self):
+        return hashlib.sha1(file(self.path).read())
+    
+    def __str__(self):
+        return "#F[{0}][{1}:{2}]".format(self.id,self.name,self.path)
+    
 class Workflow(models.Model):
     """   
     This is the master object.  It contains a list of :class:`Stage` which represent a pool of jobs that have no dependencies on each other
@@ -314,6 +338,8 @@ class Workflow(models.Model):
         
         :param tasks: (list) a list of tasks
         
+        .. note:: this does not save task->taskfile relationships
+        
         >>> tasks = [stage.new_task(name='1',pcmd='cmd1',save=False),stage.new_task(name='2',pcmd='cmd2',save=False,{},True)]
         >>> stage.bulk_add_tasks(tasks)
         """
@@ -336,9 +362,7 @@ class Workflow(models.Model):
         #remove successful tasks       
         successful_task_tags = map(lambda t: dbsafe_decode(t),self.tasks.filter(successful=True).values('tags'))
         tasks = filter(lambda t: t.tags not in successful_task_tags,tasks) #TODO use sets to speed this up
-#        
-#        Task.objects.bulk_create(tasks)
-
+        
         ### Bulk add tasks
         self.log.info("Bulk adding {0} tasks...".format(len(tasks)))
         
@@ -362,7 +386,18 @@ class Workflow(models.Model):
         self.log.info("Bulk adding {0} task tags...".format(len(tasktags)))
         TaskTag.objects.bulk_create(tasktags)
         
-        
+        return
+    
+    @transaction.commit_on_success
+    def bulk_save_task_files(self,taskfiles):
+        """
+        :param taskfiles: [taskfile1,taskfile2,...] A list of taskfiles
+        """
+        ### Bulk add
+        m = TaskFile.objects.all().aggregate(models.Max('id'))['id__max']
+        id_start =  m + 1 if m else 1
+        for i,t in enumerate(taskfiles): t.id = id_start + i
+        TaskFile.objects.bulk_create(taskfiles)
         return
     
     @transaction.commit_on_success
@@ -450,6 +485,8 @@ class Workflow(models.Model):
         self.task_edges.delete()
         self.log.info('Bulk deleting Tasks...')
         self.tasks.delete()
+#        self.log.info('Bulk deleting TaskFiles...')
+#        self.task_files.delete()
         self.log.info('Deleting Stages...'.format(self.name))
         self.stages.delete()
         self.log.info('{0} Deleted.'.format(self))
@@ -469,17 +506,24 @@ class Workflow(models.Model):
         
         :param task: the task to submit a JobAttempt for
         """
-        #TODO fix this slowness
+        #TODO fix this it's slow (do it in bulk when running a workflow?)
         if task.stage.status == 'no_attempt':
             task.stage.status = 'in_progress'
             task.stage.started_on = timezone.now()
             task.stage.save()
         task.status = 'in_progress'
         self.log.info('Running {0}'.format(task))
-        try:
-            task.exec_command = task.pre_command.format(output_dir=task.job_output_dir,outputs = task.outputs)
-        except KeyError:
-            helpers.formatError(task.pre_command,{'output_dir':task.job_output_dir,'outputs': task.outputs})
+        
+        task.exec_command = task.pre_command
+        
+        for m in re.findall('(#F\[(.+?)\]\[(.+?)\])',task.pre_command):
+            taskfile = TaskFile.objects.get(pk=m[1])
+            re.sub(m[1],task.exec_command,taskfile.path)
+        
+#        try:
+#            task.exec_command = task.pre_command.format(output_dir=task.job_output_dir,outputs = task.outputs)
+#        except KeyError:
+#            helpers.formatError(task.pre_command,{'output_dir':task.job_output_dir,'outputs': task.outputs})
                 
         #create command.sh that gets executed
         
@@ -602,8 +646,7 @@ class Workflow(models.Model):
             if jobAttempt.successful:
                 task._has_finished(jobAttempt)
                 wfDAG.completed_task(task)
-                ready_tasks = wfDAG.get_ready_tasks()
-                for n in ready_tasks:
+                for n in wfDAG.get_ready_tasks():
                     wfDAG.queued_task(n)
                     self._run_task(n)
             else:
@@ -949,6 +992,11 @@ class Stage(models.Model):
         "TaskTags in this Stage"
         return TaskTag.objects.filter(task__in=self.tasks)
     
+#    @property
+#    def task_files(self):
+#        "TaskFiles in this Stage"
+#        return TaskFile.objects.filter(task__in=self.tasks)
+    
     @property
     def num_tasks(self):
         "The number of tasks in this stage"
@@ -978,13 +1026,12 @@ class Stage(models.Model):
             if sja: 
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
 
-    def new_task(self, name, pcmd, inputs=None,outputs=None, hard_reset=False, tags = {}, mem_req=0, cpu_req=1, time_limit=None):
+    def new_task(self, name, pcmd, hard_reset=False, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_limit=None):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
         :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
         :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
-        :param outputs: (dict) a dictionary of outputs and their names. Optional.
         :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
         :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
@@ -1003,8 +1050,6 @@ class Stage(models.Model):
                        'name':name,
                        'tags':tags,
                        'pre_command':pcmd,
-                       'output_files':outputs,
-                       'input_files':inputs,
                        'memory_requirement':mem_req,
                        'cpu_requirement':cpu_req,
                        'time_limit':time_limit
@@ -1020,8 +1065,10 @@ class Stage(models.Model):
             task.delete()
     
         #Just instantiate a task
-        return Task(**task_kwargs)
-        
+        t= Task(**task_kwargs)
+        t.input_files_list = input_files
+        t.output_files_list = output_files
+        return t
         
 #    def new_task(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, parents=[], save=True, skip_checks=False, mem_req=0, cpu_req=1, time_limit=None):
 #        """
@@ -1254,8 +1301,13 @@ class Task(models.Model):
     successful = models.BooleanField(null=False)
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     
-    output_files = models.ForeignKey(TaskFile,related_name='output_for_tasks_set',null=True) #dictionary of outputs
-    input_files = models.ForeignKey(TaskFile,related_name='input_for_tasks_set',null=True)
+    _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True) #dictionary of outputs
+    @property
+    def output_files(self): return self._output_files.all()
+    
+    _input_files = models.ManyToManyField(TaskFile,related_name='task_input_set',null=True)
+    @property
+    def input_files(self): return self._input_files.all()
     
     tags = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
@@ -1264,7 +1316,7 @@ class Task(models.Model):
     
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
-        super(Task,self).__init__(*args, **kwargs)
+        return super(Task,self).__init__(*args, **kwargs)
     
     @staticmethod
     def create(*args,**kwargs):

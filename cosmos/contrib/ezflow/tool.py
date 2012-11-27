@@ -1,9 +1,7 @@
 from decorators import pformat, getcallargs
-import dag
 import re
-import hashlib
 import types
-import inspect
+import itertools
 from cosmos.Workflow.models import TaskFile
 
 i = 0
@@ -15,7 +13,12 @@ def get_id():
 files = []
 
 def return_inputs(*args,**kwargs):
-    return args,kwargs
+    r = kwargs.copy()
+    for arg in args:
+        name = arg[0].name if type(arg) == list else arg.name
+        #TODO check for collisions
+        r[name] = arg
+    return r
 
 class ExpectedError(Exception): pass
 class ToolError(Exception): pass
@@ -59,6 +62,8 @@ class Tool(object):
     
     mem_req = 1*1024
     cpu_req = 1
+    params = {}
+    tags = {}
     
     def __init__(self,DAG,stage_name,tags={},output_files=[]):
         """
@@ -66,20 +71,23 @@ class Tool(object):
         :param output_files: A list, or a dict of TaskFiles.  if a list, it will be converted to a dict who's keywords are the TaskFiles' fmt. 
         
         """
+        self.tags = tags
         self.stage_name = stage_name
         self.output_files = {}
         if not hasattr(self,'__verbose__'): self.__verbose__ = self.stage_name
         self.DAG = DAG
         
         self.id = get_id()
+                
         for tf in output_files:
             #TODO check for collisions
-            self.output_files[tf.fmt] = tf
+            self.output_files[tf.name] = tf
             
         for output_ext in self.outputs:
             if output_ext not in self.output_files:
-                self.output_files[output_ext] = TaskFile(None,output_ext)
-        self.tags = tags
+                tf = TaskFile(fmt=output_ext)
+                #TODO check for collisions
+                self.output_files[tf.name] = tf
         
     
     def get_output(self,name):
@@ -106,17 +114,20 @@ class Tool(object):
     def label(self):
         tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(re.sub('interval','chr',k),v) for k,v in self.tags.items() ]))
         return "[{3}] {0}{1}\\n{2}".format(self.__verbose__,tags,self.pcmd,self.id)
+    
+    @property
+    def input_files_aslist(self):
+        return itertools.chain(*self.input_files.values())
+    
+    @property
+    def output_files_aslist(self):
+        return itertools.chain(*self.output_files.values())   
         
     @property
     def pcmd(self):
         if self.NOOP:
             return ''
-        inputs = self.map_inputs()
-        self.input_files = inputs
-        try:
-            return self.process_cmd(*inputs[0],**inputs[1])
-        except IndexError:
-            raise ToolError("map_inputs returned bad inputs, it returned {0}".format(inputs))
+        return self.process_cmd()
 
     def map_inputs(self):
         try:
@@ -127,9 +138,13 @@ class Tool(object):
         
     @property
     def input_files(self):
-        return self.map_inputs()
+        try:
+            r = self.map_inputs()
+        except IndexError:
+            raise ToolError("map_inputs returned bad inputs, it returned {0}".format(r))
+        return r
         
-    def process_cmd(self,*args,**kwargs):
+    def process_cmd(self):
         """
         Stuff that happens inbetween map_inputs() and cmd()
         :param *args: input file parameters
@@ -138,17 +153,12 @@ class Tool(object):
         decorated = pformat(self.cmd.im_func) #decorate with pformat
         decorated = types.MethodType(decorated,self,self.__class__) #rebind to self
         
-        if 'params' in inspect.getargspec(decorated)[0]:
-            kwargs['params'] = self.parameters
-        
         #these arguments should be filled in later by decorators like from_tags
-        empty_parameter_values = [None] * (len(inspect.getargspec(decorated)[0]) - 1 - len(args) - len(kwargs)) #-1 is for self
-        args = args + tuple(empty_parameter_values)
-        try:
-            r = decorated(*args,**kwargs)
-            m = re.search('\$OUT\.([\w]+)',r)
-        except TypeError:
-            raise ToolError('TypeError calling {0}.cmd, args: {1}, kwargs: {2}.  Available args are: {3}'.format(self.__class__.__name__,args,kwargs,inspect.getargspec(decorated)[0]))
+#        try:
+        r = decorated(self.input_files,self.tags,self.params)
+        m = re.search('\$OUT\.([\w]+)',r)
+#        except TypeError:
+#            raise ToolError('TypeError calling {0}.cmd, args: {1}, kwargs: {2}.  Available args are: {3}'.format(self.__class__.__name__,args,kwargs,inspect.getargspec(decorated)[0]))
         if m:
             for out_name in m.groups():
                 r = re.sub('\$OUT\.[\w]+',str(self.output_files[out_name]),r)

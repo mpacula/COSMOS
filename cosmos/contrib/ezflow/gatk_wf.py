@@ -30,27 +30,27 @@ parameters = {
 
 # Initialize
 DAG = TaskDAG()
-INPUT = [FASTQ(DAG=DAG,stage_name='FASTQ',tags={'sample':x[0],'fq_chunk':x[1],'fq_pair':x[2]},output_taskFiles=[TaskFile(x[3])]) for x in input_data]
+INPUT = [FASTQ(DAG=DAG,stage_name='FASTQ',tags={'sample':x[0],'fq_chunk':x[1],'fq_pair':x[2]},output_files=[TaskFile(path=x[3])]) for x in input_data]
 
 DAG.describe(
     INPUT
     |Apply| ALN
-#    |Reduce| (['sample','fq_chunk'],SAMPE)
-#    |Reduce| (['sample'],CLEAN_SAM)
-#    |Split| ([intervals],IRTC)
-#    |Apply| IR
-#    |Reduce| (['sample'],BQSR)
-#    |Apply| PR
-#    |ReduceSplit| ([],[glm,intervals], UG)
-#    |Reduce| (['glm'],CV)
-#    |Apply| VQSR
-#    |Apply| Apply_VQSR
-#    |Reduce| ([],CV,"CV 2")
-#    |Split| ([dbs],ANNOVAR)
-#    |Apply| PROCESS_ANNOVAR
-#    |Reduce| ([],MERGE_ANNOTATIONS)
-#    |Apply| SQL_DUMP
-#    |Apply| ANALYSIS
+    |Reduce| (['sample','fq_chunk'],SAMPE)
+    |Reduce| (['sample'],CLEAN_SAM)
+    |Split| ([intervals],IRTC)
+    |Apply| IR
+    |Reduce| (['sample'],BQSR)
+    |Apply| PR
+    |ReduceSplit| ([],[glm,intervals], UG)
+    |Reduce| (['glm'],CV)
+    |Apply| VQSR
+    |Apply| Apply_VQSR
+    |Reduce| ([],CV,"CV 2")
+    |Split| ([dbs],ANNOVAR)
+    |Apply| PROCESS_ANNOVAR
+    |Reduce| ([],MERGE_ANNOTATIONS)
+    |Apply| SQL_DUMP
+    |Apply| ANALYSIS
 )
 DAG.set_parameters(parameters)
 

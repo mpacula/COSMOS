@@ -15,9 +15,8 @@ class ALN(Tool):
     inputs = ['fastq']
     outputs = ['sai']
     
-    @opoi
-    def cmd(self,fastq):
-        return 'bwa aln {fastq} > $OUT.sai'
+    def cmd(self,i,t,p):
+        return 'bwa aln {i[fastq][0]} > $OUT.sai'
     
 class SAMPE(Tool):
     __verbose__ = "Paired End Mapping"
@@ -51,7 +50,6 @@ class IRTC(Tool):
     inputs = ['bam']
     outputs = ['targets']
     
-    @fromtags('interval')
     def cmd(self,i,t,p):
         return 'IRTC -I {0} -L {{t[interval]}} > $OUT.targets'.format(list2input(i['bam']))
     
@@ -62,20 +60,19 @@ class IR(Tool):
     
     def map_inputs(self):
         input_bam = self.parent.parent.get_output('bam')
-        return return_inputs(input_bam = input_bam,
-                      targets = self.parent.get_output('targets'),
-                      interval = self.tags['interval'])
+        return return_inputs(bam = input_bam,
+                             targets = self.parent.get_output('targets'))
     
-    def cmd(self,input_bam,targets,interval):
-        return 'IR -I {input_bam} -L {interval} -t {targets}'
+    def cmd(self,i,t,p):
+        return 'IR -I {i[bam]} -L {t[interval]} -t {i[targets]}'
     
 class BQSR(Tool):
     __verbose__ = "Base Quality Score Recalibration"
     inputs = ['bam']
     outputs = ['recal']
     
-    def cmd(self,input_bams):
-        return 'BQSR -I {0} > $OUT.recal'.format(list2input(input_bams))
+    def cmd(self,i,t,p):
+        return 'BQSR -I {0} > $OUT.recal'.format(list2input(i['bam']))
     
 class PR(Tool):
     __verbose__ = "Apply BQSR"
@@ -84,11 +81,11 @@ class PR(Tool):
     
     def map_inputs(self):
         input_bams = [p.get_output('bam') for p in self.parent.parents ] 
-        return return_inputs(input_bams = input_bams,
+        return return_inputs(bam = input_bams,
                       recal = self.parent.get_output('recal'))
     
-    def cmd(self,input_bams,recal):
-        return 'PrintReads -I {0} -r {{recal}}'.format(list2input(input_bams))
+    def cmd(self,i,t,p):
+        return 'PrintReads -I {0} -r {{i[recal]}}'.format(list2input(i['bam']))
     
     
 class UG(Tool):
@@ -96,9 +93,8 @@ class UG(Tool):
     inputs = ['bam']
     outputs = ['vcf']
     
-    @fromtags('interval','glm')
-    def cmd(self,input_bams,glm,interval):
-        return 'UnifiedGenotyper -I {0} -glm {{glm}} -L {{interval}}'.format(list2input(input_bams))
+    def cmd(self,i,t,p):
+        return 'UnifiedGenotyper -I {0} -glm {{t[glm]}} -L {{t[interval]}}'.format(list2input(i['bam']))
     
 class CV(Tool):
     __verbose__ = "Combine Variants"
@@ -106,17 +102,17 @@ class CV(Tool):
     inputs = ['vcf']
     outputs = ['vcf']
     
-    def cmd(self,input_vcfs):
-        return 'CombineVariants {ins}'.format(ins=list2input(input_vcfs))
+    def cmd(self,i,t,p):
+        return 'CombineVariants {0}'.format(list2input(i['vcf']))
     
 class VQSR(Tool):
     __verbose__ = "Variant Quality Score Recalibration"
     inputs = ['vcf']
     outputs = ['recal']
     
-    @opoi
-    def cmd(self,input_vcf):
-        return 'vqsr {input_vcf} > $OUT.recal'
+#    @opoi
+    def cmd(self,i,t,p):
+        return 'vqsr {i[vcf][0]} > $OUT.recal'
     
 class Apply_VQSR(Tool):
     __verbose__ = "Apply VQSR"
@@ -125,54 +121,51 @@ class Apply_VQSR(Tool):
     outputs = ['vcf']
     
     def map_inputs(self):
-        input_vcf = self.parent.get_output('recal') 
-        return return_inputs(input_vcf,self.parent.parent.get_output('vcf'))
+        return return_inputs(self.parent.get_output('recal'),
+                             self.parent.parent.get_output('vcf'))
     
-    def cmd(self,input_vcf,recal):
-        return 'apply vqsr {input_vcf} {recal} > $OUT.vcf'
+    def cmd(self,i,t,p):
+        return 'apply vqsr {i[vcf]} {i[recal]} > $OUT.vcf'
     
 class ANNOVAR(Tool):
     __verbose__ = "Annovar"
     inputs = ['vcf']
     outputs = ['tsv']
     
-    @fromtags('database')
-    @opoi
-    def cmd(self,input_vcf,database):
-        return 'annovar {input_vcf} {database}'
+    def cmd(self,i,t,p):
+        return 'annovar {i[vcf][0]} {t[database]}'
     
 class PROCESS_ANNOVAR(Tool):
     __verbose__ = "Process Annovar"
     inputs = ['tsv']
     outputs = ['tsv']
     
-    @opoi
-    def cmd(self,input_tsv):
-        return 'genomekey {input_tsv}'
+#    @opoi
+    def cmd(self,i,t,p):
+        return 'genomekey {i[tsv][0]}'
     
 class MERGE_ANNOTATIONS(Tool):
     __verbose__ = "Merge Annotations"
     inputs = ['tsv']
     outputs = ['tsv']
     
-    def cmd(self,input_tsvs):
-        return 'genomekey merge {0}'.format(','.join(map(lambda x:str(x),input_tsvs)))
+    def cmd(self,i,t,p):
+        return 'genomekey merge {0}'.format(','.join(map(lambda x:str(x),i['tsv'])))
     
 class SQL_DUMP(Tool):
     __verbose__ = "SQL Dump"
     inputs = ['tsv']
     outputs = ['sql']
     
-    @opoi
-    def cmd(self,input_tsv):
-        return 'sql dump {input_tsv}'
+    def cmd(self,i,t,p):
+        return 'sql dump {i[tsv][0]}'
     
 class ANALYSIS(Tool):
     __verbose__ = "Filtration And Analysis"
     inputs = ['sql']
     outputs = ['analysis']
     
-    @opoi
-    def cmd(self,input_sql):
-        return 'analyze {input_sql}'
+    def cmd(self,i,t,p):
+        return 'analyze {i[sql][0]}'
+        
     
