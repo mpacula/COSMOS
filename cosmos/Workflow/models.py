@@ -11,6 +11,7 @@ from django.utils import timezone
 import networkx as nx
 import pygraphviz as pgv
 from cosmos.contrib.step import _unnest
+import hashlib
 
 status_choices=(
                 ('successful','Successful'),
@@ -19,6 +20,9 @@ status_choices=(
                 ('failed','Failed')
                 )
 
+
+class TaskError(Exception): pass
+class WorkflowError(Exception): pass
 
 class Workflow(models.Model):
     """   
@@ -79,7 +83,7 @@ class Workflow(models.Model):
     
     @property
     def stages(self):
-        """Stagees in this Workflow"""
+        """Stages in this Workflow"""
         return self.stage_set.all()
     
     @property
@@ -126,7 +130,7 @@ class Workflow(models.Model):
                 wf.terminate()
         try:
             signal.signal(signal.SIGINT, ctrl_c)
-        except ValueError: #signal only works in main thread
+        except ValueError: #signal only works in main thread and django complains
             pass
         
         return wf
@@ -246,7 +250,6 @@ class Workflow(models.Model):
         """
         #TODO implement a catch all exception so that this never happens.  i think i can only do this if scripts are not run directly
         for ja in JobAttempt.objects.filter(task_set=None): ja.delete()
-        
     
     def terminate(self):
         """
@@ -271,7 +274,7 @@ class Workflow(models.Model):
         self.log.info("Marking all terminated Tasks as failed.")
         tasks.update(status = 'failed',finished_on = timezone.now())
         
-        self.log.info("Marking all terminated Stagees as failed.")
+        self.log.info("Marking all terminated Stages as failed.")
         stages = Stage.objects.filter(pk__in=tasks.values('stage').distinct())
         stages.update(status = 'failed',finished_on = timezone.now())
         
@@ -303,53 +306,127 @@ class Workflow(models.Model):
             dicts = [ dict(nru) for nru in stage.yield_task_resource_usage() ]
             for d in dicts: d['stage'] = re.sub('_',' ',stage.name)
             yield dicts
-    
+
     @transaction.commit_on_success
-    def bulk_save_tasks(self,data):
+    def bulk_save_tasks(self,tasks):
         """
-        Does a bulk insert to speedup adding lots of tasks.  Will filter out any None values in the tasks_and_tags list.
+        Does a bulk insert of tasks.  Will delete unsuccessful tasks, and ignore already successful tasks
         
-        :param data: (list of {Task,dict,bool,parent_tasks)}) ie: [(task1,tags1,task_exists,parents),(task2,tags2,task_exists,parent_tasks),...]
+        :param tasks: (list) a list of tasks
         
-        >>> tasks = [(stage.add_task(name='1'pcmd='cmd1',save=False),{},True,[]),(stage.add_task(name='2',pcmd='cmd2',save=False,{},True,[]))]
+        >>> tasks = [stage.new_task(name='1',pcmd='cmd1',save=False),stage.new_task(name='2',pcmd='cmd2',save=False,{},True)]
         >>> stage.bulk_add_tasks(tasks)
         """
         
+        
+#        #validation
+#        if task_exists and task.successful:
+#            if task.pre_command != pcmd:
+#                self.log.error("You can't change the pcmd of a existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
+#            if task.outputs != outputs:
+#                self.log.error("You can't change the outputs of an existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
+#        
+#     
+        # Delete unsuccessful tasks
+        unsuccessful_tasks = list(self.tasks.filter(successful=False))
+        for t in unsuccessful_tasks: #TODO bulk delete
+            t.delete()
+        self.log.info('Deleting {0} unsuccessful tasks'.format(len(unsuccessful_tasks)))
+               
+        #remove successful tasks       
+        successful_task_tags = map(lambda t: dbsafe_decode(t),self.tasks.filter(successful=True).values('tags'))
+        tasks = filter(lambda t: t.tags not in successful_task_tags,tasks) #TODO use sets to speed this up
+#        
+#        Task.objects.bulk_create(tasks)
+
         ### Bulk add tasks
-        self.log.info("Bulk adding {0} tasks...".format(len(data)))
-        filtered_data = filter(lambda x: not x['task_exists'],data)
-        if len(filtered_data) == 0:
-            return []
+        self.log.info("Bulk adding {0} tasks...".format(len(tasks)))
         
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
         m = Task.objects.all().aggregate(models.Max('id'))['id__max']
         id_start =  m + 1 if m else 1
-        for i,d in enumerate(filtered_data): d['task'].id = id_start + i
+        for i,t in enumerate(tasks): t.id = id_start + i
         
-        Task.objects.bulk_create(map(lambda d: d['task'], filtered_data))
+        Task.objects.bulk_create(tasks)
         #create output directories
-        for n in map(lambda d: d['task'], filtered_data):
-            os.mkdir(n.output_dir)
-            os.mkdir(n.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
+        for t in tasks:
+            os.mkdir(t.output_dir)
+            os.mkdir(t.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
         
         ### Bulk add tags
-        #TODO validate that all tags have the same keyword
+        #TODO validate that all tags use the same keywords
         tasktags = []
-        for d in filtered_data:
-            for k,v in d['tags'].items():
-                tasktags.append(TaskTag(task=d['task'],key=k,value=v))
+        for t in tasks:
+            for k,v in t.tags.items():
+                tasktags.append(TaskTag(task=t,key=k,value=v))
         self.log.info("Bulk adding {0} task tags...".format(len(tasktags)))
         TaskTag.objects.bulk_create(tasktags)
         
+        
+        return
+    
+    @transaction.commit_on_success
+    def bulk_save_task_edges(self,edges):
+        """
+        :param edges: [(parent, child),...] A list of tuples of parent -> child relationships
+        """
+        #Remove existing edges
+        current_edges = self.task_edges.values('parent','child').values()
+        edges = filter(lambda e: (e[0].id,e[1].id) not in current_edges,edges)
+        
         ### Bulk add parents
-        task_edges = []
-        for d in filtered_data:
-            for parent in d['parents']:
-                task_edges.append(TaskEdge(parent=parent,child=d['task'],tags=d['tags']))
+        task_edges = map(lambda e: TaskEdge(parent=e[0],child=e[1]),edges)
         self.log.info("Bulk adding {0} task edges...".format(len(task_edges)))
         TaskEdge.objects.bulk_create(task_edges)
         
         return
+    
+#    @transaction.commit_on_success
+#    def bulk_save_tasks(self,data):
+#        """
+#        Does a bulk insert to speedup adding lots of tasks.  Will filter out any None values in the tasks_and_tags list.
+#        
+#        :param data: [{'task':task,'tags':tags_dict,'task_exists':bool,'parents':parent_tasks},..] example values of dicts: [(task1,tags1,task_exists,parent_tasks),(task2,tags2,task_exists,parent_tasks),...]
+#        
+#        >>> tasks = [(stage.new_task(name='1',pcmd='cmd1',save=False),{},True,[]),(stage.new_task(name='2',pcmd='cmd2',save=False,{},True,[]))]
+#        >>> stage.bulk_add_tasks(tasks)
+#        """
+#        
+#        ### Bulk add tasks
+#        self.log.info("Bulk adding {0} tasks...".format(len(data)))
+#        filtered_data = filter(lambda x: not x['task_exists'],data)
+#        if len(filtered_data) == 0:
+#            return []
+#        
+#        #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
+#        m = Task.objects.all().aggregate(models.Max('id'))['id__max']
+#        id_start =  m + 1 if m else 1
+#        for i,d in enumerate(filtered_data): d['task'].id = id_start + i
+#        
+#        Task.objects.bulk_create(map(lambda d: d['task'], filtered_data))
+#        #create output directories
+#        for n in map(lambda d: d['task'], filtered_data):
+#            os.mkdir(n.output_dir)
+#            os.mkdir(n.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
+#        
+#        ### Bulk add tags
+#        #TODO validate that all tags have the same keywords
+#        tasktags = []
+#        for d in filtered_data:
+#            for k,v in d['tags'].items():
+#                tasktags.append(TaskTag(task=d['task'],key=k,value=v))
+#        self.log.info("Bulk adding {0} task tags...".format(len(tasktags)))
+#        TaskTag.objects.bulk_create(tasktags)
+#        
+#        ### Bulk add parents
+#        task_edges = []
+#        for d in filtered_data:
+#            for parent in d['parents']:
+#                task_edges.append(TaskEdge(parent=parent,child=d['task'],tags=d['tags']))
+#        self.log.info("Bulk adding {0} task edges...".format(len(task_edges)))
+#        TaskEdge.objects.bulk_create(task_edges)
+#        
+#        return
             
     def delete(self, *args, **kwargs):
         """
@@ -373,7 +450,7 @@ class Workflow(models.Model):
         self.task_edges.delete()
         self.log.info('Bulk deleting Tasks...')
         self.tasks.delete()
-        self.log.info('Deleting Stagees...'.format(self.name))
+        self.log.info('Deleting Stages...'.format(self.name))
         self.stages.delete()
         self.log.info('{0} Deleted.'.format(self))
         
@@ -650,7 +727,8 @@ class WorkflowManager():
         
     def get_ready_tasks(self):
         degree_0_tasks= map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
-        return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks))
+        #TODO change query to .filter to increase speed
+        return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks)) 
     
     def createDiGraph(self):
         DAG = nx.DiGraph()
@@ -658,7 +736,7 @@ class WorkflowManager():
         for stage in self.workflow.stages:
             stage_name = stage.name
             for n in stage.tasks.values('id','tags','status'):
-                DAG.add_task(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name)
+                DAG.new_task(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name)
         return DAG
     
     def createAGraph(self,dag):
@@ -675,7 +753,7 @@ class WorkflowManager():
                     return "{0}: {1}".format(kv[0],v)
                 label = " \\n".join(map(truncate_val,attrs['tags'].items()))
                 status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
-                sg.add_task(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
+                sg.new_task(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
             
         return DAG
     
@@ -899,95 +977,140 @@ class Stage(models.Model):
             sja = task.get_successful_jobAttempt()
             if sja: 
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
-        
-    def add_task(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, parents=[], save=True, skip_checks=False, mem_req=0, cpu_req=1, time_limit=None):
+
+    def new_task(self, name, pcmd, inputs=None,outputs=None, hard_reset=False, tags = {}, mem_req=0, cpu_req=1, time_limit=None):
         """
-        Adds a task to the batch. If the task with this name (in this Batch) already exists and was successful, just return the existing one.
+        Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
-        :param name: (str) The name of the task. Must be unique within this batch. All spaces are converted to underscores. Required.
+        :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
         :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
         :param outputs: (dict) a dictionary of outputs and their names. Optional.
         :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
-        :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.Batch.group_tasks_by` and :py:meth:`~Workflow.models.Batch.get_tasks_by` Optional.
-        :param save: (bool) If False, will not save the task to the database. Meant to be used in concert with :method:`Workflow.bulk_save_tasks`
-        :param skip_checks: (bool) If True, will assume the task doesn't exist. If the task actually does exist, there will likely be a crash later on.
-        :param parents: (list) A list of parent tasks that this task is dependent on. This is optional and only used by the DAG functionality.
+        :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
         :param time_limit: (datetime.time) Not implemented.
         :returns: If save=True, an instance of a Task. If save=False, returns (task,tags) where task is a Task, tags is a dict, and task_exists is a bool.
         """
-                #validation
-                
-        # name = re.sub("\s","_",name) #user convenience
-        #
-        # if name == '' or name is None:
-        # raise ValidationError('name cannot be blank')
-        if skip_checks and save:
-            raise ValidationError('Cannot skip checks and save a task.')
-
+        
         if pcmd == '' or pcmd is None:
-            raise ValidationError('pre_command cannot be blank')
+            raise TaskError('pre_command cannot be blank')
         
         #TODO validate that this task has the same tag keys as all other tasks
         
         task_kwargs = {
-                       'batch':self,
+                       'stage':self,
                        'name':name,
                        'tags':tags,
                        'pre_command':pcmd,
-                       'outputs':outputs,
+                       'output_files':outputs,
+                       'input_files':inputs,
                        'memory_requirement':mem_req,
                        'cpu_requirement':cpu_req,
                        'time_limit':time_limit
                        }
-        if skip_checks:
-            task_exists = False
-        else:
-            task_exists = Task.objects.filter(batch=self,tags=tags).count() > 0
+        
+        #delete if hard_reset
+        if hard_reset:
+            task_exists = Task.objects.filter(stage=self,tags=tags).count() > 0
             if task_exists:
-                task = Task.objects.get(batch=self,tags=tags)
+                task = Task.objects.get(stage=self,tags=tags)
+            if not task_exists:
+                raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
+            task.delete()
+    
+        #Just instantiate a task
+        return Task(**task_kwargs)
         
-            #delete if hard_reset
-            if hard_reset:
-                if not task_exists:
-                    raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
-                task.delete()
-            
-            if task_exists and not task.successful:
-                self.log.info("{0} was unsuccessful last run.".format(task))
-                task.delete()
         
-            #validation
-            if task_exists and task.successful:
-                if task.pre_command != pcmd:
-                    self.log.error("You can't change the pcmd of a existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
-                if task.outputs != outputs:
-                    self.log.error("You can't change the outputs of an existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
-        
-        if not task_exists:
-            if save:
-                #Create and save a task
-                task = Task.create(**task_kwargs)
-                for k,v in tags.items():
-                    TaskTag.objects.create(task=task,key=k,value=v) #this is faster than a task.tag, because task.tag also writes to task.tags
-                for n in parents:
-                    TaskEdge.objects.create(parent=n,child=task,tags=tags) #TODO think about what a TaskEdge tag is
-                self.log.info("Created {0} in {1}, and saved to the database.".format(task,self))
-                
-                batch = task.batch
-                if batch.is_done():
-                    batch.status = 'in_progress'
-                    batch.successful = False
-                    batch.save()
-            else:
-                #Just instantiate a task
-                task = Task(**task_kwargs)
-                
-        if save:
-            return task
-        else:
-            return {'task':task,'tags':tags,'parents':parents,'task_exists':task_exists}
+#    def new_task(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, parents=[], save=True, skip_checks=False, mem_req=0, cpu_req=1, time_limit=None):
+#        """
+#        Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
+#        If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
+#        :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
+#        :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
+#        :param outputs: (dict) a dictionary of outputs and their names. Optional.
+#        :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
+#        :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
+#        :param save: (bool) If False, will not save the task to the database. Meant to be used in concert with :method:`Workflow.bulk_save_tasks`
+#        :param skip_checks: (bool) If True, will assume the task doesn't exist. If the task actually does exist, there will likely be a crash later on.
+#        :param parents: (list) A list of parent tasks that this task is dependent on. This is optional and only used by the DAG functionality.
+#        :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
+#        :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
+#        :param time_limit: (datetime.time) Not implemented.
+#        :returns: If save=True, an instance of a Task. If save=False, returns (task,tags) where task is a Task, tags is a dict, and task_exists is a bool.
+#        """
+#                #validation
+#                
+#        # name = re.sub("\s","_",name) #user convenience
+#        #
+#        # if name == '' or name is None:
+#        # raise ValidationError('name cannot be blank')
+#        if skip_checks and save:
+#            raise ValidationError('Cannot skip checks and save a task.')
+#
+#        if pcmd == '' or pcmd is None:
+#            raise TaskError('pre_command cannot be blank')
+#        
+#        #TODO validate that this task has the same tag keys as all other tasks
+#        
+#        task_kwargs = {
+#                       'stage':self,
+#                       'name':name,
+#                       'tags':tags,
+#                       'pre_command':pcmd,
+#                       'outputs':outputs,
+#                       'memory_requirement':mem_req,
+#                       'cpu_requirement':cpu_req,
+#                       'time_limit':time_limit
+#                       }
+#        if skip_checks:
+#            task_exists = False
+#        else:
+#            task_exists = Task.objects.filter(stage=self,tags=tags).count() > 0
+#            if task_exists:
+#                task = Task.objects.get(stage=self,tags=tags)
+#        
+#            #delete if hard_reset
+#            if hard_reset:
+#                if not task_exists:
+#                    raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
+#                task.delete()
+#            
+#            if task_exists and not task.successful:
+#                self.log.info("{0} was unsuccessful last run.".format(task))
+#                task.delete()
+#        
+#            #validation
+#            if task_exists and task.successful:
+#                if task.pre_command != pcmd:
+#                    self.log.error("You can't change the pcmd of a existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
+#                if task.outputs != outputs:
+#                    self.log.error("You can't change the outputs of an existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
+#        
+#        if not task_exists:
+#            if save:
+#                #Create and save a task
+#                task = Task.create(**task_kwargs)
+#                for k,v in tags.items():
+#                    TaskTag.objects.create(task=task,key=k,value=v) #this is faster than a task.tag, because task.tag also writes to task.tags
+#                for n in parents:
+#                    TaskEdge.objects.create(parent=n,child=task)
+#                self.log.info("Created {0} in {1}, and saved to the database.".format(task,self))
+#                
+#                stage = task.stage
+#                if stage.is_done():
+#                    stage.status = 'in_progress'
+#                    stage.successful = False
+#                    stage.save()
+#            else:
+#                #Just instantiate a task
+#                task = Task(**task_kwargs)
+#                
+#        if save:
+#            return task
+#        else:
+#            return {'task':task,'tags':tags,'parents':parents,'task_exists':task_exists}
 
 
     def is_done(self):
@@ -1113,7 +1236,6 @@ class TaskEdge(models.Model):
 #    tags = PickledObjectField(null=True,default={})
     "The keys associated with the relationship.  ex, the group_by parameter of a many2one" 
     
-    
     def __str__(self):
         return "{0.parent}->{0.child}".format(self)
 
@@ -1131,7 +1253,9 @@ class Task(models.Model):
     stage = models.ForeignKey(Stage,null=True)
     successful = models.BooleanField(null=False)
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
-    outputs = PickledObjectField(null=True) #dictionary of outputs
+    
+    output_files = models.ForeignKey(TaskFile,related_name='output_for_tasks_set',null=True) #dictionary of outputs
+    input_files = models.ForeignKey(TaskFile,related_name='input_for_tasks_set',null=True)
     
     tags = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)

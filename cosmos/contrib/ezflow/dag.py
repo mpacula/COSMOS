@@ -3,8 +3,10 @@ import itertools as it
 import networkx as nx
 import pygraphviz as pgv
 import decorator
+from cosmos.Workflow.models import TaskError
 
-class WorkflowDAG(object):
+
+class TaskDAG(object):
     
     def __init__(self):
         self.G = nx.DiGraph()
@@ -33,17 +35,45 @@ class WorkflowDAG(object):
             task.parameters = params.get(task.stage_name,{})
             
     def add_to_workflow(self,WF):
-        for stage_name, nodes in groupby(self.G.node,lambda t: t.stage_name):
-            pass
-            #print stage_name
-            #print list(nodes)
-        #print self.G.in_degree().items()
-        #degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.G.in_degree().items()))
-        #print degree_0_tasks
+        
+        for stage_name, nodes in groupby(self.G.node.items(),lambda t: t[0].stage_name):
+            stage = WF.add_stage(stage_name)
+            for n in nodes:
+                n[1]['stage'] = stage
+        
+        #bulk save task_files
+        
+        
+        #bulk save tasks
+        for node,attrs in self.G.node.items():
+            if not node.NOOP:
+                node._task_instance = self.__add_task_to_stage(WF,attrs['stage'],node)
+        
+        tasks = [ node._task_instance for node,attrs in filter(lambda x: not x[0].NOOP, self.G.node.items()) ]
+        WF.bulk_save_tasks(tasks)
+        
+        #bulk save edges
+        task_edges = [ (parent._task_instance,child._task_instance) for parent,child in filter(lambda x: not x[0].NOOP and not x[1].NOOP,self.G.edges()) ]
+        WF.bulk_save_task_edges(task_edges)   
+        
+        
+    
+    def __add_task_to_stage(self,workflow,stage,task):
+        """adds a task"""
+        try:
+            return stage.new_task(name = '',
+                               pcmd = task.pcmd,
+                                tags = task.tags,
+                                inputs = None,
+                                outputs = None,
+                                mem_req = task.mem_req,
+                                cpu_req = task.cpu_req)
+        except TaskError as e:
+            raise TaskError('{0}. Task is {1}.'.format(e,task))
+            
 
 
 class DagError(Exception):pass
-
 
 def merge_dicts(*args):
     """

@@ -1,4 +1,4 @@
-from tool import Tool,cmd_inputs
+from tool import Tool,return_inputs
 from decorators import fromtags, opoi
 
 def list2input(l):
@@ -25,45 +25,44 @@ class SAMPE(Tool):
     inputs = ['fastq','sai']
     outputs = ['sam']
     
-    def map_cmd(self):
+    def map_inputs(self):
         "Expecting 2 parents"
         ps = self.parents
-        return cmd_inputs(fastq1=ps[0].parent.get_output('fastq'),
+        return return_inputs(fastq1=ps[0].parent.get_output('fastq'),
                       fastq2=ps[1].parent.get_output('fastq'),
                       sai1=ps[0].get_output('sai'),
                       sai2=ps[1].get_output('sai'))
     
-    def cmd(self,fastq1,fastq2,sai1,sai2,params):
-        return 'bwa sampe {fastq1} {fastq2} {sai1} {sai2} > $OUT.sam'
+    def cmd(self,i,t,p):
+        return 'bwa sampe {i[fastq1]} {i[fastq2]} {i[sai1]} {i[sai2]} > $OUT.sam'
     
 class CLEAN_SAM(Tool):
     __verbose__ = "Sam Cleaning"
     
     inputs = ['sam']
-    outputs=['bam']
+    outputs = ['bam']
     
-    def cmd(self,sams):
-        return 'cleansam {0} -o $OUT.bam'.format(list2input(sams))
+    def cmd(self,i,t,p):
+        return 'cleansam {0} -o $OUT.bam'.format(list2input(i['sam']))
     
 class IRTC(Tool):
     __verbose__ = "Indel Realigner Target Creator"
-    call_cmd = ""
     
     inputs = ['bam']
     outputs = ['targets']
     
     @fromtags('interval')
-    def cmd(self,input_bams,interval):
-        return 'IRTC -I {0} -L {{interval}} > $OUT.targets'.format(list2input(input_bams))
+    def cmd(self,i,t,p):
+        return 'IRTC -I {0} -L {{t[interval]}} > $OUT.targets'.format(list2input(i['bam']))
     
 class IR(Tool):
     __verbose__ = "Indel Realigner"
     inputs = ['bam','targets']
     outputs = ['bam']
     
-    def map_cmd(self):
+    def map_inputs(self):
         input_bam = self.parent.parent.get_output('bam')
-        return cmd_inputs(input_bam = input_bam,
+        return return_inputs(input_bam = input_bam,
                       targets = self.parent.get_output('targets'),
                       interval = self.tags['interval'])
     
@@ -83,9 +82,9 @@ class PR(Tool):
     inputs = ['bam','recal']
     outputs = ['bam']
     
-    def map_cmd(self):
+    def map_inputs(self):
         input_bams = [p.get_output('bam') for p in self.parent.parents ] 
-        return cmd_inputs(input_bams = input_bams,
+        return return_inputs(input_bams = input_bams,
                       recal = self.parent.get_output('recal'))
     
     def cmd(self,input_bams,recal):
@@ -125,9 +124,9 @@ class Apply_VQSR(Tool):
     inputs = ['vcf','recal']
     outputs = ['vcf']
     
-    def map_cmd(self):
+    def map_inputs(self):
         input_vcf = self.parent.get_output('recal') 
-        return cmd_inputs(input_vcf,self.parent.parent.get_output('vcf'))
+        return return_inputs(input_vcf,self.parent.parent.get_output('vcf'))
     
     def cmd(self,input_vcf,recal):
         return 'apply vqsr {input_vcf} {recal} > $OUT.vcf'

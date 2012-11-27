@@ -53,7 +53,7 @@ class Step():
             for n in input_stage.tasks:
                 r = self.one2one_cmd(input_task=n,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                self.stage.add_task(name = n.name,
+                self.stage.new_task(name = n.name,
                                     pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_task=n,tags=n.tags),
                                     tags = n.tags,
                                     outputs = self.outputs,
@@ -73,7 +73,7 @@ class Step():
             for tags,input_tasks in input_stage.group_tasks_by(keys=group_by):
                 r = self.many2one_cmd(input_tasks=input_tasks,tags=tags,*args,**kwargs)
                 pcmd_dict = r.setdefault('pcmd_dict',{})
-                self.stage.add_task(name = dict2task_name(tags),
+                self.stage.new_task(name = dict2task_name(tags),
                                     pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,tags=tags),
                                     tags = tags,
                                     outputs = self.outputs,
@@ -92,7 +92,7 @@ class Step():
                     validate_dict_has_keys(r,['pcmd','add_tags'])
                     pcmd_dict = r.setdefault('pcmd_dict',{})
                     new_tags = merge_dicts(n.tags, r['add_tags'])
-                    self.stage.add_task(name = dict2task_name(new_tags),
+                    self.stage.new_task(name = dict2task_name(new_tags),
                                         pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_task=n,tags=n.tags),
                                         tags = new_tags,
                                         outputs = self.outputs,
@@ -112,7 +112,7 @@ class Step():
                 validate_dict_has_keys(r,['pcmd','new_tags'])
                 pcmd_dict = r.setdefault('pcmd_dict',{})
                 name = r.setdefault('name',dict2task_name(r['new_tags']))
-                self.stage.add_task(name = name,
+                self.stage.new_task(name = name,
                                     pcmd = self._parse_cmd2(r['pcmd'],pcmd_dict,input_stage=input_stage,tags=r['new_tags']),
                                     tags = r['new_tags'],
                                     outputs = self.outputs,

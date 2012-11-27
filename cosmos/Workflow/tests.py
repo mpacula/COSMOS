@@ -17,19 +17,19 @@ class Test_Workflow(TestCase):
         
     def test_no_duplicate_task_names(self):
         b = self.wF.add_stage(name='Test_Stage')
-        b.add_task(pre_command='',outputs='',name='test_task')
-        self.assertRaises(ValidationError,b.add_task,pre_command='',outputs='',name='test_task')
+        b.new_task(pre_command='',outputs='',name='test_task')
+        self.assertRaises(ValidationError,b.new_task,pre_command='',outputs='',name='test_task')
     
     
     def test_one_command(self):
         b = self.wF.add_stage(name='Test_Stage')
-        b.add_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
+        b.new_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
         self.wF.run_stage(b)
         
     def test_resume(self):
         #run once
         b = self.wF.add_stage(name='Test_Stage')
-        b.add_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
+        b.new_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
         self.wF.run_stage(b)
  
         #run second time, have to setup again
@@ -38,7 +38,7 @@ class Test_Workflow(TestCase):
         
         #next command shouldn't __create a new task since it already exists
         b = self.wF.add_stage(name='Test_Stage')
-        b.add_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
+        b.new_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
         
         assert self.wF.stages.count() == 1
         #next command should skip execution
@@ -76,8 +76,8 @@ class Test_Workflow(TestCase):
 #        echo.save()
 #        cat = Cat()
 #        cat.save()
-#        self.WF.add_task(cat)
-#        self.WF.add_task(echo)
+#        self.WF.new_task(cat)
+#        self.WF.new_task(echo)
 #        tasks = self.WF.get_tasks()
 #        assert tasks[0] == echo
 #        assert tasks[1] == cat

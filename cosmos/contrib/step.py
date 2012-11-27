@@ -83,7 +83,7 @@ class Step():
     
     def __add_task_to_stage(self,pcmd,pcmd_dict,tags,parents):
         """adds a task"""
-        return self.stage.add_task(name = '',
+        return self.stage.new_task(name = '',
                                    pcmd = self._parse_cmd2(pcmd,pcmd_dict,tags=tags),
                                     tags = tags,
                                     save = False,
