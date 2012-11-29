@@ -2,12 +2,34 @@ from cosmos.Cosmos.helpers import groupby
 import itertools as it
 import networkx as nx
 import pygraphviz as pgv
-from cosmos.Workflow.models import Task,TaskError
+from cosmos.Workflow.models import Task,TaskError,TaskFile
+from tool import INPUT
 
-class TaskDAG(object):
+class DAGError(Exception): pass
+
+class DAG(object):
     
     def __init__(self):
         self.G = nx.DiGraph()
+        self.last_tasks = []
+        
+    def add_input(self,tags,filepaths):
+        #validate
+        for t in self.last_tasks:
+            if t.__class__.__name__ != 'INPUT':
+                raise dagError('You must add all inputs during dag initialization')
+            
+        tfs = [ TaskFile(path=f) for f in filepaths ]
+        i = INPUT(dag=self,tags=tags,stage_name='INPUT')
+        
+        #set i.output_files and i.outputs
+        for tf in tfs:
+            print tf
+            i.output_files[tf.name] = tf
+        i.outputs = [ tf.fmt for tf in tfs ]
+        
+        self.G.add_node(i)
+        self.last_tasks.append(i)
         
     def create_dag_img(self):
         AG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
@@ -19,8 +41,8 @@ class TaskDAG(object):
         AG.add_edges_from(self.G.edges())
         AG.layout(prog="dot")
         AG.draw('/tmp/graph.svg',format='svg')
-        print 'wrote to /tmp/graph.svg'
-        
+        print 'wrote to ~/graph.svg'
+    
     def describe(self,generator):
         return list(generator)
         
@@ -76,7 +98,7 @@ class TaskDAG(object):
             
 
 
-class DagError(Exception):pass
+class dagError(Exception):pass
 
 def merge_dicts(*args):
     """
@@ -106,71 +128,86 @@ WF = None
 
 def infix(func,*args,**kwargs):
     """
-    If the second argument is a tuple, submit it as *args
+    1) If the second argument is a tuple (ie multiple args submitted with infix notation), submit it as *args
+    2) The decorated function should return a genorator, so evaluate it
+    3) Set the dag.last_tasks to the decorated function's return value
+    4) Return the dag
     """
     def wrapped(*args,**kwargs):
+        #TODO confirm args[0] is a dag
         LHS = args[0]
         RHS = args[1] if type(args[1]) == tuple else (args[1],)
         try:
-            return func(LHS,*RHS)
+            LHS.last_tasks = list(func(LHS,*RHS))
+            return LHS
         except TypeError:
-            raise DagError('Func {0} called with arguments {1} and *{2}'.format(func,LHS,RHS))
+            raise
+#            raise dagError('Func {0} called with arguments {1} and *{2}'.format(func,LHS,RHS))
     return wrapped
 
 @infix
-def _apply(input_tasks,tool_class,stage_name=None):
+def _add(dag,tags_list,tool_class,stage_name=None):
+    if not stage_name: stage_name = tool_class.__name__
+    for tags in tags_list:
+        new_task = tool_class(stage_name=stage_name,dag=dag,tags=tags)
+        dag.G.add_node(new_task)
+        yield new_task
+Add = Infix(_add)
+
+@infix
+def _apply(dag,tool_class,stage_name=None):
+    input_tasks = dag.last_tasks
     if not stage_name: stage_name = tool_class.__name__
     #TODO validate that tool_class.stage_name is unique
     for input_task in input_tasks:
-        DAG = input_task.DAG
-        new_task = tool_class(stage_name=stage_name,DAG=DAG,tags=input_task.tags)
-        DAG.G.add_edge(input_task,new_task)
+        new_task = tool_class(stage_name=stage_name,dag=dag,tags=input_task.tags)
+        dag.G.add_edge(input_task,new_task)
         yield new_task
         
 Apply = Infix(_apply) #map
 
 @infix
-def _reduce(input_tasks,keywords,tool_class,stage_name=None):
+def _reduce(dag,keywords,tool_class,stage_name=None):
+    input_tasks = dag.last_tasks
     if not stage_name: stage_name = tool_class.__name__
     try:
         if type(keywords) != list:
-            raise DagError('Invalid Right Hand Side of reduce')
+            raise dagError('Invalid Right Hand Side of reduce')
     except Exception:
-        raise DagError('Invalid Right Hand Side of reduce')
+        raise dagError('Invalid Right Hand Side of reduce')
     for tags, input_task_group in groupby(input_tasks,lambda t: dict([(k,t.tags[k]) for k in keywords])):
         input_task_group = list(input_task_group)
-        DAG = input_task_group[0].DAG
-        new_task = tool_class(stage_name=stage_name,DAG=DAG,tags=tags)
+        new_task = tool_class(stage_name=stage_name,dag=dag,tags=tags)
         for input_task in input_task_group:
-            DAG.G.add_edge(input_task,new_task)
+            dag.G.add_edge(input_task,new_task)
         yield new_task
 Reduce = Infix(_reduce)
 
 @infix
-def _split(input_tasks,split_by,tool_class,stage_name=None):
+def _split(dag,split_by,tool_class,stage_name=None):
+    input_tasks = dag.last_tasks
     if not stage_name: stage_name = tool_class.__name__
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     for input_task in input_tasks:
-        DAG = input_task.DAG
         for new_tags in it.product(*splits):
             tags = tags=merge_dicts(dict(input_task.tags),dict(new_tags))
-            new_task = tool_class(stage_name=stage_name,DAG=DAG,tags=tags) 
-            DAG.G.add_edge(input_task,new_task)
+            new_task = tool_class(stage_name=stage_name,dag=dag,tags=tags) 
+            dag.G.add_edge(input_task,new_task)
             yield new_task
 Split = Infix(_split)
 
 @infix
-def _reduce_and_split(input_tasks,keywords,split_by,tool_class,stage_name=None):
+def _reduce_and_split(dag,keywords,split_by,tool_class,stage_name=None):
+    input_tasks = dag.last_tasks
     if not stage_name: stage_name = tool_class.__name__
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     
     for group_tags,input_task_group in groupby(input_tasks,lambda t: dict([(k,t.tags[k]) for k in keywords])):
         input_task_group = list(input_task_group)
-        DAG = input_task_group[0].DAG
         for new_tags in it.product(*splits):
-            new_task = tool_class(stage_name=stage_name,DAG=DAG,tags=merge_dicts(group_tags,dict(new_tags)))
+            new_task = tool_class(stage_name=stage_name,dag=dag,tags=merge_dicts(group_tags,dict(new_tags)))
             for input_task in input_task_group:
-                DAG.G.add_edge(input_task,new_task)
+                dag.G.add_edge(input_task,new_task)
             yield new_task
 ReduceSplit = Infix(_reduce_and_split)
 

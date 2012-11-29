@@ -1,8 +1,9 @@
 import cosmos.session
 from cosmos.Workflow.models import Workflow
-from dag import TaskDAG, Apply, Reduce, Split, ReduceSplit
+from dag import DAG, Apply, Reduce, Split, ReduceSplit
 from gatk_tools import *
 from cosmos.Workflow.models import TaskFile
+from tool import INPUT
 
 input_data = [
     #Sample, fq_chunk, fq_pair, output_path
@@ -29,11 +30,12 @@ parameters = {
 }
 
 # Initialize
-DAG = TaskDAG()
-INPUT = [FASTQ(DAG=DAG,stage_name='FASTQ',tags={'sample':x[0],'fq_chunk':x[1],'fq_pair':x[2]},output_files=[TaskFile(path=x[3])]) for x in input_data]
+dag = DAG()
+for x in input_data:
+    dag.add_input(tags={'sample':x[0],'fq_chunk':x[1],'fq_pair':x[2]},filepaths=[x[3]])
 
-DAG.describe(
-    INPUT
+dag = (
+    dag
     |Apply| ALN
     |Reduce| (['sample','fq_chunk'],SAMPE)
     |Reduce| (['sample'],CLEAN_SAM)
@@ -52,15 +54,15 @@ DAG.describe(
     |Apply| SQL_DUMP
     |Apply| ANALYSIS
 )
-DAG.set_parameters(parameters)
+dag.set_parameters(parameters)
 
 #################
 # Run Workflow
 #################
 
 WF = Workflow.start('test',restart=True)
-DAG.add_to_workflow(WF)
+dag.add_to_workflow(WF)
 
 #print dag
-DAG.create_dag_img()
+dag.create_dag_img()
 

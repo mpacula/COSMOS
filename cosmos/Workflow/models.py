@@ -35,10 +35,13 @@ class TaskFile(models.Model):
     
 
     def __init__(self,*args,**kwargs):
-        if 'fmt' not in kwargs and 'path' in kwargs:
-            kwargs['fmt'] = re.search('\.(.+?)$',kwargs['path']).group(1)
-        if 'name' not in kwargs and 'fmt' in kwargs:
-            kwargs['name'] = kwargs['fmt']
+        fmt = kwargs.get('fmt',None)
+        path = kwargs.get('path',None)
+        name = kwargs.get('name',None)
+        if not fmt and path:
+            kwargs['fmt'] = re.search('\.(.+?)$',path).group(1)
+        if not name and fmt:
+            kwargs['name'] = fmt
         return super(TaskFile,self).__init__(*args,**kwargs)
         
     @property
@@ -46,7 +49,7 @@ class TaskFile(models.Model):
         return hashlib.sha1(file(self.path).read())
     
     def __str__(self):
-        return "#F[{0}][{1}:{2}]".format(self.id,self.name,self.path)
+        return "#F[{0}:{1}:{2}]".format(self.id,self.name,self.path)
     
 class Workflow(models.Model):
     """   
@@ -91,6 +94,11 @@ class Workflow(models.Model):
     def task_tags(self):
         """TaskTags in this Workflow"""
         return TaskTag.objects.filter(task__in=self.tasks)
+    
+    @property
+    def task_files(self):
+        "TaskFiles in this Stage"
+        return TaskFile.objects.filter(task_output_set__in=self.tasks)
     
     @property
     def wall_time(self):
@@ -238,7 +246,7 @@ class Workflow(models.Model):
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
-        self.log.info("Adding stage {0}.".format(name))
+        #self.log.info("Adding stage {0}.".format(name))
         #determine order in workflow
         m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
         if m is None:
@@ -485,8 +493,8 @@ class Workflow(models.Model):
         self.task_edges.delete()
         self.log.info('Bulk deleting Tasks...')
         self.tasks.delete()
-#        self.log.info('Bulk deleting TaskFiles...')
-#        self.task_files.delete()
+        self.log.info('Bulk deleting TaskFiles...')
+        self.task_files.delete()
         self.log.info('Deleting Stages...'.format(self.name))
         self.stages.delete()
         self.log.info('{0} Deleted.'.format(self))
@@ -516,9 +524,15 @@ class Workflow(models.Model):
         
         task.exec_command = task.pre_command
         
-        for m in re.findall('(#F\[(.+?)\]\[(.+?)\])',task.pre_command):
+        #set output_file paths to the task's job_output_dir
+        for f in task.output_files:
+            if not f.path:
+                f.path = os.path.join(task.job_output_dir,'{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt))
+                f.save()
+                
+        for m in re.findall('(#F\[(.+?):(.+?):(.+?)\])',task.exec_command):
             taskfile = TaskFile.objects.get(pk=m[1])
-            re.sub(m[1],task.exec_command,taskfile.path)
+            task.exec_command = task.exec_command.replace(m[0],taskfile.path)
         
 #        try:
 #            task.exec_command = task.pre_command.format(output_dir=task.job_output_dir,outputs = task.outputs)
@@ -759,14 +773,14 @@ class WorkflowManager():
         self.workflow = workflow
         self.dag = self.createDiGraph()
         self.dag_queue = self.dag.copy()
-        self.dag_queue.remove_tasks_from(map(lambda x: x['id'],workflow.tasks.filter(successful=True).values('id')))
+        self.dag_queue.remove_nodes_from(map(lambda x: x['id'],workflow.tasks.filter(successful=True).values('id')))
         self.queued_tasks = []
     
     def queued_task(self,task):
         self.queued_tasks.append(task.id)
     
     def completed_task(self,task):
-        self.dag_queue.remove_task(task.id)
+        self.dag_queue.remove_node(task.id)
         
     def get_ready_tasks(self):
         degree_0_tasks= map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
@@ -774,21 +788,21 @@ class WorkflowManager():
         return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks)) 
     
     def createDiGraph(self):
-        DAG = nx.DiGraph()
-        DAG.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.task_edges.values('parent','child')])
+        dag = nx.DiGraph()
+        dag.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.task_edges.values('parent','child')])
         for stage in self.workflow.stages:
             stage_name = stage.name
             for n in stage.tasks.values('id','tags','status'):
-                DAG.new_task(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name)
-        return DAG
+                dag.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name)
+        return dag
     
     def createAGraph(self,dag):
-        DAG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
-        DAG.node_attr['fontname']="Courier"
-        DAG.node_attr['fontsize']=8
-        DAG.add_edges_from(dag.edges())
-        for stage,tasks in helpers.groupby(dag.tasks(data=True),lambda x:x[1]['stage']):
-            sg = DAG.add_subgraph(name="cluster_{0}".format(stage),label=stage,color='lightgrey')
+        dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
+        dag.node_attr['fontname']="Courier"
+        dag.node_attr['fontsize']=8
+        dag.add_edges_from(dag.edges())
+        for stage,tasks in helpers.groupby(dag.nodes(data=True),lambda x:x[1]['stage']):
+            sg = dag.add_subgraph(name="cluster_{0}".format(stage),label=stage,color='lightgrey')
             for n,attrs in tasks:
                 def truncate_val(kv):
                     v = "{0}".format(kv[1])
@@ -796,9 +810,9 @@ class WorkflowManager():
                     return "{0}: {1}".format(kv[0],v)
                 label = " \\n".join(map(truncate_val,attrs['tags'].items()))
                 status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
-                sg.new_task(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
+                sg.add_node(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
             
-        return DAG
+        return dag
     
 #    def simple_path(self,head,vs):
 #        """
@@ -863,7 +877,7 @@ class WorkflowManager():
         edges = self.simple_path(root,[],[])
         g= nx.DiGraph()
         tasks = set(_unnest(edges))
-        g.add_tasks_from(map(lambda n: (n,self.dag.task[n]),tasks))
+        g.add_nodes_from(map(lambda n: (n,self.dag.task[n]),tasks))
         g.add_edges_from(edges)
         return g
         #return self.dag.subgraph(nx.dfs_tree(self.dag,root).tasks())
@@ -992,10 +1006,10 @@ class Stage(models.Model):
         "TaskTags in this Stage"
         return TaskTag.objects.filter(task__in=self.tasks)
     
-#    @property
-#    def task_files(self):
-#        "TaskFiles in this Stage"
-#        return TaskFile.objects.filter(task__in=self.tasks)
+    @property
+    def task_files(self):
+        "TaskFiles in this Stage"
+        return TaskFile.objects.filter(task_output_set__in=self.tasks)
     
     @property
     def num_tasks(self):
@@ -1249,6 +1263,8 @@ class Stage(models.Model):
         JobAttempt.objects.filter(task_set__in = self.tasks).delete()
         self.log.info('Bulk deleting TaskTags...')
         self.task_tags.delete()
+        self.log.info('Bulk deleting TaskFiles...')
+        self.task_files.delete()
         self.log.info('Bulk deleting TaskEdges...')
         self.task_edges.delete()
         self.log.info('Bulk deleting Tasks...')
@@ -1464,6 +1480,7 @@ class Task(models.Model):
         for ja in self._jobAttempts.all(): ja.delete()
         self.task_tags.delete()
         self.task_edges.delete
+        self.output_files.delete()
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         super(Task, self).delete(*args, **kwargs)
