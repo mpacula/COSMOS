@@ -19,3 +19,10 @@ class PASTE(Tool):
     
     def cmd(self,i,t,p):
         return 'paste {0} > $OUT.txt'.format(' '.join(i['txt']))
+    
+class WC(Tool):
+    inputs = ['txt']
+    outputs = ['txt']
+    
+    def cmd(self,i,t,p):
+        return 'wc{{p[args]}} {0} > $OUT.txt'.format(' '.join(i['txt']))

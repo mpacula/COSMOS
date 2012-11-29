@@ -102,7 +102,7 @@ class Workflow(models.Model):
     
     @property
     def wall_time(self):
-        """Time between this workflowh's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
+        """Time between this workflow's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
     
     @property

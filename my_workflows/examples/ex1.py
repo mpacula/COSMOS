@@ -16,7 +16,7 @@ input_data = [
 # Tags
 # Parameters
 parameters = {
-  'SAMPE': { 'q': 5 }
+  'WC': { 'args': ' -m' }
 }
 
 # Initialize
@@ -27,6 +27,7 @@ dag = (
        |Add| ([{'word':'hello'},{'word':'world'}],ECHO)
        |Split| ([('i',[1,2])],CAT)
        |Reduce| (['i'],PASTE)
+       |Apply| WC
     
 )
 dag.set_parameters(parameters)
@@ -38,6 +39,7 @@ dag.set_parameters(parameters)
 WF = Workflow.start('test',restart=True)
 dag.add_to_workflow(WF)
 WF.run()
+
 #print dag
 dag.create_dag_img()
 

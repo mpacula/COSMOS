@@ -63,7 +63,7 @@ class Tool(object):
     
     mem_req = 1*1024
     cpu_req = 1
-    params = {}
+    parameters = {}
     tags = {}
     inputs = []
     outputs = []
@@ -156,7 +156,7 @@ class Tool(object):
         
         #these arguments should be filled in later by decorators like from_tags
 #        try:
-        r = decorated(self.input_files,self.tags,self.params)
+        r = decorated(self.input_files,self.tags,self.parameters)
         m = re.search('\$OUT\.([\w]+)',r)
 #        except TypeError:
 #            raise ToolError('TypeError calling {0}.cmd, args: {1}, kwargs: {2}.  Available args are: {3}'.format(self.__class__.__name__,args,kwargs,inspect.getargspec(decorated)[0]))
@@ -166,8 +166,6 @@ class Tool(object):
                     r = re.sub('\$OUT\.[\w]+',str(self.output_files[out_name]),r)
                 except KeyError as e:
                     raise KeyError('{0}. Available output_file keys are {1}'.format(e,self.output_files.keys()))
-                #TODO memoization will occur here.  if this pcmd has already been executed,
-                #set output_files to the memoized output path, and set this task as some kind of a NOOP
         return r
         
     def cmd(self,*args,**kwargs):

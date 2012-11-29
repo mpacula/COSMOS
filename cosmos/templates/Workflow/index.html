@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load extras %}
 {%block content%}
 
 <h1>Workflows</h1>
@@ -15,8 +16,8 @@
                 <td><a href="{{workflow.url}}"><strong>{{ workflow }}</strong></a></td>
                 <td>{{workflow.created_on|date:"SHORT_DATETIME_FORMAT"}}</td>
                 <td>{{workflow.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
-                <td>{{workflow.wall_time}}</td>
-                <td>{{workflow.total_stage_wall_time}}</td>
+                <td>{{workflow.wall_time.seconds|format_time}}</td>
+                <td>{{workflow.total_stage_wall_time.seconds|format_time}}</td>
                 </tr>
         {% endfor %}
     </tbody>

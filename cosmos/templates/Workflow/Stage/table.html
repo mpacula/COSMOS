@@ -43,7 +43,7 @@
                     <div class="bar" style="opacity:.75;width:{{stage.percent_done}}%"%></div>
                 </div></td>
             <td>{{stage.num_tasks_successful}}/{{stage.num_tasks}}</td>
-            <td>{{stage.wall_time}}</td>
+            <td>{{stage.wall_time.seconds|format_time}}</td>
             <td>{% get_task_stat stage "cpu_requirement" "Avg"%}</td>
             <td>{% get_sjob_stat stage "percent_cpu" "Avg" "format_percent"%}</td>
             <td>{% get_sjob_stat stage "wall_time" "Avg" "format_time"%}</td>

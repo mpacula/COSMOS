@@ -49,6 +49,8 @@ class DAG(object):
     def set_parameters(self,params):
         """
         Sets the parameters of every task in the dag
+        
+        :param params: (dict) {'stage_name': { params_dict }, {'stage_name2': { param_dict2 } }
         """
         for task in self.G.node:
             task.parameters = params.get(task.stage_name,{})
