@@ -1,8 +1,8 @@
-from decorators import pformat, getcallargs
-import re
-import types
-import itertools
+from helpers import getcallargs,cosmos_format
+import collections
+import re,types,itertools
 from cosmos.Workflow.models import TaskFile
+from cosmos.Cosmos.helpers import parse_cmd
 
 i = 0
 def get_id():
@@ -67,32 +67,47 @@ class Tool(object):
     tags = {}
     inputs = []
     outputs = []
+    forward_input = False
     
-    def __init__(self,stage_name,tags={},dag=None):
+    def __init__(self,stage_name=None,tags={},dag=None):
         """
         :param stage_name: (str) The name of the stage this tool belongs to. Required.
-        :param output_files: A list, or a dict of TaskFiles.  if a list, it will be converted to a dict who's keywords are the TaskFiles' fmt. 
         :param dag: the dag this task belongs to.
         """
+        if not hasattr(self,'output_files'): self.output_files = {} 
         self.tags = tags
-        self.stage_name = stage_name
-        self.output_files = {}
+        self.stage_name = stage_name if stage_name else self.__class__.__name__
         if not hasattr(self,'__verbose__'): self.__verbose__ = self.stage_name
         self.dag = dag
         
         self.id = get_id()
-            
+        
         for output_ext in self.outputs:
-            if output_ext not in self.output_files:
-                tf = TaskFile(fmt=output_ext)
-                #TODO check for collisions
-                self.output_files[tf.name] = tf
+            tf = TaskFile(fmt=output_ext)
+            self.add_output(tf)
     
     def get_output(self,name):
+        if self.forward_input and name not in self.output_files:
+            return self.parent.get_output(name)
+        
         try:
             return self.output_files[name]
         except KeyError:
-            raise GetOutputError("{0} does not exist in {1}.output_files".format(name,self))
+            raise GetOutputError("{0} does not exist in {1}.  output_files available are {2}".format(name,self,self.output_files))
+        
+    def add_output(self,taskfile):
+        if not isinstance(taskfile,TaskFile):
+            raise ExpectedError('Expected a TaskFile')
+        name = taskfile.name
+        if name not in self.output_files:
+            self.output_files[name] = []
+        self.output_files[name].append(taskfile)
+            
+    def add_outputs(self,*taskfiles):
+        if not isinstance(taskfiles[0],TaskFile):
+            raise ExpectedError('Expected an iterable of TaskFiles')
+        for taskfile in taskfiles:
+            self.add_output(taskfile)
     
     
     @property
@@ -111,15 +126,7 @@ class Tool(object):
     @property
     def label(self):
         tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(re.sub('interval','chr',k),v) for k,v in self.tags.items() ]))
-        return "[{3}] {0}{1}\\n{2}".format(self.__verbose__,tags,self.pcmd,self.id)
-    
-    @property
-    def input_files_aslist(self):
-        return itertools.chain(*self.input_files.values())
-    
-    @property
-    def output_files_aslist(self):
-        return itertools.chain(*self.output_files.values())   
+        return "\"[{3}] {0}{1}\\n{2}\"".format(self.__verbose__,tags,self.pcmd,self.id)
         
     @property
     def pcmd(self):
@@ -130,11 +137,13 @@ class Tool(object):
     def map_inputs(self):
         if not self.inputs:
             return {}
+        input_files = { }
         try:
-            inputs = { self.inputs[0]: map(lambda tf: str(tf),[ p.get_output(self.inputs[0]) for p in self.parents ]) }
+            for i in self.inputs:
+                input_files[i] = map(lambda tf: str(tf),[ p.get_output(i) for p in self.parents ])
         except GetOutputError as e:
-            raise GetOutputError("{0} tried to access a non-existant output file '{1}' in {2}".format(self,self.inputs[0],p))
-        return inputs
+            raise GetOutputError("Error in {0}.  {1}".format(self,e))
+        return input_files
         
     @property
     def input_files(self):
@@ -142,7 +151,6 @@ class Tool(object):
             r = self.map_inputs()
         except IndexError:
             raise
-            raise ToolError("map_inputs returned bad inputs, it returned {0}".format(r))
         return r
         
     def process_cmd(self):
@@ -151,22 +159,28 @@ class Tool(object):
         :param *args: input file parameters
         :param **kwargs: Named input file parameters
         """
-        decorated = pformat(self.cmd.im_func) #decorate with pformat
-        decorated = types.MethodType(decorated,self,self.__class__) #rebind to self
-        
         #these arguments should be filled in later by decorators like from_tags
 #        try:
-        r = decorated(self.input_files,self.tags,self.parameters)
-        m = re.search('\$OUT\.([\w]+)',r)
+        callargs = getcallargs(self.cmd,i=self.input_files,t=self.tags,s=self.settings,p=self.parameters)
+        del callargs['self']
+        r = self.cmd(**callargs)
+        extra_format_dict = r[1] if len(r) == 2 else {}
+        pcmd = r[0] if len(r) == 2 else r 
+            
+        m = re.search('\$OUT\.([\w]+)',pcmd)
 #        except TypeError:
 #            raise ToolError('TypeError calling {0}.cmd, args: {1}, kwargs: {2}.  Available args are: {3}'.format(self.__class__.__name__,args,kwargs,inspect.getargspec(decorated)[0]))
         if m:
             for out_name in m.groups():
                 try:
-                    r = re.sub('\$OUT\.[\w]+',str(self.output_files[out_name]),r)
+                    pcmd = re.sub('\$OUT\.[\w]+',str(self.get_output(out_name)),pcmd)
                 except KeyError as e:
-                    raise KeyError('{0}. Available output_file keys are {1}'.format(e,self.output_files.keys()))
-        return r
+                    raise KeyError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.output_files.keys()))
+                
+        #format() return string with callargs
+        callargs['self'] = self
+        callargs.update(extra_format_dict)
+        return parse_cmd(cosmos_format(pcmd,callargs))
         
     def cmd(self,*args,**kwargs):
         raise NotImplementedError("{0}.cmd is not implemented.".format(self.__class__.__name__))
@@ -176,6 +190,12 @@ class Tool(object):
     
 class INPUT(Tool):
     NOOP = True
-class ROOT(Tool):
-    NOOP = True
+    
+    def __init__(self,*args,**kwargs):
+        filepaths = kwargs.pop('filepaths')
+        self.output_files = {}
+        for fp in filepaths:
+            tf = TaskFile(path=fp)
+            self.add_output(tf)
+        super(INPUT,self).__init__(*args,**kwargs)
     

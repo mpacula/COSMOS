@@ -24,32 +24,36 @@ status_choices=(
 class TaskError(Exception): pass
 class WorkflowError(Exception): pass
 
+i = 0
+def get_tmp_id():
+    global i
+    i +=1
+    return i
 
 class TaskFile(models.Model):
     """
     Task File
     """
-    name = models.CharField(max_length=50,null=False)
-    fmt = models.CharField(max_length=10,null=True) #file format
     path = models.CharField(max_length=250,null=True)
+    name = models.CharField(max_length=50,null=True)
+    fmt = models.CharField(max_length=10,null=True) #file format
     
 
     def __init__(self,*args,**kwargs):
-        fmt = kwargs.get('fmt',None)
-        path = kwargs.get('path',None)
-        name = kwargs.get('name',None)
-        if not fmt and path:
-            kwargs['fmt'] = re.search('\.(.+?)$',path).group(1)
-        if not name and fmt:
-            kwargs['name'] = fmt
-        return super(TaskFile,self).__init__(*args,**kwargs)
+        r = super(TaskFile,self).__init__(*args,**kwargs)
+        if not self.fmt and self.path:
+            self.fmt = re.search('\.(.+?)$',self.path).group(1)
+        if not self.name and self.fmt:
+            self.name = self.fmt
+        self.tmp_id = get_tmp_id()
+        return r
         
     @property
     def sha1sum(self):
         return hashlib.sha1(file(self.path).read())
     
     def __str__(self):
-        return "#F[{0}:{1}:{2}]".format(self.id,self.name,self.path)
+        return "#F[{0}:{1}:{2}]".format(self.id if self.id else self.tmp_id,self.name,self.path)
     
 class Workflow(models.Model):
     """   
@@ -365,14 +369,14 @@ class Workflow(models.Model):
         unsuccessful_tasks = list(self.tasks.filter(successful=False))
         for t in unsuccessful_tasks: #TODO bulk delete
             t.delete()
-        self.log.info('Deleting {0} unsuccessful tasks'.format(len(unsuccessful_tasks)))
+        self.log.info('Deleting {0} unsuccessful Tasks'.format(len(unsuccessful_tasks)))
                
         #remove successful tasks       
         successful_task_tags = map(lambda t: dbsafe_decode(t),self.tasks.filter(successful=True).values('tags'))
         tasks = filter(lambda t: t.tags not in successful_task_tags,tasks) #TODO use sets to speed this up
         
         ### Bulk add tasks
-        self.log.info("Bulk adding {0} tasks...".format(len(tasks)))
+        self.log.info("Bulk adding {0} Tasks...".format(len(tasks)))
         
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
         m = Task.objects.all().aggregate(models.Max('id'))['id__max']
@@ -391,7 +395,7 @@ class Workflow(models.Model):
         for t in tasks:
             for k,v in t.tags.items():
                 tasktags.append(TaskTag(task=t,key=k,value=v))
-        self.log.info("Bulk adding {0} task tags...".format(len(tasktags)))
+        self.log.info("Bulk adding {0} TaskTags...".format(len(tasktags)))
         TaskTag.objects.bulk_create(tasktags)
         
         return
@@ -402,6 +406,7 @@ class Workflow(models.Model):
         :param taskfiles: [taskfile1,taskfile2,...] A list of taskfiles
         """
         ### Bulk add
+        self.log.info("Bulk adding {0} TaskFiles...".format(len(taskfiles)))
         m = TaskFile.objects.all().aggregate(models.Max('id'))['id__max']
         id_start =  m + 1 if m else 1
         for i,t in enumerate(taskfiles): t.id = id_start + i
