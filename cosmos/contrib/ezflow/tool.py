@@ -12,38 +12,10 @@ def get_id():
 
 files = []
 
-#def return_inputs(*args,**kwargs):
-#    r = kwargs.copy()
-#    for arg in args:
-#        if arg:
-#            name = arg[0].name if type(arg) == list else arg.name
-#            #TODO check for collisions
-#            r[name] = arg
-#    return r
-
 class ExpectedError(Exception): pass
 class ToolError(Exception): pass
 class GetOutputError(Exception): pass
 
-#class DefaultDict(dict):
-#    def __init__(self,root,*args,**kwargs):
-#        self.root = root
-#        return super(DefaultDict, self).__init__(*args,**kwargs) 
-#    
-#    def __getitem__(self, name):
-#        try:
-#            return super(DefaultDict, self).__getitem__(name)
-#        except KeyError:
-#            return "/{0}/{1}".format(self.root,name)
-#class AttributeDict(dict):
-#    """
-#    Provides access to attributes using dict.attr
-#    """
-#    def __getattr__(self,name):
-#        if not hasattr(self,name):
-#            return self.__getitem__(name)
-#        return super(dict,self).__getattr__(name)
-        
 class Tool(object):
     """
     A Tool
@@ -58,6 +30,7 @@ class Tool(object):
     :property tags: This Tool's tags
     :property inputs: a list of input names, must be specified by user
     :property outputs: a list of output names, must be specified by user
+    :property default_params: a dictionary of default parameters
     """
     NOOP = False #set to True if this Task should never actually be submitted to the Cosmos Workflow
     
@@ -68,13 +41,14 @@ class Tool(object):
     inputs = []
     outputs = []
     forward_input = False
+    default_params = {}
     
     def __init__(self,stage_name=None,tags={},dag=None):
         """
         :param stage_name: (str) The name of the stage this tool belongs to. Required.
         :param dag: the dag this task belongs to.
         """
-        if not hasattr(self,'output_files'): self.output_files = {} 
+        if not hasattr(self,'output_files'): self.output_files = []
         self.tags = tags
         self.stage_name = stage_name if stage_name else self.__class__.__name__
         if not hasattr(self,'__verbose__'): self.__verbose__ = self.stage_name
@@ -85,30 +59,6 @@ class Tool(object):
         for output_ext in self.outputs:
             tf = TaskFile(fmt=output_ext)
             self.add_output(tf)
-    
-    def get_output(self,name):
-        if self.forward_input and name not in self.output_files:
-            return self.parent.get_output(name)
-        
-        try:
-            return self.output_files[name]
-        except KeyError:
-            raise GetOutputError("{0} does not exist in {1}.  output_files available are {2}".format(name,self,self.output_files))
-        
-    def add_output(self,taskfile):
-        if not isinstance(taskfile,TaskFile):
-            raise ExpectedError('Expected a TaskFile')
-        name = taskfile.name
-        if name not in self.output_files:
-            self.output_files[name] = []
-        self.output_files[name].append(taskfile)
-            
-    def add_outputs(self,*taskfiles):
-        if not isinstance(taskfiles[0],TaskFile):
-            raise ExpectedError('Expected an iterable of TaskFiles')
-        for taskfile in taskfiles:
-            self.add_output(taskfile)
-    
     
     @property
     def parents(self):
@@ -123,59 +73,84 @@ class Tool(object):
             raise Exception('{0} has no parents'.format(self))
         else:
             return ps[0]
-    @property
-    def label(self):
-        tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(re.sub('interval','chr',k),v) for k,v in self.tags.items() ]))
-        return "\"[{3}] {0}{1}\\n{2}\"".format(self.__verbose__,tags,self.pcmd,self.id)
+    
+    def get_output(self,name):
+        """
+        Returns a list of output TaskFiles who's name == name.  If list is of size one, return the first element.
+        
+        :param name: the name of the output files.
+        """
+        outputs = filter(lambda x: x.name == name,self.output_files)
+        if len(outputs) == 0:
+            if self.forward_input:
+                return self.parent.get_output(name)
+            else:
+                raise GetOutputError('No output file in {0} with name {1}'.format(self,name))
+        return outputs if len(outputs) >1 else outputs[0]
+    
+    def get_output_file_names(self):
+        return set(map(lambda x: x.name, self.output_files))
+        
+    def add_output(self,taskfile):
+        """
+        Adds an output file to this Task
+        
+        :param taskfile: an instance of a TaskFile
+        """
+        self.output_files.append(taskfile)
         
     @property
-    def pcmd(self):
-        if self.NOOP:
-            return ''
-        return self.process_cmd()
+    def input_files(self):
+        "A dictionary of input files"
+        return self.map_inputs()
+    
+    @property
+    def label(self):
+        "Label used for the DAG image"
+        tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(re.sub('interval','chr',k),v) for k,v in self.tags.items() ]))
+        return "[{3}] {0}{1}\\n{2}".format(self.__verbose__,tags,self.pcmd,self.id)
 
     def map_inputs(self):
+        """
+        Default method to map inputs.  Can be overriden of a different behavior is desired
+        """
         if not self.inputs:
             return {}
         input_files = { }
         try:
             for i in self.inputs:
                 input_files[i] = map(lambda tf: str(tf),[ p.get_output(i) for p in self.parents ])
+                for k in input_files:
+                    if len(input_files[k]) == 1: input_files[k] = input_files[k][0]
         except GetOutputError as e:
             raise GetOutputError("Error in {0}.  {1}".format(self,e))
         return input_files
         
-    @property
-    def input_files(self):
-        try:
-            r = self.map_inputs()
-        except IndexError:
-            raise
-        return r
         
+    @property
+    def pcmd(self):
+        return self.process_cmd() if not self.NOOP else ''
+    
     def process_cmd(self):
         """
         Stuff that happens inbetween map_inputs() and cmd()
         :param *args: input file parameters
         :param **kwargs: Named input file parameters
         """
-        #these arguments should be filled in later by decorators like from_tags
-#        try:
         callargs = getcallargs(self.cmd,i=self.input_files,t=self.tags,s=self.settings,p=self.parameters)
         del callargs['self']
         r = self.cmd(**callargs)
+        
+        #if tuple is returned, second element is a dict to format with
         extra_format_dict = r[1] if len(r) == 2 else {}
         pcmd = r[0] if len(r) == 2 else r 
-            
-        m = re.search('\$OUT\.([\w]+)',pcmd)
-#        except TypeError:
-#            raise ToolError('TypeError calling {0}.cmd, args: {1}, kwargs: {2}.  Available args are: {3}'.format(self.__class__.__name__,args,kwargs,inspect.getargspec(decorated)[0]))
-        if m:
-            for out_name in m.groups():
-                try:
-                    pcmd = re.sub('\$OUT\.[\w]+',str(self.get_output(out_name)),pcmd)
-                except KeyError as e:
-                    raise KeyError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.output_files.keys()))
+        
+        #replace $OUT with taskfile    
+        for out_name in re.findall('\$OUT\.([\w]+)',pcmd):
+            try:
+                pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
+            except KeyError as e:
+                raise KeyError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.get_output_file_names()))
                 
         #format() return string with callargs
         callargs['self'] = self
@@ -193,9 +168,8 @@ class INPUT(Tool):
     
     def __init__(self,*args,**kwargs):
         filepaths = kwargs.pop('filepaths')
-        self.output_files = {}
+        super(INPUT,self).__init__(*args,**kwargs)
         for fp in filepaths:
             tf = TaskFile(path=fp)
             self.add_output(tf)
-        super(INPUT,self).__init__(*args,**kwargs)
     

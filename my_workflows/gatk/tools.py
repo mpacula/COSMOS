@@ -17,7 +17,7 @@ class Picard(Tool):
 
 class ALN(Tool):
     __verbose__ = "Reference Alignment"
-    forward_input=True
+    forward_input = True
     
     inputs = ['fastq']
     outputs = ['sai']
@@ -30,7 +30,6 @@ class SAMPE(Tool):
     
     inputs = ['fastq','sai']
     outputs = ['sam']
-    
     
     def cmd(self,i,t,s,p):
         return r"""
@@ -68,7 +67,7 @@ class CLEAN_SAM(Picard):
     def cmd(self,i,t,s,p):
         return r"""
             {self.bin} -jar CleanSam.jar
-            I={i[bam][0]}
+            I={i[bam]}
             O=$OUT.bam'
         """
 
@@ -176,8 +175,17 @@ class PR(GATK):
               }
     
     def cmd(self,i,t,s,p):
-        return 'PrintReads -I {0} -r {{i[recal]}}'.format(list2input(i['bam']))
-    
+        return r"""
+            {self.bin}
+            -T PrintReads
+            -R {s[reference_fasta_path]}
+            {inputs}
+            -o $OUT.bam
+            -BQSR {i[recal]}
+        """, {
+            'inputs' : list2input(i['bam'])  
+        }
+
     
 class UG(GATK):
     __verbose__ = "Unified Genotyper"
@@ -185,7 +193,23 @@ class UG(GATK):
     outputs = ['vcf']
     
     def cmd(self,i,t,s,p):
-        return 'UnifiedGenotyper -I {0} -glm {{t[glm]}} -L {{t[interval]}}'.format(list2input(i['bam']))
+        return r"""
+            {self.bin}
+            -T UnifiedGenotyper
+            -R {s[reference_fasta_path]}
+            --dbsnp {s[dbsnp_path]}
+            -glm {t[glm]}
+            {inputs}
+            -o $OUT.vcf
+            -A DepthOfCoverage
+            -A HaplotypeScore
+            -A InbreedingCoeff
+            -baq CALCULATE_AS_NECESSARY
+            -L {t[interval]}
+            -nt {self.cpu_req}
+        """, {
+            'inputs' : list2input(i['bam']) 
+        }
     
 class CV(GATK):
     __verbose__ = "Combine Variants"
@@ -193,31 +217,106 @@ class CV(GATK):
     inputs = ['vcf']
     outputs = ['vcf']
     
+    default_params = {
+      'genotypeMergeOptions':'UNSORTED'       
+    }
+    
     def cmd(self,i,t,s,p):
-        return 'CombineVariants {0}'.format(list2input(i['vcf']))
+        """
+        :param genotypemergeoptions: select from the following:
+            UNIQUIFY - Make all sample genotypes unique by file. Each sample shared across RODs gets named sample.ROD.
+            PRIORITIZE - Take genotypes in priority order (see the priority argument).
+            UNSORTED - Take the genotypes in any order.
+            REQUIRE_UNIQUE - Require that all samples/genotypes be unique between all inputs.
+        """
+        return r"""
+            {self.bin}
+            -T CombineVariants
+            -R {s[reference_fasta_path]}
+            {inputs}
+            -o $OUT.vcf
+            -genotypeMergeOptions {p[genotypeMergeOptions]}
+        """, {
+            'inputs' : "\n".join(["--variant {0}".format(vcf) for vcf in i['vcf']])
+        }
     
 class VQSR(GATK):
     __verbose__ = "Variant Quality Score Recalibration"
     inputs = ['vcf']
-    outputs = ['recal']
+    outputs = ['recal','tranches','R']
     
-#    @opoi
+    forward_input = True
+    
+    default_params = {
+      'inbreeding_coeff' : False
+    }
+    
     def cmd(self,i,t,s,p):
-        return 'vqsr {i[vcf][0]} > $OUT.recal'
+        if t['glm'] == 'SNP': 
+            cmd = r"""
+            {self.bin}
+            -T VariantRecalibrator
+            -R {s[reference_fasta_path]}
+            -input {i[vcf]}
+            --maxGaussians 6
+            -resource:hapmap,known=false,training=true,truth=true,prior=15.0 {s[hapmap_path]}
+            -resource:omni,known=false,training=true,truth=false,prior=12.0 {s[omni_path]}
+            -resource:dbsnp,known=true,training=false,truth=false,prior=6.0 {s[dbsnp_path]}
+            -an QD -an HaplotypeScore -an MQRankSum -an ReadPosRankSum -an FS -an MQ {InbreedingCoeff}
+            -mode SNP
+            -recalFile $OUT.recal
+            -tranchesFile $OUT.tranches
+            -rscriptFile $OUT.R
+            """
+        elif t['glm'] == 'INDEL':
+            cmd = r"""
+            {self.bin}
+            -T VariantRecalibrator
+            -R {s[reference_fasta_path]}
+            -input {i[vcf]}
+            --maxGaussians 4 -std 10.0 -percentBad 0.12
+            -resource:mills,known=true,training=true,truth=true,prior=12.0 {s[mills_path]}
+            -an QD -an FS -an HaplotypeScore -an ReadPosRankSum -an {InbreedingCoeff}
+            -mode INDEL
+            -recalFile $OUT.recal
+            -tranchesFile $OUT.tranches
+            -rscriptFile $OUT.R
+            """
+        return cmd, {'InbreedingCoeff' : '-an InbreedingCoeff' if p['inbreeding_coeff'] else '' }
     
 class Apply_VQSR(GATK):
     __verbose__ = "Apply VQSR"
     
-    inputs = ['vcf','recal']
+    inputs = ['vcf','recal','tranches']
     outputs = ['vcf']
     
-    def map_inputs(self):
-        return {'recal': self.parent.get_output('recal'),
-                 'vcf': self.parent.parent.get_output('vcf')
-                }
-    
     def cmd(self,i,t,s,p):
-        return 'apply vqsr {i[vcf]} {i[recal]} > $OUT.vcf'
+        if t['glm'] == 'SNP': 
+            cmd = r"""
+            {self.bin}
+            -T ApplyRecalibration
+            -R {s[reference_fasta_path]}
+            -input {i[vcf]}
+            -tranchesFile {i[tranches]}
+            -recalFile {i[recal]}
+            -o $OUT.vcf
+            --ts_filter_level 99.0
+            -mode SNP
+            """
+        elif t['glm'] == 'INDEL':
+            cmd = r"""
+            {self.bin}
+            -T ApplyRecalibration
+            -R {s[reference_fasta_path]}
+            -input {i[vcf]}
+            -tranchesFile {i[tranches]}
+            -recalFile {i[recal]}
+            -o $OUT.vcf
+            --ts_filter_level 95.0
+            -mode INDEL
+            """
+        return cmd
+    
     
 class ANNOVAR(Tool):
     __verbose__ = "Annovar"

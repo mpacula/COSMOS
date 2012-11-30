@@ -13,30 +13,12 @@ class DAG(object):
         self.G = nx.DiGraph()
         self.last_tools = []
         
-#    def add_input(self,tags,filepaths):
-#        #validate
-#        for t in self.last_tools:
-#            if t.__class__.__name__ != 'INPUT':
-#                raise dagError('You must add all inputs during dag initialization')
-#            
-#        tfs = [ TaskFile(path=f) for f in filepaths ]
-#        i = INPUT(dag=self,tags=tags,stage_name='INPUT')
-#        
-#        #set i.output_files and i.outputs
-#        for tf in tfs:
-#            print tf
-#            i.output_files[tf.name] = tf
-#        i.outputs = [ tf.fmt for tf in tfs ]
-#        
-#        self.G.add_node(i)
-#        self.last_tools.append(i)
-        
     def create_dag_img(self,path):
         AG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
         AG.node_attr['fontname']="Courier-Bold"
         AG.node_attr['fontsize']=12
             
-        for tool,data in self.G.nodes(data=True):
+        for tool in self.G.nodes():
             AG.add_node(tool,label=tool.label)
         AG.add_edges_from(self.G.edges())
         AG.layout(prog="dot")
@@ -52,9 +34,13 @@ class DAG(object):
         
         :param params: (dict) {'stage_name': { params_dict }, {'stage_name2': { param_dict2 } }
         """
+        self.parameters = parameters
         for tool in self.G.node:
             tool.settings = settings
-            tool.parameters = parameters.get(tool.stage_name,{})
+            if tool.stage_name not in self.parameters:
+                self.parameters[tool.stage_name] = tool.default_params.copy()
+                self.parameters[tool.stage_name].update(parameters.get(tool.stage_name,{}))
+            tool.parameters = self.parameters[tool.stage_name]
             
     def add_to_workflow(self,WF):
         OPnodes = filter(lambda x: not x.NOOP,self.G.node.keys())
@@ -66,9 +52,7 @@ class DAG(object):
                 n[1]['stage'] = stage
         
         #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs
-        taskfiles = list(it.chain(*[ n.output_files.values() for n in self.G.node ]))
-        for n in self.G.node:
-            print n.output_files
+        taskfiles = list(it.chain(*[ n.output_files for n in self.G.node ]))
         WF.bulk_save_task_files(taskfiles)
         
         #bulk save tasks
@@ -81,7 +65,7 @@ class DAG(object):
         
         ### Bulk add task->output_taskfile relationships
         ThroughModel = Task._output_files.through
-        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=out.id) for n in OPnodes for out in n.output_files.values() ]
+        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=out.id) for n in OPnodes for out in n.output_files ]
         ThroughModel.objects.bulk_create(rels)
         
         #bulk save edges

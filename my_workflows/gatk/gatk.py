@@ -15,6 +15,8 @@ input_data = [
     ('B',4,1,2,'/data/B_1_2.fastq','rgid','lib','illumina'),
  ]
 
+inputs = [ INPUT(tags={'sample':x[0],'lane':x[1],'fq_chunk':x[2],'fq_pair':x[3],'RG_ID':x[4], 'RG_LIB':x[5], 'RG_PLATFORM':x[6]},filepaths=[x[4]]) for x in input_data ]
+
 
 ####################
 # Describe workflow
@@ -49,24 +51,22 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 
 # Initialize
 dag = DAG()
-inputs = [ INPUT(tags={'sample':x[0],'lane':x[1],'fq_chunk':x[2],'fq_pair':x[3],'RG_ID':x[4], 'RG_LIB':x[5], 'RG_PLATFORM':x[6]},filepaths=[x[4]]) for x in input_data ]
-
 dag = (
     dag
     |Add| inputs
     |Apply| ALN
     |Reduce| (['sample','lane','fq_chunk'],SAMPE)
-#    |Reduce| (['sample'],MERGE_SAMS)
-#    |Apply| (CLEAN_SAM)
-#    |Split| ([intervals],RTC)
-#    |Apply| IR
-#    |Reduce| (['sample'],BQSR)
-#    |Apply| PR
-#    |ReduceSplit| ([],[glm,intervals], UG)
-#    |Reduce| (['glm'],CV)
-#    |Apply| VQSR
-#    |Apply| Apply_VQSR
-#    |Reduce| ([],CV,"CV 2")
+    |Reduce| (['sample'],MERGE_SAMS)
+    |Apply| (CLEAN_SAM)
+    |Split| ([intervals],RTC)
+    |Apply| IR
+    |Reduce| (['sample'],BQSR)
+    |Apply| PR
+    |ReduceSplit| ([],[glm,intervals], UG)
+    |Reduce| (['glm'],CV)
+    |Apply| VQSR
+    |Apply| Apply_VQSR
+    |Reduce| ([],CV,"CV 2")
 #    |Split| ([dbs],ANNOVAR)
 #    |Apply| PROCESS_ANNOVAR
 #    |Reduce| ([],MERGE_ANNOTATIONS)
@@ -82,6 +82,4 @@ dag.configure(settings,parameters)
 WF = Workflow.start('test',restart=True)
 dag.create_dag_img('/tmp/graph.svg')
 dag.add_to_workflow(WF)
-
-#print dag
 
