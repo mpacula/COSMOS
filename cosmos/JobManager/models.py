@@ -326,7 +326,11 @@ class JobManager(models.Model):
 #        
     def terminate_jobAttempt(self,jobAttempt):
         "Terminates a jobAttempt"
-        session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+        try:
+            session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+            return True
+        except drmaa.errors.InternalException:
+            False
 
     def __create_command_sh(self,jobAttempt):
         """Create a sh script that will execute command"""

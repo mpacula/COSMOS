@@ -8,7 +8,6 @@ import os, json
 
 if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
     data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/test_data3',depth=1))
-    print data_dict
 
 data_dict = [{u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R1_001.fastq'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R2_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R1_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R2_001.fastq'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R1_001.fastq'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R2_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R1_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R2_001.fastq'}]
     
@@ -25,8 +24,8 @@ for i in data_dict:
 #Configuration
 resource_bundle_path = '/nas/erik/bundle/1.5/b37'
 settings = {
-    'GATK_path' : '/home/ch158749/tools/GenomeAnalysisTKLite-2.1-8-gbb7f038',
-    'Picard_path' : '/home/ch158749/tools/picard-tools-1.77',
+    'GATK_path' : '/home/ch158749/tools/GenomeAnalysisTKLite-2.1-8-gbb7f038/GenomeAnalysisTKLite.jar',
+    'Picard_dir' : '/home/ch158749/tools/picard-tools-1.77',
     'bwa_path' : '/home/ch158749/tools/bwa-0.6.2/bwa',
     'resource_bundle_path' : resource_bundle_path,
     'bwa_reference_fasta_path' : '/nas/erik/bwa_reference/human_g1k_v37.fasta',
@@ -42,7 +41,6 @@ settings = {
 #parameter keywords can be the name of the tool class, or its default __verbose__
 parameters = {
   'SAMPE': { 'q': 5 },
-  'MERGE_SAMS' : { 'assume_sorted' : True }
 }
 
 # Tags
@@ -58,7 +56,8 @@ dag = (
     |Apply| ALN
     |Reduce| (['sample','lane','chunk'],SAMPE)
     |Reduce| (['sample'],MERGE_SAMS)
-    |Apply| (CLEAN_SAM)
+    |Apply| CLEAN_SAM
+    |Apply| INDEX_BAM
     |Split| ([intervals],RTC)
     |Apply| IR
     |Reduce| (['sample'],BQSR)

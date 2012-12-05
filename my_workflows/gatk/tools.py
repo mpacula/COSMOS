@@ -5,16 +5,15 @@ def list2input(l):
     return "-I " +" -I ".join(map(lambda x: str(x),l))
 
 class GATK(Tool):
-    
     @property
     def bin(self):
-        return 'java -Xmx{self.mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings)
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req))
     
 class Picard(Tool):
     
     @property
     def bin(self):
-        return 'java -Xmx{self.mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,s=self.settings,jar=os.path.join(self.settings['Picard_path'],self.jar))
+        return 'java -Xmx{self.mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
 
 
 class ALN(Tool):
@@ -22,7 +21,6 @@ class ALN(Tool):
     mem_req = 3.5*1024
     cpu_req = 2 #4
     forward_input = True
-    
     inputs = ['fastq']
     outputs = ['sai']
     
@@ -57,8 +55,10 @@ class MERGE_SAMS(Picard):
     mem_req = 3*1024
     inputs = ['sam']
     outputs = ['bam']
+    default_params = { 'assume_sorted': False}
     
     jar = 'MergeSamFiles.jar'
+    
     
     def cmd(self,i,t,s,p):
         return r"""
@@ -111,7 +111,7 @@ class INDEX_BAM(Picard):
     forward_input = True
     inputs = ['bam']
     
-    jar = ' BuildBamIndex.jar'
+    jar = 'BuildBamIndex.jar'
     
     def cmd(self,i,t,s,p):
         return r"""
@@ -126,7 +126,6 @@ class RTC(GATK):
     forward_input = True
     inputs = ['bam']
     outputs = ['intervals']
-    
     
     def cmd(self,i,t,s,p):
         return r"""
@@ -154,7 +153,7 @@ class IR(GATK):
             -R {s[reference_fasta_path]}
             -I {i[bam][0]}
             -o $OUT.bam
-            -targetIntervals {i[intervals][0]}
+            -targetIntervals {i[intervals]}
             -known {s[indels_1000g_phase1_path]}
             -known {s[mills_path]}
             -model USE_READS

@@ -47,59 +47,58 @@ class DAG(object):
             tool.parameters = self.parameters[tool.stage_name]
             
     def add_to_workflow(self,WF):
-        #this assumes WF has resently been reloaded, so all tasks in the DB are successful.
-        OPnodes = filter(lambda x: not x.NOOP,self.G.nodes())
-        OPedges = filter(lambda x: not x[0].NOOP and not x[1].NOOP,self.G.edges())
+        #add new tasks and related objects to WF
+        WF.log.info('Adding tasks to workflow.')
+        
+        #Validation
+        taskfiles = list(it.chain(*[ n.output_files for n in self.G.nodes() ]))
+        v = map(lambda tf: tf.path,taskfiles)
+        v = filter(lambda x:x,v)
+        if len(map(lambda t: t,v)) != len(map(lambda t: t,set(v))): raise DAGError('Multiple taskfiles refer to the same path.  Paths should be unique.')
         
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
         for tool in nx.topological_sort(self.G):
-            tool.in_database = False
-            if not tool.NOOP:
                 stage_name = tool.stage_name
                 if stage_name not in stages: #have not seen this stage yet
                     stages[stage_name] = WF.add_stage(stage_name)
                 tool.stage = stages[stage_name]
         
-        """
-        Update with the data that is already in the database
-        """
-        all_tags = map(lambda n: n.tags, self.G.node)
-        #validate all_tags has no duplicates
-        if len(set(all_tags)) != len(all_tags): raise DAGError('Duplicate tags detected!')
-        stasks = list(Task.objects.all().select_related('_output_files','stage'))
+        #update tool._task_instance and tool._output_files with existing data
+        stasks = list(WF.tasks.select_related('_output_files','stage'))
         for tpl, group in groupby(stasks + self.G.nodes(), lambda x: (x.tags,x.stage.name)):
             group = list(group)
             if len(group) >1:
                 tags = tpl[0]
                 stage_name = tpl[1]
-                tool = group[0] if isinstance(group[0],Task) else group[1]
+                tool = group[0] if isinstance(group[1],Task) else group[1]
                 task = group[0] if isinstance(group[0],Task) else group[1]
-                tool._output_files = task.output_files
-                tool.in_database = True
+                tool.output_files = task.output_files
                 tool._task_instance = task
         
+        #bulk save tasks
+        new_nodes = filter(lambda n: not hasattr(n,'_task_instance'), nx.topological_sort(self.G))
+        WF.log.info('Total tasks: {0}, New tasks being added: {1}'.format(len(self.G.nodes()),len(new_nodes)))
         
-        new_nodes = filter(lambda n: not n.in_database, self.G.nodes())
-        
-        #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs
+        #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs.
+        #Must come before adding tasks, since taskfile.ids must be populated to compute the proper pcmd.
         taskfiles = list(it.chain(*[ n.output_files for n in new_nodes ]))
         WF.bulk_save_task_files(taskfiles)
         
         #bulk save tasks
         for node in new_nodes:
                 node._task_instance = self.__new_task(WF,node.stage,node)
-        
-        tasks = [ node._task_instance for node in OPnodes ]
+        tasks = [ node._task_instance for node in new_nodes ]
         WF.bulk_save_tasks(tasks)
         
         ### Bulk add task->output_taskfile relationships
         ThroughModel = Task._output_files.through
-        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=out.id) for n in OPnodes for out in n.output_files ]
+        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=out.id) for n in new_nodes for out in n.output_files ]
         ThroughModel.objects.bulk_create(rels)
         
         #bulk save edges
-        task_edges = [ (parent._task_instance,child._task_instance) for parent,child in OPedges ]
+        new_edges = filter(lambda e: e[0] in new_nodes or e[1] in new_nodes,self.G.edges())
+        task_edges = [ (parent._task_instance,child._task_instance) for parent,child in new_edges ]
         WF.bulk_save_task_edges(task_edges)
     
     def __new_task(self,workflow,stage,task):
@@ -111,7 +110,8 @@ class DAG(object):
                                   input_files = task.input_files,
                                   output_files = task.output_files,
                                   mem_req = task.mem_req,
-                                  cpu_req = task.cpu_req)
+                                  cpu_req = task.cpu_req,
+                                  NOOP = task.NOOP)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e,task))
             

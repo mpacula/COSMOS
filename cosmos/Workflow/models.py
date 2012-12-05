@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from django.db.models import Q,Count
+from django.db.utils import IntegrityError
 from cosmos.JobManager.models import JobAttempt,JobManager
 import os,sys,re,signal
 from cosmos.Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
@@ -12,6 +13,7 @@ import networkx as nx
 import pygraphviz as pgv
 from cosmos.contrib.step import _unnest
 import hashlib
+import pprint
 
 status_choices=(
                 ('successful','Successful'),
@@ -53,7 +55,11 @@ class TaskFile(models.Model):
         return hashlib.sha1(file(self.path).read())
     
     def __str__(self):
-        return "#F[{0}:{1}:{2}]".format(self.id if self.id else self.tmp_id,self.name,self.path)
+        return "#F[{0}:{1}:{2}]".format(self.id if self.id else 't{0}'.format(self.tmp_id),self.name,self.path)
+    
+    @models.permalink    
+    def url(self):
+        return ('taskfile_view',[str(self.id)])
     
 class Workflow(models.Model):
     """   
@@ -201,7 +207,7 @@ class Workflow(models.Model):
             if not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
                 print "Exiting."
                 sys.exit(1)
-            for t in utasks: t.delete() #need to change this to a bulk delete
+            wf.bulk_delete_tasks(utasks)
             #delete empty stages
             Stage.objects.filter(pk__in=map(lambda d:d['id'],filter(lambda d:d['task__count'] == 0,Stage.objects.annotate(Count('task')).values('id','task__count')))).delete()
         
@@ -305,25 +311,21 @@ class Workflow(models.Model):
         self.log.warning("Terminating this workflow...")
         self.save()
         jobAttempts = self.jobManager.jobAttempts.filter(queue_status='queued')
-        jids = [ ja.id for ja in jobAttempts ]
-        drmaa_jids = [ ja.drmaa_jobID for ja in jobAttempts ]
-        #jobIDs = ', '.join(ids)
-        #cmd = 'qdel {0}'.format(jobIDs)
-        for jid in drmaa_jids:
-            cmd = 'qdel {0}'.format(jid)
-            os.system(cmd)
+        self.log.info("Sending Terminate signal to all running jobs.")
+        for ja in jobAttempts:
+            self.jobManager.terminate_jobAttempt(ja)
         
         #this basically a bulk task._has_finished and jobattempt.hasFinished
-        self.log.info("Marking all terminated JobAttempts as failed.")
-        jobAttempts.update(queue_status='completed',finished_on = timezone.now())
-        tasks = Task.objects.filter(_jobAttempts__in=jids)
-
-        self.log.info("Marking all terminated Tasks as failed.")
+        tasks = Task.objects.filter(_jobAttempts__in=jobAttempts)
+        self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
         
-        self.log.info("Marking all terminated Stages as failed.")
-        stages = Stage.objects.filter(pk__in=tasks.values('stage').distinct())
+        stages = Stage.objects.filter(task__in=tasks)
+        self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
         stages.update(status = 'failed',finished_on = timezone.now())
+        
+        self.log.info("Marking {0} terminated JobAttempts as failed.".format(len(jobAttempts)))
+        jobAttempts.update(queue_status='completed',finished_on = timezone.now())
         
         self.finished()
         
@@ -357,36 +359,15 @@ class Workflow(models.Model):
     @transaction.commit_on_success
     def bulk_save_tasks(self,tasks):
         """
-        Does a bulk insert of tasks.  Will delete unsuccessful tasks, and ignore already successful tasks
+        Does a bulk insert of tasks.  Identical tasks should not be in the database.
         
         :param tasks: (list) a list of tasks
         
         .. note:: this does not save task->taskfile relationships
         
         >>> tasks = [stage.new_task(name='1',pcmd='cmd1',save=False),stage.new_task(name='2',pcmd='cmd2',save=False,{},True)]
-        >>> stage.bulk_add_tasks(tasks)
+        >>> stage.bulk_save_tasks(tasks)
         """
-        
-        
-#        #validation
-#        if task_exists and task.successful:
-#            if task.pre_command != pcmd:
-#                self.log.error("You can't change the pcmd of a existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
-#            if task.outputs != outputs:
-#                self.log.error("You can't change the outputs of an existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
-#        
-#     
-        # Delete unsuccessful tasks
-        unsuccessful_tasks = list(self.tasks.filter(successful=False))
-        for t in unsuccessful_tasks: #TODO bulk delete
-            t.delete()
-        self.log.info('Deleting {0} unsuccessful Tasks'.format(len(unsuccessful_tasks)))
-               
-        #remove successful tasks       
-        successful_task_tags = map(lambda t: dbsafe_decode(t),self.tasks.filter(successful=True).values('tags'))
-        tasks = filter(lambda t: t.tags not in successful_task_tags,tasks) #TODO use sets to speed this up
-        
-        ### Bulk add tasks
         self.log.info("Bulk adding {0} Tasks...".format(len(tasks)))
         
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
@@ -394,7 +375,16 @@ class Workflow(models.Model):
         id_start =  m + 1 if m else 1
         for i,t in enumerate(tasks): t.id = id_start + i
         
-        Task.objects.bulk_create(tasks)
+        try:
+            Task.objects.bulk_create(tasks)
+        except IntegrityError as e:
+            for tpl, tasks in helpers.groupby(tasks + list(self.tasks), lambda t: (t.tags,t.stage)):
+                if len(list(tasks)) > 1:
+                    print 'ERROR! Duplicate tags in {0}, which are:'.format(tpl[1])
+                    pprint.pprint(tpl[0])
+                    
+            raise(IntegrityError('{0}'.format(e)))
+        
         #create output directories
         for t in tasks:
             os.mkdir(t.output_dir)
@@ -429,9 +419,6 @@ class Workflow(models.Model):
         """
         :param edges: [(parent, child),...] A list of tuples of parent -> child relationships
         """
-        #Remove existing edges
-        current_edges = self.task_edges.values('parent','child').values()
-        edges = filter(lambda e: (e[0].id,e[1].id) not in current_edges,edges)
         
         ### Bulk add parents
         task_edges = map(lambda e: TaskEdge(parent=e[0],child=e[1]),edges)
@@ -440,81 +427,43 @@ class Workflow(models.Model):
         
         return
     
-#    @transaction.commit_on_success
-#    def bulk_save_tasks(self,data):
-#        """
-#        Does a bulk insert to speedup adding lots of tasks.  Will filter out any None values in the tasks_and_tags list.
-#        
-#        :param data: [{'task':task,'tags':tags_dict,'task_exists':bool,'parents':parent_tasks},..] example values of dicts: [(task1,tags1,task_exists,parent_tasks),(task2,tags2,task_exists,parent_tasks),...]
-#        
-#        >>> tasks = [(stage.new_task(name='1',pcmd='cmd1',save=False),{},True,[]),(stage.new_task(name='2',pcmd='cmd2',save=False,{},True,[]))]
-#        >>> stage.bulk_add_tasks(tasks)
-#        """
-#        
-#        ### Bulk add tasks
-#        self.log.info("Bulk adding {0} tasks...".format(len(data)))
-#        filtered_data = filter(lambda x: not x['task_exists'],data)
-#        if len(filtered_data) == 0:
-#            return []
-#        
-#        #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
-#        m = Task.objects.all().aggregate(models.Max('id'))['id__max']
-#        id_start =  m + 1 if m else 1
-#        for i,d in enumerate(filtered_data): d['task'].id = id_start + i
-#        
-#        Task.objects.bulk_create(map(lambda d: d['task'], filtered_data))
-#        #create output directories
-#        for n in map(lambda d: d['task'], filtered_data):
-#            os.mkdir(n.output_dir)
-#            os.mkdir(n.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
-#        
-#        ### Bulk add tags
-#        #TODO validate that all tags have the same keywords
-#        tasktags = []
-#        for d in filtered_data:
-#            for k,v in d['tags'].items():
-#                tasktags.append(TaskTag(task=d['task'],key=k,value=v))
-#        self.log.info("Bulk adding {0} task tags...".format(len(tasktags)))
-#        TaskTag.objects.bulk_create(tasktags)
-#        
-#        ### Bulk add parents
-#        task_edges = []
-#        for d in filtered_data:
-#            for parent in d['parents']:
-#                task_edges.append(TaskEdge(parent=parent,child=d['task'],tags=d['tags']))
-#        self.log.info("Bulk adding {0} task edges...".format(len(task_edges)))
-#        TaskEdge.objects.bulk_create(task_edges)
-#        
-#        return
+    @transaction.commit_on_success
+    def bulk_delete_tasks(self,tasks):
+        """Bulk deletes tasks and their related objects"""
+        task_output_dirs = map(lambda t: t.output_dir,tasks)
+        
+        self.log.info("Bulk deleting {0} tasks".format(len(tasks)))
+        self.log.info('Bulk deleting JobAttempts...')
+        JobAttempt.objects.filter(task_set__in = tasks).delete()
+        self.log.info('Bulk deleting TaskTags...')
+        TaskTag.objects.filter(task__in=tasks).delete()
+        self.log.info('Bulk deleting TaskEdges...')
+        TaskEdge.objects.filter(Q(parent=self)|Q(child=self)).delete()
+        self.log.info('Bulk deleting TaskFiles...')
+        TaskFile.objects.filter(task_output_set__in=tasks).delete()
+        self.log.info('Bulk deleting Tasks...')
+        tasks.delete()
+        
+        self.log.info('Deleting Task output directories')
+        for d in task_output_dirs:
+            os.system('rm -rf {0}'.format(d))
             
+    @transaction.commit_on_success
     def delete(self, *args, **kwargs):
         """
         Deletes this workflow.
         """
         self.log.info("Deleting {0}...".format(self))
         
-#        if kwargs.setdefault('delete_files',False):
-#            kwargs.pop('delete_files')
-#            self.log.info('Deleting directory {0}'.format(self.output_dir))
         if os.path.exists(self.output_dir):
             self.log.info('Deleting directory {0}...'.format(self.output_dir))
             os.system('rm -rf {0}'.format(self.output_dir))
             
         self.jobManager.delete()
-        self.log.info('Bulk deleting JobAttempts...')
-        JobAttempt.objects.filter(task_set__in = self.tasks).delete()
-        self.log.info('Bulk deleting TaskTags...')
-        self.task_tags.delete()
-        self.log.info('Bulk deleting TaskEdges...')
-        self.task_edges.delete()
-        self.log.info('Bulk deleting Tasks...')
-        self.tasks.delete()
-        self.log.info('Bulk deleting TaskFiles...')
-        self.task_files.delete()
-        self.log.info('Deleting Stages...'.format(self.name))
+        self.bulk_delete_tasks(self.tasks)
+        self.log.info('Bulk Deleting Stages...'.format(self.name))
         self.stages.delete()
         self.log.info('{0} Deleted.'.format(self))
-        
         
         for h in list(self.log.handlers):
             h.close()
@@ -523,13 +472,15 @@ class Workflow(models.Model):
         super(Workflow, self).delete(*args, **kwargs)
                 
 
-    
     def _run_task(self,task):
         """
         Creates and submits and JobAttempt.
         
         :param task: the task to submit a JobAttempt for
         """
+        if (task.NOOP):
+            return 'NOOP'
+        
         #TODO fix this it's slow (do it in bulk when running a workflow?)
         if task.stage.status == 'no_attempt':
             task.stage.status = 'in_progress'
@@ -545,17 +496,17 @@ class Workflow(models.Model):
             if not f.path:
                 f.path = os.path.join(task.job_output_dir,'{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt))
                 f.save()
-                
-        for m in re.findall('(#F\[(.+?):(.+?):(.+?)\])',task.exec_command):
-            taskfile = TaskFile.objects.get(pk=m[1])
-            task.exec_command = task.exec_command.replace(m[0],taskfile.path)
         
-#        try:
-#            task.exec_command = task.pre_command.format(output_dir=task.job_output_dir,outputs = task.outputs)
-#        except KeyError:
-#            helpers.formatError(task.pre_command,{'output_dir':task.job_output_dir,'outputs': task.outputs})
-                
-        #create command.sh that gets executed
+        #Replace TaskFile hashes with their paths        
+        for m in re.findall('(#F\[(.+?):(.+?):(.+?)\])',task.exec_command):
+            try:
+                taskfile = TaskFile.objects.get(pk=m[1])
+                task.exec_command = task.exec_command.replace(m[0],taskfile.path)
+            except ValueError as e:
+                raise ValueError('{0}.  Task is {1}. Taskfile str is {2}'.format(e,task,m[0]))
+            except TypeError as e:
+                raise TypeError("{0}. m[0] is {0} and taskfile is {1}".format(m[0],taskfile))
+        
         
         jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
                                      drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
@@ -574,22 +525,6 @@ class Workflow(models.Model):
         task.save()
         #self.jobManager.save()
         return jobAttempt
-
-#    def run_stage(self,stage):
-#        """
-#        Runs any unsuccessful tasks of a stage
-#        """
-#        self.log.info('Running stage {0}.'.format(stage))
-#        
-#        if stage.successful:
-#            self.log.info('{0} has already been executed successfully, skip run.'.format(stage))
-#            return
-#        for task in stage.tasks:
-#            if task.successful:
-#                self.log.info('{0} has already been executed successfully, skip run.'.format(task))
-#            else:
-#                self.log.debug('{0} has not been executed successfully yet.'.format(task))
-#                self._run_task(task)
 
 
     def _reattempt_task(self,task,failed_jobAttempt):
@@ -612,45 +547,6 @@ class Workflow(models.Model):
                 self.status = 'failed'
                 self.save()
                 return False
-    
-            
-#    def wait(self,stage=None,terminate_on_fail=False):
-#        """
-#        Waits for all executing tasks to finish.  Returns an array of the tasks that finished.
-#        if stage is omitted or set to None, all running tasks will be waited on.
-#        
-#        :param stage: (Stage) wait for all of a stage's tasks to finish
-#        :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the tasks of this stage fail `max_job_attempts` times
-#        """
-#        tasks = []
-#        if stage is None:
-#            self.log.info('Waiting on all tasks...')
-#        else:
-#            self.log.info('Waiting on stage {0}...'.format(stage))
-#        
-#        for jobAttempt in self.jobManager.yield_all_queued_jobs():
-#            task = jobAttempt.task
-#            #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
-#            tasks.append(task)
-#            if jobAttempt.successful:
-#                task._has_finished(jobAttempt)
-#            else:
-#                submitted_another_job = self._reattempt_task(task,jobAttempt)
-#                if not submitted_another_job:
-#                    task._has_finished(jobAttempt) #job has failed and out of reattempts
-#                    if terminate_on_fail:
-#                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
-#                        self.terminate()
-#            if stage and stage.is_done():
-#                break;
-#            
-#                    
-#        if stage is None: #no waiting on a stage
-#            self.log.info('All tasks for this wait have completed!')
-#        else:
-#            self.log.info('All tasks for the wait on {0} completed!'.format(stage))
-#        
-#        return tasks 
 
 
     def run(self,terminate_on_fail=False):
@@ -663,58 +559,45 @@ class Workflow(models.Model):
         wfDAG = WorkflowManager(self)
         self.log.info("Running DAG.")
         
-        ready_tasks = wfDAG.get_ready_tasks()
-        for n in ready_tasks:
-            wfDAG.queued_task(n)
-            self._run_task(n)
+        def run_ready_tasks():
+            submitted_tasks = wfDAG.run_ready_tasks()
+            for st in submitted_tasks:
+                if st.NOOP:
+                    st._has_finished('NOOP')
+                    wfDAG.complete_task(st)
+            if submitted_tasks:
+                run_ready_tasks()
         
-        finished_tasks = []
+        run_ready_tasks()
+        
         for jobAttempt in self.jobManager.yield_all_queued_jobs():
             task = jobAttempt.task
             #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
-            finished_tasks.append(task)
             if jobAttempt.successful:
                 task._has_finished(jobAttempt)
-                wfDAG.completed_task(task)
-                for n in wfDAG.get_ready_tasks():
-                    wfDAG.queued_task(n)
-                    self._run_task(n)
+                wfDAG.complete_task(task)
+                run_ready_tasks()
             else:
-                submitted_another_job = self._reattempt_task(task,jobAttempt)
-                if not submitted_another_job:
+                if not self._reattempt_task(task,jobAttempt):
                     task._has_finished(jobAttempt) #job has failed and out of reattempts
                     if terminate_on_fail:
                         self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
                         self.terminate()
                     
         self.finished()
-        return finished_tasks
+        return
     
-    def finished(self,delete_unused_stages=False):
+    def finished(self):
         """
         Call at the end of every workflow.
-        If there any left over jobs that have not been collected,
-        It will wait for all of them them
         
         :param delete_unused_stages: (bool) Any stages and their output_dir from previous workflows that weren't loaded since the last create, __reload, or __restart, using add_stage() are deleted.
         
         """
-        self._check_and_wait_for_leftover_tasks()
-        
-        self.log.debug("Cleaning up workflow")
-        if delete_unused_stages:
-            self.log.info("Deleting unused stages")
-            for b in Stage.objects.filter(workflow=self,order_in_workflow=None): b.delete() #these stages weren't used again after a __restart
-            
         self.finished_on = timezone.now()
         self.save()
         self.log.info('Finished.')
         
-    def _check_and_wait_for_leftover_tasks(self):
-        """Checks and waits for any leftover tasks"""
-        if self.tasks.filter(status='in_progress').count()>0:
-            self.log.warning("There are left over tasks in the queue, waiting for them to finish")
-            self.wait()
                
     
 #    def restart_from_here(self):
@@ -792,16 +675,23 @@ class WorkflowManager():
         self.dag_queue.remove_nodes_from(map(lambda x: x['id'],workflow.tasks.filter(successful=True).values('id')))
         self.queued_tasks = []
     
-    def queued_task(self,task):
+    def queue_task(self,task):
         self.queued_tasks.append(task.id)
     
-    def completed_task(self,task):
+    def run_ready_tasks(self):
+        ready_tasks = [ n for n in self.get_ready_tasks() ]
+        for n in ready_tasks:
+            self.queue_task(n)
+            self.workflow._run_task(n)
+        return ready_tasks
+    
+    def complete_task(self,task):
         self.dag_queue.remove_node(task.id)
         
     def get_ready_tasks(self):
-        degree_0_tasks= map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
-        #TODO change query to .filter to increase speed
-        return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks)) 
+        degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
+        return Task.objects.filter(id__in=filter(lambda x: x not in self.queued_tasks,degree_0_tasks))
+        #return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks)) 
     
     def createDiGraph(self):
         dag = nx.DiGraph()
@@ -812,12 +702,12 @@ class WorkflowManager():
                 dag.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name)
         return dag
     
-    def createAGraph(self,dag):
+    def createAGraph(self):
         dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
         dag.node_attr['fontname']="Courier"
         dag.node_attr['fontsize']=8
-        dag.add_edges_from(dag.edges())
-        for stage,tasks in helpers.groupby(dag.nodes(data=True),lambda x:x[1]['stage']):
+        dag.add_edges_from(self.dag.edges())
+        for stage,tasks in helpers.groupby(self.dag.nodes(data=True),lambda x:x[1]['stage']):
             sg = dag.add_subgraph(name="cluster_{0}".format(stage),label=stage,color='lightgrey')
             for n,attrs in tasks:
                 def truncate_val(kv):
@@ -830,28 +720,6 @@ class WorkflowManager():
             
         return dag
     
-#    def simple_path(self,head,vs):
-#        """
-#        task is the current task, vs is visited tasks
-#        """
-#        ss = self.dag.successors(head)
-#        vs.append(head)
-#        if len(ss) == 0: return [head] + self.simple_path_up(head,vs)
-#        if len(ss) == 1: return [head] + self.simple_path(ss[0],vs) + self.simple_path_up(head,vs)
-#        if len(ss) > 1: return [head] + self.simple_path(ss[0],vs) + self.simple_path(ss[1],vs) + self.simple_path_up(head,vs)
-#    
-#    def simple_path_up(self,tail,vs):
-#        ps = self.dag.predecessors(tail)
-#        ps = map(lambda n: (n,self.dag.task[n]),ps)
-#        ps = filter(lambda p: p[0] not in vs,ps) # TODO speedup by marking visited tasks instead of keeping what can become a huge list
-#        ps = [ ps.next()[0] for stage, ps in helpers.groupby(ps,lambda p: p[1]['stage']) ]
-#        return ps
-#        if len(ps) == 0: return [task]
-#        if len(ps) == 1: return [task,ps[0]]
-#        if len(ps) > 1: return [task,ps[0],ps[1]]
-        #if len(ps) > 2: return [task,ps[0],ps[1],ps[2]]
-#        if len(ps) == 1: return [task] + self.simple_path_up(ps)
-#        if len(ps) > 1: return [task] + self.simple_path_up(ps[0]) + self.simple_path_up(ps[1])
     def simple_path(self,head,vtasks,vedges):
         """
         task is the current task, vs is visited tasks
@@ -900,15 +768,15 @@ class WorkflowManager():
     
     
     def as_img(self,format="svg"):      
-        #g = self.createAGraph(self.dag)
-        g = self.createAGraph(self.get_simple_dag())
+        g = self.createAGraph()
+        #g = self.createAGraph(self.get_simple_dag())
         #g=nx.to_agraph(self.get_simple_dag())
         g.layout(prog="dot")
         return g.draw(format=format)
         
     def __str__(self): 
-        #g = self.createAGraph(self.dag)
-        g = self.createAGraph(self.get_simple_dag())
+        g = self.createAGraph()
+        #g = self.createAGraph(self.get_simple_dag())
         #g=nx.to_agraph(self.get_simple_dag())
         return g.to_string()
 
@@ -928,6 +796,8 @@ class Stage(models.Model):
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     
+    class Meta:
+        unique_together = (('name','workflow'))
     
     def __init__(self,*args,**kwargs):
         kwargs['created_on'] = timezone.now()
@@ -938,8 +808,8 @@ class Stage(models.Model):
         
         validate_name(self.name,self.name)
         #validate unique name
-        if Stage.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
-            raise ValidationError("Stage names must be unique within a given Workflow. The name {0} already exists.".format(self.name))
+#        if Stage.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
+#            raise ValidationError("Stage names must be unique within a given Workflow. The name {0} already exists.".format(self.name))
 
     @property
     def log(self):
@@ -1056,7 +926,7 @@ class Stage(models.Model):
             if sja: 
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
 
-    def new_task(self, name, pcmd, hard_reset=False, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_limit=None):
+    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_limit=None, NOOP=False, hard_reset=False):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
@@ -1067,11 +937,12 @@ class Stage(models.Model):
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
         :param time_limit: (datetime.time) Not implemented.
+        :param NOOP: (booean) No Operation, this task does not get executed.
         :returns: If save=True, an instance of a Task. If save=False, returns (task,tags) where task is a Task, tags is a dict, and task_exists is a bool.
         """
         
-        if pcmd == '' or pcmd is None:
-            raise TaskError('pre_command cannot be blank')
+        if (pcmd == '' or pcmd) is None and not NOOP:
+            raise TaskError('pre_command cannot be blank if NOOP==False')
         
         #TODO validate that this task has the same tag keys as all other tasks
         
@@ -1079,6 +950,7 @@ class Stage(models.Model):
                        'stage':self,
                        'name':name,
                        'tags':tags,
+                       'NOOP': NOOP,
                        'pre_command':pcmd,
                        'memory_requirement':mem_req,
                        'cpu_requirement':cpu_req,
@@ -1265,8 +1137,9 @@ class Stage(models.Model):
             
             for tags,task_id_and_tags_tuple in helpers.groupby(task_id2tags.items(),lambda x: x[1]):
                 task_ids = [ x[0] for x in task_id_and_tags_tuple ]
-                yield tags, Task.objects.filter(pk__in=task_ids)
+                yield tags, Task.objects.filter(pk__in=task_ids)    
     
+    @transaction.commit_on_success
     def delete(self, *args, **kwargs):
         """
         Bulk deletes this stage and all files associated with it.
@@ -1275,16 +1148,7 @@ class Stage(models.Model):
         if os.path.exists(self.output_dir):
             self.log.info('Deleting directory {0}...'.format(self.output_dir))
             os.system('rm -rf {0}'.format(self.output_dir))
-        self.log.info('Bulk deleting JobAttempts...')
-        JobAttempt.objects.filter(task_set__in = self.tasks).delete()
-        self.log.info('Bulk deleting TaskTags...')
-        self.task_tags.delete()
-        self.log.info('Bulk deleting TaskFiles...')
-        self.task_files.delete()
-        self.log.info('Bulk deleting TaskEdges...')
-        self.task_edges.delete()
-        self.log.info('Bulk deleting Tasks...')
-        self.tasks.delete()
+        self.workflow.bulk_delete_tasks(self.tasks)
         super(Stage, self).delete(*args, **kwargs)
         self.log.info('{0} Deleted.'.format(self))
     
@@ -1334,6 +1198,10 @@ class Task(models.Model):
     stage = models.ForeignKey(Stage,null=True)
     successful = models.BooleanField(null=False)
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
+    NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
+    
+    class Meta:
+        unique_together = (('tags','stage'))
     
     _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True) #dictionary of outputs
     @property
@@ -1455,10 +1323,10 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        if self._jobAttempts.filter(successful=True).count():
+        if jobAttempt == 'NOOP' or self._jobAttempts.filter(successful=True).count():
             self.status = 'successful'
             self.successful = True
-            self.log.info("{0} Successful!".format(self,jobAttempt))        
+            if not jobAttempt == 'NOOP': self.log.info("{0} Successful!".format(self,jobAttempt))        
         else:
             self.status = 'failed'
             self.log.info("{0} Failed!".format(self,jobAttempt))
@@ -1488,7 +1356,7 @@ class Task(models.Model):
         "This task's url."
         return ('task_view',[str(self.id)])
 
-
+    @transaction.commit_on_success
     def delete(self, *args, **kwargs):
         """
         Deletes this task and all files associated with it
@@ -1497,7 +1365,7 @@ class Task(models.Model):
         #todo delete stuff in output_paths that may be extra files
         for ja in self._jobAttempts.all(): ja.delete()
         self.task_tags.delete()
-        self.task_edges.delete
+        self.task_edges.delete()
         self.output_files.delete()
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))

@@ -25,7 +25,13 @@
 <dt>Parents</dt><dd>
 	{%for parent in task.parents%}
 	<a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
-	{%empty%}None{%endfor%}</dd>
+	{%empty%}None{%endfor%}
+</dd>
+<dt>Output Files</dt><dd>
+	{%for of in task.output_files%}
+	<a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
+	{%empty%}None{%endfor%}
+</dd>
 <dt>Memory Requirement</dt><dd>{{task.memory_requirement}}MB</dd>
 <dt>File_size</dt><dd>{%if settings.show_task_file_sizes%}{{task.file_size}}{%else%}off{%endif%}</dd>
 <dt>Wall time</dt><dd>{{task.wall_time|format_time}}</dd>
