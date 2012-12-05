@@ -2,20 +2,20 @@ from cosmos import session
 from cosmos.Workflow.models import Workflow
 from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.tool import INPUT
+import make_data_dict
 from tools import *
-import os
+import os, json
 
-input_data = [
-    #Sample, lane, fq_chunk, fq_pair, fq_path, RG_ID, RG_LIB, RG_PLATFORM
-    ('A',4,1,1,'/data/A_1_1.fastq','rgid','lib','illumina'),
-    ('A',4,1,2,'/data/A_1_2.fastq','rgid','lib','illumina'),
-    ('A',4,2,1,'/data/A_2_1.fastq','rgid','lib','illumina'),
-    ('A',4,2,2,'/data/A_2_2.fastq','rgid','lib','illumina'),
-    ('B',4,1,1,'/data/B_1_1.fastq','rgid','lib','illumina'),
-    ('B',4,1,2,'/data/B_1_2.fastq','rgid','lib','illumina'),
- ]
+if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
+    data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/test_data3',depth=1))
+    print data_dict
 
-inputs = [ INPUT(tags={'sample':x[0],'lane':x[1],'fq_chunk':x[2],'fq_pair':x[3],'RG_ID':x[4], 'RG_LIB':x[5], 'RG_PLATFORM':x[6]},filepaths=[x[4]]) for x in input_data ]
+data_dict = [{u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R1_001.fastq'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R2_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R1_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R2_001.fastq'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R1_001.fastq'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R2_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R1_001.fastq'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R2_001.fastq'}]
+    
+inputs = []
+for i in data_dict:
+    path = i.pop('path')
+    inputs.append(INPUT(tags = i,output_paths=[path]))
 
 
 ####################
@@ -39,6 +39,7 @@ settings = {
     'indels_1000g_phase1_path' : os.path.join(resource_bundle_path,'1000G_phase1.indels.b37.vcf')
 }
 
+#parameter keywords can be the name of the tool class, or its default __verbose__
 parameters = {
   'SAMPE': { 'q': 5 },
   'MERGE_SAMS' : { 'assume_sorted' : True }
@@ -55,7 +56,7 @@ dag = (
     dag
     |Add| inputs
     |Apply| ALN
-    |Reduce| (['sample','lane','fq_chunk'],SAMPE)
+    |Reduce| (['sample','lane','chunk'],SAMPE)
     |Reduce| (['sample'],MERGE_SAMS)
     |Apply| (CLEAN_SAM)
     |Split| ([intervals],RTC)
@@ -79,7 +80,7 @@ dag.configure(settings,parameters)
 # Run Workflow
 #################
 
-WF = Workflow.start('test',restart=True)
+WF = Workflow.start('test',restart=False)
 dag.create_dag_img('/tmp/graph.svg')
 dag.add_to_workflow(WF)
-
+WF.run()

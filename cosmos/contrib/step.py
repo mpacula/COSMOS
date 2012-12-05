@@ -81,7 +81,7 @@ class Step():
     
     
     
-    def __add_task_to_stage(self,pcmd,pcmd_dict,tags,parents):
+    def __new_task(self,pcmd,pcmd_dict,tags,parents):
         """adds a task"""
         return self.stage.new_task(name = '',
                                    pcmd = self._parse_cmd2(pcmd,pcmd_dict,tags=tags),
@@ -98,7 +98,7 @@ class Step():
         #if type(parents) != list: raise StepError('parents parameter must be a list.  parents is {0} and set to {1}'.format(type(parents),parents))
         for r in G:
             validate_dict_has_keys(r,['pcmd','add_tags'])
-            new_task = self.__add_task_to_stage(pcmd = r['pcmd'],
+            new_task = self.__new_task(pcmd = r['pcmd'],
                                      pcmd_dict = merge_mdicts(self.kwargs,{'tags':tags},r['add_tags'],extra_pcmd_dict,r.setdefault('pcmd_dict',{})),
                                      tags = merge_dicts(tags,r['add_tags']),
                                      parents = parents)
@@ -108,7 +108,7 @@ class Step():
         #if type(parents) != list: raise StepError('parents parameter must be a list.  parents type is {0} and set to {1}'.format(type(parents),parents))
         validate_dict_has_keys(r,['pcmd'])
         add_tags = r.setdefault('add_tags',{})
-        new_task = self.__add_task_to_stage(pcmd = r['pcmd'],
+        new_task = self.__new_task(pcmd = r['pcmd'],
                              pcmd_dict = merge_mdicts(self.kwargs,{'tags':tags},extra_pcmd_dict,r.setdefault('pcmd_dict',{}),add_tags),
                              tags = merge_dicts(add_tags,tags),
                              parents = parents)

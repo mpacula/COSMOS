@@ -22,8 +22,11 @@
 </div>
 <dl class="dl-horizontal">
 <dt>Status</dt><dd>{{task.status}}</dd>
-<dt>Parents</dt><dd>{{task.parents|join:', '}}</dd>
-<dt>Memory Requirement</dt><dd>{{task.memory_requirement}}</dd>
+<dt>Parents</dt><dd>
+	{%for parent in task.parents%}
+	<a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
+	{%empty%}None{%endfor%}</dd>
+<dt>Memory Requirement</dt><dd>{{task.memory_requirement}}MB</dd>
 <dt>File_size</dt><dd>{%if settings.show_task_file_sizes%}{{task.file_size}}{%else%}off{%endif%}</dd>
 <dt>Wall time</dt><dd>{{task.wall_time|format_time}}</dd>
 <dt>Successful</dt><dd>{{task.successful}}</dd>

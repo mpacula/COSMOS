@@ -4,6 +4,7 @@ import networkx as nx
 import pygraphviz as pgv
 from cosmos.Workflow.models import Task,TaskError,TaskFile
 from tool import INPUT
+from picklefield.fields import dbsafe_decode
 
 class DAGError(Exception): pass
 
@@ -38,27 +39,56 @@ class DAG(object):
         for tool in self.G.node:
             tool.settings = settings
             if tool.stage_name not in self.parameters:
+                #set defaults, then override with parameters
                 self.parameters[tool.stage_name] = tool.default_params.copy()
+                self.parameters[tool.stage_name].update(parameters.get(tool.__class__.__name__,{}))
                 self.parameters[tool.stage_name].update(parameters.get(tool.stage_name,{}))
+                
             tool.parameters = self.parameters[tool.stage_name]
             
     def add_to_workflow(self,WF):
-        OPnodes = filter(lambda x: not x.NOOP,self.G.node.keys())
+        #this assumes WF has resently been reloaded, so all tasks in the DB are successful.
+        OPnodes = filter(lambda x: not x.NOOP,self.G.nodes())
         OPedges = filter(lambda x: not x[0].NOOP and not x[1].NOOP,self.G.edges())
         
-        for stage_name, nodes in groupby(self.G.node.items(),lambda t: t[0].stage_name):
-            stage = WF.add_stage(stage_name)
-            for n in nodes:
-                n[1]['stage'] = stage
+        #Add stages, and set the tool.stage reference for all tools
+        stages = {}
+        for tool in nx.topological_sort(self.G):
+            tool.in_database = False
+            if not tool.NOOP:
+                stage_name = tool.stage_name
+                if stage_name not in stages: #have not seen this stage yet
+                    stages[stage_name] = WF.add_stage(stage_name)
+                tool.stage = stages[stage_name]
+        
+        """
+        Update with the data that is already in the database
+        """
+        all_tags = map(lambda n: n.tags, self.G.node)
+        #validate all_tags has no duplicates
+        if len(set(all_tags)) != len(all_tags): raise DAGError('Duplicate tags detected!')
+        stasks = list(Task.objects.all().select_related('_output_files','stage'))
+        for tpl, group in groupby(stasks + self.G.nodes(), lambda x: (x.tags,x.stage.name)):
+            group = list(group)
+            if len(group) >1:
+                tags = tpl[0]
+                stage_name = tpl[1]
+                tool = group[0] if isinstance(group[0],Task) else group[1]
+                task = group[0] if isinstance(group[0],Task) else group[1]
+                tool._output_files = task.output_files
+                tool.in_database = True
+                tool._task_instance = task
+        
+        
+        new_nodes = filter(lambda n: not n.in_database, self.G.nodes())
         
         #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs
-        taskfiles = list(it.chain(*[ n.output_files for n in self.G.node ]))
+        taskfiles = list(it.chain(*[ n.output_files for n in new_nodes ]))
         WF.bulk_save_task_files(taskfiles)
         
         #bulk save tasks
-        for node,attrs in self.G.node.items():
-            if not node.NOOP:
-                node._task_instance = self.__add_task_to_stage(WF,attrs['stage'],node)
+        for node in new_nodes:
+                node._task_instance = self.__new_task(WF,node.stage,node)
         
         tasks = [ node._task_instance for node in OPnodes ]
         WF.bulk_save_tasks(tasks)
@@ -72,7 +102,7 @@ class DAG(object):
         task_edges = [ (parent._task_instance,child._task_instance) for parent,child in OPedges ]
         WF.bulk_save_task_edges(task_edges)
     
-    def __add_task_to_stage(self,workflow,stage,task):
+    def __new_task(self,workflow,stage,task):
         """adds a task"""
         try:
             return stage.new_task(name = '',
@@ -118,7 +148,7 @@ WF = None
 def infix(func,*args,**kwargs):
     """
     1) If the second argument is a tuple (ie multiple args submitted with infix notation), submit it as *args
-    2) The decorated function should return a genorator, so evaluate it
+    2) The decorated function should return a genorator, evaluate it
     3) Set the dag.last_tools to the decorated function's return value
     4) Return the dag
     """

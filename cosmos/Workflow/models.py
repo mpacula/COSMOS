@@ -1,5 +1,5 @@
 from django.db import models, transaction
-from django.db.models import Q
+from django.db.models import Q,Count
 from cosmos.JobManager.models import JobAttempt,JobManager
 import os,sys,re,signal
 from cosmos.Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
@@ -78,7 +78,7 @@ class Workflow(models.Model):
         validate_name(self.name)
         #Validate unique name
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
-            raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__resume()'.format(self.name))
+            raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
             
         check_and_create_output_dir(self.output_dir)
         
@@ -112,7 +112,7 @@ class Workflow(models.Model):
     @property
     def total_stage_wall_time(self):
         """
-        Sum(stage_wall_times).  Can be different from workflow.wall_time due to workflow stops and resumes.
+        Sum(stage_wall_times).  Can be different from workflow.wall_time due to workflow stops and reloads.
         """
         times = map(lambda x: x['finished_on']-x['started_on'],Stage.objects.filter(workflow=self).values('finished_on','started_on'))
         return reduce(lambda x,y: x+y, filter(lambda wt: wt,times))
@@ -154,7 +154,7 @@ class Workflow(models.Model):
         if restart:
             wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
         elif Workflow.objects.filter(name=name).count() > 0:
-            wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue)
+            wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue)
         else:
             wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue)
         
@@ -173,9 +173,9 @@ class Workflow(models.Model):
         
     
     @staticmethod
-    def __resume(name=None,dry_run=False, default_queue=None):
+    def __reload(name=None,dry_run=False, default_queue=None):
         """
-        Resumes a workflow from the last failed task.
+        Reloads a workflow, keeping successful tasks and deleting unsuccessful ones.
         
         :param name: (str) A unique name for this workflow
         :param dry_run: (bool) Don't actually execute jobs. Optional.
@@ -184,15 +184,26 @@ class Workflow(models.Model):
         """
 
         if Workflow.objects.filter(name=name).count() == 0:
-            raise ValidationError('Workflow {0} does not exist, cannot resume it'.format(name))
+            raise ValidationError('Workflow {0} does not exist, cannot reload it'.format(name))
         wf = Workflow.objects.get(name=name)
         wf.dry_run=dry_run
         wf.finished_on = None
         wf.default_queue=default_queue
         
         wf.save()
-        wf.log.info('Resuming workflow.')
+        wf.log.info('Reloading workflow.')
         Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
+        
+        #Delete unsuccessful tasks
+        utasks = wf.tasks.filter(successful=False)
+        num_utasks = len(utasks)
+        if num_utasks > 0:
+            if not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
+                print "Exiting."
+                sys.exit(1)
+            for t in utasks: t.delete() #need to change this to a bulk delete
+            #delete empty stages
+            Stage.objects.filter(pk__in=map(lambda d:d['id'],filter(lambda d:d['task__count'] == 0,Stage.objects.annotate(Count('task')).values('id','task__count')))).delete()
         
         return wf
 
@@ -258,23 +269,23 @@ class Workflow(models.Model):
         else:
             order_in_workflow = m+1
         
-        stage_exists = Stage.objects.filter(workflow=self,name=name).count()>0
-        _old_id = None
-        if stage_exists:
-            old_stage = Stage.objects.get(workflow=self,name=name)
-            _old_id = old_stage.id
-            if old_stage.status == 'failed' or old_stage.status == 'in_progress':
-                unadded_stages = list(self.stages.filter(order_in_workflow=None)) + [ old_stage ] #TODO filter using DAG, so that only dependent stages are deleted
-                unadded_stages_str = ', '.join(map(lambda x: x.__str__(), unadded_stages))
-                if helpers.confirm('{0} has a status of failed.  Would you like to restart the workflow from here?  Answering yes will delete the following stages: {1}. Answering no will only delete and re-run unsuccessful jobs.'.format(old_stage,unadded_stages_str),default=True):
-                    map(lambda b: b.delete(),unadded_stages)
+#        stage_exists = Stage.objects.filter(workflow=self,name=name).count()>0
+#        _old_id = None
+#        if stage_exists:
+#            old_stage = Stage.objects.get(workflow=self,name=name)
+#            _old_id = old_stage.id
+#            if old_stage.status == 'failed' or old_stage.status == 'in_progress':
+#                unadded_stages = list(self.stages.filter(order_in_workflow=None)) + [ old_stage ] #TODO filter using DAG, so that only dependent stages are deleted
+#                unadded_stages_str = ', '.join(map(lambda x: x.__str__(), unadded_stages))
+#                if helpers.confirm('{0} has a status of failed.  Would you like to restart the workflow from here?  Answering yes will delete the following stages: {1}. Answering no will only delete and re-run unsuccessful jobs.'.format(old_stage,unadded_stages_str),default=True):
+#                    map(lambda b: b.delete(),unadded_stages)
                 
-        b, created = Stage.objects.get_or_create(workflow=self,name=name,id=_old_id)
+        b, created = Stage.objects.get_or_create(workflow=self,name=name)
         if created:
             self.log.info('Creating {0} from scratch.'.format(b))
         else:
             self.log.info('{0} already exists, loading it from history...'.format(b))
-            self.finished_on = None #resuming, so reset this
+            self.finished_on = None #reloading, so reset this
             
         b.order_in_workflow = order_in_workflow
         b.save()
@@ -685,7 +696,7 @@ class Workflow(models.Model):
         If there any left over jobs that have not been collected,
         It will wait for all of them them
         
-        :param delete_unused_stages: (bool) Any stages and their output_dir from previous workflows that weren't loaded since the last create, __resume, or __restart, using add_stage() are deleted.
+        :param delete_unused_stages: (bool) Any stages and their output_dir from previous workflows that weren't loaded since the last create, __reload, or __restart, using add_stage() are deleted.
         
         """
         self._check_and_wait_for_leftover_tasks()
@@ -706,15 +717,15 @@ class Workflow(models.Model):
             self.wait()
                
     
-    def restart_from_here(self):
-        """
-        Deletes any stages in the history that haven't been added yet
-        """
-        if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0} (All files will be deleted)? Answering no will simply exit.".format(self),default=True,timeout=30):
-            self.log.info('Restarting Workflow from here.')
-            for b in Stage.objects.filter(workflow=self,order_in_workflow=None): b.delete()
-        else:
-            sys.exit(1)
+#    def restart_from_here(self):
+#        """
+#        Deletes any stages in the history that haven't been added yet
+#        """
+#        if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0} (All files will be deleted)? Answering no will simply exit.".format(self),default=True,timeout=30):
+#            self.log.info('Restarting Workflow from here.')
+#            for b in Stage.objects.filter(workflow=self,order_in_workflow=None): b.delete()
+#        else:
+#            sys.exit(1)
     
     def get_tasks_by(self,stage=None,tags={},op="and"):
         """
@@ -1310,6 +1321,8 @@ class TaskEdge(models.Model):
 class Task(models.Model):
     """
     The object that represents the command line that gets executed.
+    
+    tags must be unique for all tasks in the same stage
     """
     _jobAttempts = models.ManyToManyField(JobAttempt,related_name='task_set')
     pre_command = models.TextField(help_text='preformatted command.  almost always will contain the special string {output} which will later be replaced by the proper output path')
@@ -1351,7 +1364,7 @@ class Task(models.Model):
             raise ValidationError("Tasks belonging to a stage with the same tags detected! tags: {0}".format(task.tags))
         
         check_and_create_output_dir(task.output_dir)
-        check_and_create_output_dir(task.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
+        check_and_create_output_dir(task.job_output_dir) #this is not in JobManager because JobManager should be not care about these details
             
         #Create task tags    
         if type(task.tags) == dict:

@@ -1,54 +1,68 @@
 from cosmos.contrib.ezflow.tool import Tool
+import os
 
 def list2input(l):
-    return " -I ".join(map(lambda x: str(x),l))
+    return "-I " +" -I ".join(map(lambda x: str(x),l))
 
 class GATK(Tool):
     
     @property
     def bin(self):
-        return '{0[GATK_path]}'.format(self.settings)
+        return 'java -Xmx{self.mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings)
     
 class Picard(Tool):
     
     @property
     def bin(self):
-        return 'picard_cmd'
+        return 'java -Xmx{self.mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,s=self.settings,jar=os.path.join(self.settings['Picard_path'],self.jar))
+
 
 class ALN(Tool):
     __verbose__ = "Reference Alignment"
+    mem_req = 3.5*1024
+    cpu_req = 2 #4
     forward_input = True
     
     inputs = ['fastq']
     outputs = ['sai']
     
     def cmd(self,i,t,s,p):
-        return '{s[bwa_path]} aln -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq][0]} > $OUT.sai'
+        return '{s[bwa_path]} aln -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq]} > $OUT.sai'
     
 class SAMPE(Tool):
     __verbose__ = "Paired End Mapping"
-    
+    mem_req = 5*1024
+    cpu_req = 1 #4
     inputs = ['fastq','sai']
     outputs = ['sam']
-    
+
     def cmd(self,i,t,s,p):
+        t2 = self.parents[0].tags
         return r"""
             {s[bwa_path]} sampe
             -f $OUT.sam
-            -r "@RG\tID:{t2[RG_ID]}\tLB:{t2[RG_LIB]}\tSM:{t2[sample]}\tPL:{t2[RG_PLATFORM]}"
-            {i[fastq][0]} {i[fastq][1]} {i[sai][0]} {i[sai][1]}
+            -r "@RG\tID:{RG_ID}\tLB:{t2[library]}\tSM:{t2[sample]}\tPL:{t2[platform]}"
+            {s[bwa_reference_fasta_path]}
+            {i[sai][0]}
+            {i[sai][1]}
+            {i[fastq][0]}
+            {i[fastq][1]}
             """, {
-            't2' : self.parents[0].tags
+            't2' : t2,
+            'RG_ID':'{0}.L{1}'.format(t2['flowcell'],t2['lane'])
         }
 
 class MERGE_SAMS(Picard):
     __verbose__ = "Merge Sam Files"
+    mem_req = 3*1024
     inputs = ['sam']
     outputs = ['bam']
     
+    jar = 'MergeSamFiles.jar'
+    
     def cmd(self,i,t,s,p):
         return r"""
-            {self.bin} -jar MergeSamFiles.jar
+            {self.bin}
             {inputs}
             OUTPUT=$OUT.bam
             SORT_ORDER=coordinate
@@ -60,26 +74,31 @@ class MERGE_SAMS(Picard):
                 
 class CLEAN_SAM(Picard):
     __verbose__ = "Clean Sams"
+    mem_req = 2*1024
     
     inputs = ['bam']
     outputs = ['bam']
     
+    jar = 'CleanSam.jar'
+    
     def cmd(self,i,t,s,p):
         return r"""
-            {self.bin} -jar CleanSam.jar
+            {self.bin}
             I={i[bam]}
-            O=$OUT.bam'
+            O=$OUT.bam
         """
 
 class DEDUPE(Picard):
     __verbose__ = "Mark Duplicates"
-    
+    mem_req = 5*1024
     inputs = ['bam']
     outputs = ['bam','metrics']
     
+    jar = 'MarkDuplicates.jar'
+    
     def cmd(self,i,t,s,p):
         return r"""
-            {self.bin} -jar MarkDuplicates.jar
+            {self.bin}
             I={i[bam]}
             O=$OUT.bam
             METRICS_FILE=$OUT.metrics
@@ -88,21 +107,23 @@ class DEDUPE(Picard):
 
 class INDEX_BAM(Picard):
     __verbose__ = "Index Bam Files"
+    mem_req = 2*1024
     forward_input = True
-    
     inputs = ['bam']
+    
+    jar = ' BuildBamIndex.jar'
     
     def cmd(self,i,t,s,p):
         return r"""
-            {self.bin} -jar BuildBamIndex.jar
+            {self.bin}
             INPUT={i[bam]}
             OUTPUT={i[bam]}.bai
         """
                 
 class RTC(GATK):
     __verbose__ = "Indel Realigner Target Creator"
+    mem_req = 2.5*1024
     forward_input = True
-    
     inputs = ['bam']
     outputs = ['intervals']
     
@@ -122,6 +143,7 @@ class RTC(GATK):
     
 class IR(GATK):
     __verbose__ = "Indel Realigner"
+    mem_req = 2.5*1024
     inputs = ['bam','intervals']
     outputs = ['bam']
     
@@ -141,6 +163,7 @@ class IR(GATK):
     
 class BQSR(GATK):
     __verbose__ = "Base Quality Score Recalibration"
+    mem_req = 2.5*1024
     inputs = ['bam']
     outputs = ['recal']
     
@@ -165,6 +188,7 @@ class BQSR(GATK):
     
 class PR(GATK):
     __verbose__ = "Apply BQSR"
+    mem_req = 5*1024
     inputs = ['bam','recal']
     outputs = ['bam']
     
@@ -189,6 +213,7 @@ class PR(GATK):
     
 class UG(GATK):
     __verbose__ = "Unified Genotyper"
+    mem_req = 5.5*1024
     inputs = ['bam']
     outputs = ['vcf']
     
@@ -213,6 +238,7 @@ class UG(GATK):
     
 class CV(GATK):
     __verbose__ = "Combine Variants"
+    mem_req = 2*1024
     
     inputs = ['vcf']
     outputs = ['vcf']
@@ -242,6 +268,7 @@ class CV(GATK):
     
 class VQSR(GATK):
     __verbose__ = "Variant Quality Score Recalibration"
+    mem_req = 3.5*1024
     inputs = ['vcf']
     outputs = ['recal','tranches','R']
     
@@ -286,6 +313,7 @@ class VQSR(GATK):
     
 class Apply_VQSR(GATK):
     __verbose__ = "Apply VQSR"
+    mem_req = 2*1024
     
     inputs = ['vcf','recal','tranches']
     outputs = ['vcf']

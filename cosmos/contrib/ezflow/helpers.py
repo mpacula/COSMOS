@@ -1,7 +1,18 @@
 import types
 from inspect import getargspec
 import sys, pprint
+from cosmos.Cosmos.helpers import groupby
 
+def join_dicts(d1,d2):
+    """
+    Joints the values of a dictionary so that complementary keys will results in a list of values.
+    
+    >>> join_dicts({'a':1,'b':2},{'a':'c'})
+    { 'a':[1,'c'], 'b': [2] }  
+    """
+    return dict([ (items[0],map(lambda x: x[1], items[1])) for items in groupby(d1.items()+d2.items(),lambda x: x[0]) ])
+
+    
 
 def cosmos_format(s,d):
     """

@@ -50,8 +50,8 @@ class Tool(object):
         """
         if not hasattr(self,'output_files'): self.output_files = []
         self.tags = tags
-        self.stage_name = stage_name if stage_name else self.__class__.__name__
-        if not hasattr(self,'__verbose__'): self.__verbose__ = self.stage_name
+        if not hasattr(self,'__verbose__'): self.__verbose__ = self.__class__.__name__
+        self.stage_name = stage_name if stage_name else self.__verbose__
         self.dag = dag
         
         self.id = get_id()
@@ -167,7 +167,7 @@ class INPUT(Tool):
     NOOP = True
     
     def __init__(self,*args,**kwargs):
-        filepaths = kwargs.pop('filepaths')
+        filepaths = kwargs.pop('output_paths')
         super(INPUT,self).__init__(*args,**kwargs)
         for fp in filepaths:
             tf = TaskFile(path=fp)
