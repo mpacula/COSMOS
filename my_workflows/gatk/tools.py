@@ -24,9 +24,10 @@ class ALN(Tool):
     one_parent = True
     inputs = ['fastq']
     outputs = ['sai']
+    default_params = { 'q': 5}
     
     def cmd(self,i,t,s,p):
-        return '{s[bwa_path]} aln -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq]} > $OUT.sai'
+        return '{s[bwa_path]} -q {p[q]} aln -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq]} > $OUT.sai'
     
 class SAMPE(Tool):
     __verbose__ = "Paired End Mapping"
