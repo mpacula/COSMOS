@@ -1,15 +1,45 @@
-import cosmos.session
+from cosmos import session
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib import step
-import steps
+from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
+from tools import *
 
-WF = Workflow.start('Example1',default_queue='',restart=True)
-step.workflow = WF
+input_data = [
+    #Sample, fq_chunk, fq_pair, output_path
+    ('A',1,1,'/data/A_1_1.fastq'),
+    ('A',1,2,'/data/A_1_2.fastq'),
+ ]
 
-echo = steps.Echo('Echo').none2many(strings=['Hello','World','!'])
-wc = steps.WordCount('WordCount').one2one(echo,flags='-m')
-paste = steps.Paste("Paste").multi_one2one(input_steps=[echo,wc])
-cat = steps.Cat("Cat o2m").one2many(paste,copies=2)
-cat2 = steps.Cat("Cat m2o",hard_reset=True).many2one(cat,group_by=[])
+####################
+# Describe workflow
+####################
 
-WF.run()
+# Tags
+# Parameters
+parameters = {
+  'WC': { 'args': ' -m' }
+}
+
+# Initialize
+dag = DAG()
+
+dag = (
+       dag
+       |Add| [ ECHO(tags=tags) for tags in [{'word':'hello'},{'word':'world'}]]
+       |Split| ([('i',[1,2])],CAT)
+       |Reduce| (['i'],PASTE)
+       |Apply| WC
+    
+)
+dag.configure({},parameters)
+
+#################
+# Run Workflow
+#################
+
+WF = Workflow.start('test',restart=True)
+dag.add_to_workflow(WF)
+dag.create_dag_img('/tmp/graph.svg')
+#WF.run()
+
+#print dag
+

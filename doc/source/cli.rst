@@ -30,5 +30,5 @@ Manually send a bkill to above jobs (note, Cosmos will reattempt a failed job 3 
 
    $ cosmos wf jobs -jid -q 1 |xargs bkill
 
-.. automodule:: Cosmos.cli
+.. automodule:: cosmos.Cosmos.cli
    :members:

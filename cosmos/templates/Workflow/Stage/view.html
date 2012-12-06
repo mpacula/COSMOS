@@ -29,15 +29,15 @@
                      async:   true,
                 }); 
             }
-        // url_batch_table = function() { return '{% url 'batch_table' batch.id %}' }
-        // update_html('#batch_table',url_batch_table)
-        // url_node_table = function() { return '{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize() }
-        // update_html('#node_table',url_node_table)
+        // url_stage_table = function() { return '{% url 'stage_table' stage.id %}' }
+        // update_html('#stage_table',url_stage_table)
+        // url_task_table = function() { return '{% url 'stage_task_table' stage.id %}?'+$('#filter_form').serialize() }
+        // update_html('#task_table',url_task_table)
         
         //Filter Submit Button
         $('#filter_submit').click(function() {
             $('#filter_dropdown-toggle').dropdown('toggle')
-            $('#node_table').load('{% url 'batch_node_table' batch.id %}?'+$('#filter_form').serialize() );
+            $('#task_table').load('{% url 'stage_task_table' stage.id %}?'+$('#filter_form').serialize() );
             return false;
         });
     });
@@ -47,19 +47,19 @@
 {%block content%}
     <ul class="breadcrumb">
       <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
-      <li><a href="{{batch.workflow.url }}">{{batch.workflow}}</a> <span class="divider">/</span></li>
-      <li class="active">{{batch}}</li>
+      <li><a href="{{stage.workflow.url }}">{{stage.workflow}}</a> <span class="divider">/</span></li>
+      <li class="active">{{stage}}</li>
     </ul>
     
-    <div id="batch_table">
-        {% with details=1 batches=batch|aslist%}
-        {%include "Workflow/Batch/table.html"%}
+    <div id="stage_table">
+        {% with details=1 stages=stage|aslist%}
+        {%include "Workflow/Stage/table.html"%}
         {% endwith %}
     </div>
 
     <div class="dropdown">
         <h3 style="display:inline" class="dropdown-toggle" data-toggle="dropdown"  id="filter_dropdown-toggle">
-            Nodes
+            Tasks
             <button class="btn btn-small">Filter
             <span class="caret"></span>
             </button>
@@ -92,8 +92,8 @@
     </div>
     <br/>
 
-    <div id="node_table">
-        {% include "Workflow/Node/table.html" %}
+    <div id="task_table">
+        {% include "Workflow/Task/table.html" %}
     </div>
 
 {% endblock %}

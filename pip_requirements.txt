@@ -1,6 +1,7 @@
-Django==1.4.1
-MySQL-python==1.2.3
-South==0.7.6
+decorator
+Django
+MySQL-python
+South
 argh
 networkx
 argparse==1.2.1

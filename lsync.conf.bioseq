@@ -11,7 +11,6 @@ sync{
    host="ch158749@gpp",
    host="erik@bioseq.info",
    rsyncOps={
-	"--exclude-from=/home/erik/workspace/Cosmos/.gitignore",
 	"--no-perms",
 	"-vz",
 	"-l"

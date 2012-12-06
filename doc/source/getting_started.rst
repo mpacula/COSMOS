@@ -40,25 +40,25 @@ features of Cosmos.  Again, the number beside each object inside brackets, `[#]`
    INFO: 2012-09-27 16:47:08: Deleting directory /nas/erik/cosmos_out/Test_Workflow
    INFO: 2012-09-27 16:47:30: Created Workflow Workflow[3] Test Workflow.
    INFO: 2012-09-27 16:47:31: Restarting this Workflow.
-   INFO: 2012-09-27 16:47:31: Adding batch Job_That_Runs_Too_Long.
-   INFO: 2012-09-27 16:47:31: Creating Batch[352] Job That Runs Too Long from scratch.
-   INFO: 2012-09-27 16:47:31: Created node Node[7145] 1 from scratch
-   INFO: 2012-09-27 16:47:31: Running batch Batch[352] Job That Runs Too Long.
-   INFO: 2012-09-27 16:47:31: Running Node[7145] 1 from Batch[352] Job That Runs Too Long
+   INFO: 2012-09-27 16:47:31: Adding stage Job_That_Runs_Too_Long.
+   INFO: 2012-09-27 16:47:31: Creating Stage[352] Job That Runs Too Long from scratch.
+   INFO: 2012-09-27 16:47:31: Created task Task[7145] 1 from scratch
+   INFO: 2012-09-27 16:47:31: Running stage Stage[352] Job That Runs Too Long.
+   INFO: 2012-09-27 16:47:31: Running Task[7145] 1 from Stage[352] Job That Runs Too Long
    INFO: 2012-09-27 16:47:32: Submitted jobAttempt with drmaa jobid 14173
-   INFO: 2012-09-27 16:47:32: Adding batch Echo.
-   INFO: 2012-09-27 16:47:35: Creating Batch[353] Echo from scratch.
-   INFO: 2012-09-27 16:47:35: Created node Node[7146] 1 from scratch
-   INFO: 2012-09-27 16:47:35: Created node Node[7147] 2 from scratch
-   INFO: 2012-09-27 16:47:35: Created node Node[7148] 3 from scratch
-   INFO: 2012-09-27 16:47:35: Running batch Batch[353] Echo.
-   INFO: 2012-09-27 16:47:35: Running Node[7146] 1 from Batch[353] Echo
+   INFO: 2012-09-27 16:47:32: Adding stage Echo.
+   INFO: 2012-09-27 16:47:35: Creating Stage[353] Echo from scratch.
+   INFO: 2012-09-27 16:47:35: Created task Task[7146] 1 from scratch
+   INFO: 2012-09-27 16:47:35: Created task Task[7147] 2 from scratch
+   INFO: 2012-09-27 16:47:35: Created task Task[7148] 3 from scratch
+   INFO: 2012-09-27 16:47:35: Running stage Stage[353] Echo.
+   INFO: 2012-09-27 16:47:35: Running Task[7146] 1 from Stage[353] Echo
    INFO: 2012-09-27 16:47:36: Submitted jobAttempt with drmaa jobid 14174
-   INFO: 2012-09-27 16:47:36: Running Node[7147] 2 from Batch[353] Echo
+   INFO: 2012-09-27 16:47:36: Running Task[7147] 2 from Stage[353] Echo
    INFO: 2012-09-27 16:47:40: Submitted jobAttempt with drmaa jobid 14175
-   INFO: 2012-09-27 16:47:40: Running Node[7148] 3 from Batch[353] Echo
+   INFO: 2012-09-27 16:47:40: Running Task[7148] 3 from Stage[353] Echo
    INFO: 2012-09-27 16:47:41: Submitted jobAttempt with drmaa jobid 14176
-   INFO: 2012-09-27 16:47:41: Waiting on batch Batch[353] Echo...
+   INFO: 2012-09-27 16:47:41: Waiting on stage Stage[353] Echo...
 
 
 Launch the Web Interface

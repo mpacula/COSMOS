@@ -9,13 +9,13 @@ def aslist(o):
     return [o]
 
 @register.simple_tag
-def get_sjob_stat(batch,field,statistic,pipe=None):
-    r = batch.get_sjob_stat(field,statistic)
+def get_sjob_stat(stage,field,statistic,pipe=None):
+    r = stage.get_sjob_stat(field,statistic)
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
 @register.simple_tag
-def get_node_stat(batch,field,statistic,pipe=None):
-    r =  batch.get_node_stat(field,statistic)
+def get_task_stat(stage,field,statistic,pipe=None):
+    r =  stage.get_task_stat(field,statistic)
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
 @register.simple_tag

@@ -20,8 +20,8 @@ sequences = [
           ]
 
 
-fusion_b1_batch = workflow.add_batch("tophat_fusion_bowtie1")
-#fusion_b2_batch = workflow.add_batch("fusions_bowtie2")
+fusion_b1_stage = workflow.add_stage("tophat_fusion_bowtie1")
+#fusion_b2_stage = workflow.add_stage("fusions_bowtie2")
 #for bowtie_version in ['bowtie1','bowtie2']:
 for i, seqs in enumerate(sequences):
     seq1 = os.path.join(input_files_path,seqs[0])
@@ -41,11 +41,11 @@ for i, seqs in enumerate(sequences):
     {seq1} {seq2}
     """
     cmd = parse_cmd(cmd,seq1=seq1,seq2=seq2,output_dir='{output_dir}')
-    fusion_b1_batch.add_node(name="seq{0}".format(i+1),
+    fusion_b1_stage.add_task(name="seq{0}".format(i+1),
                              pcmd = cmd,
                              outputs = {})
         
         
-workflow.run_batch(fusion_b1_batch)
-#workflow.run_batch(fusion_b2_batch)
+workflow.run_stage(fusion_b1_stage)
+#workflow.run_stage(fusion_b2_stage)
 workflow.wait()
