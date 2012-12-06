@@ -5,6 +5,7 @@ import pygraphviz as pgv
 from cosmos.Workflow.models import Task,TaskError,TaskFile
 from tool import INPUT
 from picklefield.fields import dbsafe_decode
+import textwrap
 
 class DAGError(Exception): pass
 
@@ -15,15 +16,17 @@ class DAG(object):
         self.last_tools = []
         
     def create_dag_img(self,path):
-        AG = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
-        AG.node_attr['fontname']="Courier-Bold"
-        AG.node_attr['fontsize']=12
-            
-        for tool in self.G.nodes():
-            AG.add_node(tool,label=tool.label)
-        AG.add_edges_from(self.G.edges())
-        AG.layout(prog="dot")
-        AG.draw(path,format='svg')
+        dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
+        dag.node_attr['fontname']="Courier"
+        dag.node_attr['fontsize']=8
+        dag.add_edges_from(self.G.edges())
+        for stage,tasks in groupby(self.G.nodes(),lambda x:x.stage_name):
+            sg = dag.add_subgraph(name="cluster_{0}".format(stage),label=stage,color='lightgrey')
+            for task in tasks:
+                sg.add_node(task,label=task.label)    
+        
+        dag.layout(prog="dot")
+        dag.draw(path,format='svg')
         print 'wrote to {0}'.format(path)
     
     def describe(self,generator):

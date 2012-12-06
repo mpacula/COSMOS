@@ -151,7 +151,7 @@ class IR(GATK):
             {self.bin}
             -T IndelRealigner
             -R {s[reference_fasta_path]}
-            -I {i[bam][0]}
+            -I {i[bam]}
             -o $OUT.bam
             -targetIntervals {i[intervals]}
             -known {s[indels_1000g_phase1_path]}
@@ -302,7 +302,7 @@ class VQSR(GATK):
             -input {i[vcf]}
             --maxGaussians 4 -std 10.0 -percentBad 0.12
             -resource:mills,known=true,training=true,truth=true,prior=12.0 {s[mills_path]}
-            -an QD -an FS -an HaplotypeScore -an ReadPosRankSum -an {InbreedingCoeff}
+            -an QD -an FS -an HaplotypeScore -an ReadPosRankSum {InbreedingCoeff}
             -mode INDEL
             -recalFile $OUT.recal
             -tranchesFile $OUT.tranches
@@ -351,7 +351,7 @@ class ANNOVAR(Tool):
     outputs = ['tsv']
     
     def cmd(self,i,t,s,p):
-        return 'annovar {i[vcf][0]} {t[database]}'
+        return 'annovar {i[vcf]} {t[database]}'
     
 class PROCESS_ANNOVAR(Tool):
     __verbose__ = "Process Annovar"
@@ -360,7 +360,7 @@ class PROCESS_ANNOVAR(Tool):
     
 #    @opoi
     def cmd(self,i,t,s,p):
-        return 'genomekey {i[tsv][0]}'
+        return 'genomekey {i[tsv]}'
     
 class MERGE_ANNOTATIONS(Tool):
     __verbose__ = "Merge Annotations"
@@ -376,7 +376,7 @@ class SQL_DUMP(Tool):
     outputs = ['sql']
     
     def cmd(self,i,t,s,p):
-        return 'sql dump {i[tsv][0]}'
+        return 'sql dump {i[tsv]}'
     
 class ANALYSIS(Tool):
     __verbose__ = "Filtration And Analysis"
@@ -384,6 +384,6 @@ class ANALYSIS(Tool):
     outputs = ['analysis']
     
     def cmd(self,i,t,s,p):
-        return 'analyze {i[sql][0]}'
+        return 'analyze {i[sql]}'
         
     

@@ -4,7 +4,7 @@ from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Ad
 from cosmos.contrib.ezflow.tool import INPUT
 import make_data_dict
 from tools import *
-import os, json
+import json
 
 if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
     data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/test_data3',depth=1))
@@ -40,7 +40,7 @@ settings = {
 
 #parameter keywords can be the name of the tool class, or its default __verbose__
 parameters = {
-  'SAMPE': { 'q': 5 },
+  'ALN': { 'q': 5 },
 }
 
 # Tags
@@ -48,10 +48,9 @@ intervals = ('interval',[3,4])
 glm = ('glm',['SNP','INDEL'])
 dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 
-# Initialize
+# Describe Workflow
 dag = DAG()
-dag = (
-    dag
+dag = ( dag
     |Add| inputs
     |Apply| ALN
     |Reduce| (['sample','lane','chunk'],SAMPE)
@@ -74,12 +73,12 @@ dag = (
 #    |Apply| ANALYSIS
 )
 dag.configure(settings,parameters)
+dag.create_dag_img('/tmp/graph.svg')
 
 #################
 # Run Workflow
 #################
 
 WF = Workflow.start('test',restart=False)
-dag.create_dag_img('/tmp/graph.svg')
 dag.add_to_workflow(WF)
 WF.run()

@@ -165,6 +165,8 @@ class Tool(object):
     
 class INPUT(Tool):
     NOOP = True
+    mem_req = 0
+    cpu_req = 0
     
     def __init__(self,*args,**kwargs):
         filepaths = kwargs.pop('output_paths')
