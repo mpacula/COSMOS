@@ -1,34 +1,65 @@
+.. _cli:
+
 Command Line Interface
-======================
+______________________
 
-The CLI can be accessed by typing :command:`cosmos` at your prompt.  See below for usage.
-
-Examples
-++++++++
-
-Get Usage Help:
+Make sure your environment variables, are set.  In particular :file:`/path/to/Cosmos/bin` must be in your PATH
+Use the shell command :command:`env` if you're not sure what's in your environment.
 
 .. code-block:: bash
 
    $ cosmos -h
+   usage: cli.py [-h] {adm,wf} ...
+   
+   positional arguments:
+     {adm,wf}
+       adm       Admin
+       wf        Workflow
+   
+   optional arguments:
+     -h, --help  show this help message and exit
+         
+Explore the available commands, using -h if you wish.  Or see the :ref:`cli` for more info.  Note that when
+listing workflows, the number beside each Workflow inside brackets, `[#]`, is the ID of that object.
 
-List workflows:
+Examples
+________
 
+Get Usage Help:
++++++++++++++++
+.. code-block:: bash
+
+   $ cosmos -h
+   
+Reset the SQL database
+++++++++++++++++++++++
+.. note:: This will *not* delete the files associated with workflow output.
+
+.. code-block:: bash
+
+   $ cosmos adm resetentiredb
+
+List workflows
+++++++++++++++
 .. code-block:: bash
 
    $ cosmos wf list
 
 
-List the DRMAA specific jobids of the queued jobs in workflow with id 1:
+List the DRMAA specific jobids of the queued jobs in workflow with id 1
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 .. code-block:: bash
 
    $ cosmos wf jobs -jid -q 1
 
-Manually send a bkill to above jobs (note, Cosmos will reattempt a failed job 3 times by default):
-
+Manually send a bkill to above jobs (note, Cosmos will reattempt a failed job 3 times by default)
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 .. code-block:: bash
 
    $ cosmos wf jobs -jid -q 1 |xargs bkill
 
-.. automodule:: cosmos.Cosmos.cli
+API
+___
+
+.. automodule:: cosmos.cli
    :members:

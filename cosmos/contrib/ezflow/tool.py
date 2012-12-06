@@ -1,6 +1,5 @@
 from helpers import getcallargs,cosmos_format
-import collections
-import re,types,itertools
+import re
 from cosmos.Workflow.models import TaskFile
 from cosmos.Cosmos.helpers import parse_cmd
 
@@ -36,11 +35,13 @@ class Tool(object):
     
     mem_req = 1*1024
     cpu_req = 1
-    parameters = {}
-    tags = {}
     inputs = []
     outputs = []
     forward_input = False
+    one_parent = False
+    settings = {}
+    parameters = {}
+    tags = {}
     default_params = {}
     
     def __init__(self,stage_name=None,tags={},dag=None):
@@ -107,7 +108,7 @@ class Tool(object):
     @property
     def label(self):
         "Label used for the DAG image"
-        tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(re.sub('interval','chr',k),v) for k,v in self.tags.items() ]))
+        tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(k,v) for k,v in self.tags.items() ]))
         return "[{3}] {0}{1}\\n{2}".format(self.__verbose__,tags,self.pcmd,self.id)
 
     def map_inputs(self):
@@ -120,8 +121,9 @@ class Tool(object):
         try:
             for i in self.inputs:
                 input_files[i] = map(lambda tf: str(tf),[ p.get_output(i) for p in self.parents ])
-                for k in input_files:
-                    if len(input_files[k]) == 1: input_files[k] = input_files[k][0]
+                if self.one_parent:
+                    for k in input_files:
+                        if len(input_files[k]) == 1: input_files[k] = input_files[k][0]
         except GetOutputError as e:
             raise GetOutputError("Error in {0}.  {1}".format(self,e))
         return input_files

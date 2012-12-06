@@ -11,18 +11,24 @@ class CAT(Tool):
     outputs = ['txt']
     
     def cmd(self,i,t,s,p):
-        return 'cat {0} > $OUT.txt'.format(' '.join(i['text']))
+        return 'cat {input} > $OUT.txt', {
+                'input':' '.join(i['text'])
+                }
     
 class PASTE(Tool):
     inputs = ['txt']
     outputs = ['txt']
     
     def cmd(self,i,t,s,p):
-        return 'paste {0} > $OUT.txt'.format(' '.join(i['txt']))
+        return 'paste {input} > $OUT.txt', {
+                'input':' '.join(i['text'])
+                }
     
 class WC(Tool):
     inputs = ['txt']
     outputs = ['txt']
     
     def cmd(self,i,t,s,p):
-        return 'wc{{p[args]}} {0} > $OUT.txt'.format(' '.join(i['txt']))
+        return 'wc{p[args]} {0input} > $OUT.txt', {
+                'input':' '.join(i['text'])
+                }

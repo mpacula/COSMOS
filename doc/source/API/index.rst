@@ -1,7 +1,7 @@
+.. _api:
+
 Cosmos API
 ==========
-
-   
 
 .. toctree::
    :numbered:

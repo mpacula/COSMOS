@@ -1,8 +1,0 @@
-TaskFile class to memoize tasks
-    sha1sum
-      
-replace step.py with dag.py
-
-Upgrade to gatk 2.2
-Run validation data from pacbio data
-

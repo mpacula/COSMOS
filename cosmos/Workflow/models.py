@@ -925,20 +925,33 @@ class Stage(models.Model):
             sja = task.get_successful_jobAttempt()
             if sja: 
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
+    
+    def add_task(self, *args, **kwargs):
+        """
+        Creates a new task, and saves it
+        Has the same signature as :meth:new_task
+        
+        :returns: the task added
+        """
+        newtask = self.new_task(*args,**kwargs)
+        newtask.save()
+        return newtask
+        
 
     def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_limit=None, NOOP=False, hard_reset=False):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
+        
         :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
         :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
-        :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
         :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
         :param time_limit: (datetime.time) Not implemented.
         :param NOOP: (booean) No Operation, this task does not get executed.
-        :returns: If save=True, an instance of a Task. If save=False, returns (task,tags) where task is a Task, tags is a dict, and task_exists is a bool.
+        :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
+        :returns: A new task instance.  The instance has not been saved to the database.
         """
         
         if (pcmd == '' or pcmd) is None and not NOOP:
@@ -971,97 +984,7 @@ class Stage(models.Model):
         t.input_files_list = input_files
         t.output_files_list = output_files
         return t
-        
-#    def new_task(self, name, pcmd, outputs={}, hard_reset=False, tags = {}, parents=[], save=True, skip_checks=False, mem_req=0, cpu_req=1, time_limit=None):
-#        """
-#        Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
-#        If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
-#        :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
-#        :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
-#        :param outputs: (dict) a dictionary of outputs and their names. Optional.
-#        :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
-#        :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
-#        :param save: (bool) If False, will not save the task to the database. Meant to be used in concert with :method:`Workflow.bulk_save_tasks`
-#        :param skip_checks: (bool) If True, will assume the task doesn't exist. If the task actually does exist, there will likely be a crash later on.
-#        :param parents: (list) A list of parent tasks that this task is dependent on. This is optional and only used by the DAG functionality.
-#        :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
-#        :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
-#        :param time_limit: (datetime.time) Not implemented.
-#        :returns: If save=True, an instance of a Task. If save=False, returns (task,tags) where task is a Task, tags is a dict, and task_exists is a bool.
-#        """
-#                #validation
-#                
-#        # name = re.sub("\s","_",name) #user convenience
-#        #
-#        # if name == '' or name is None:
-#        # raise ValidationError('name cannot be blank')
-#        if skip_checks and save:
-#            raise ValidationError('Cannot skip checks and save a task.')
-#
-#        if pcmd == '' or pcmd is None:
-#            raise TaskError('pre_command cannot be blank')
-#        
-#        #TODO validate that this task has the same tag keys as all other tasks
-#        
-#        task_kwargs = {
-#                       'stage':self,
-#                       'name':name,
-#                       'tags':tags,
-#                       'pre_command':pcmd,
-#                       'outputs':outputs,
-#                       'memory_requirement':mem_req,
-#                       'cpu_requirement':cpu_req,
-#                       'time_limit':time_limit
-#                       }
-#        if skip_checks:
-#            task_exists = False
-#        else:
-#            task_exists = Task.objects.filter(stage=self,tags=tags).count() > 0
-#            if task_exists:
-#                task = Task.objects.get(stage=self,tags=tags)
-#        
-#            #delete if hard_reset
-#            if hard_reset:
-#                if not task_exists:
-#                    raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
-#                task.delete()
-#            
-#            if task_exists and not task.successful:
-#                self.log.info("{0} was unsuccessful last run.".format(task))
-#                task.delete()
-#        
-#            #validation
-#            if task_exists and task.successful:
-#                if task.pre_command != pcmd:
-#                    self.log.error("You can't change the pcmd of a existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
-#                if task.outputs != outputs:
-#                    self.log.error("You can't change the outputs of an existing successful task (keeping the one from history). Use hard_reset=True if you really want to do this.")
-#        
-#        if not task_exists:
-#            if save:
-#                #Create and save a task
-#                task = Task.create(**task_kwargs)
-#                for k,v in tags.items():
-#                    TaskTag.objects.create(task=task,key=k,value=v) #this is faster than a task.tag, because task.tag also writes to task.tags
-#                for n in parents:
-#                    TaskEdge.objects.create(parent=n,child=task)
-#                self.log.info("Created {0} in {1}, and saved to the database.".format(task,self))
-#                
-#                stage = task.stage
-#                if stage.is_done():
-#                    stage.status = 'in_progress'
-#                    stage.successful = False
-#                    stage.save()
-#            else:
-#                #Just instantiate a task
-#                task = Task(**task_kwargs)
-#                
-#        if save:
-#            return task
-#        else:
-#            return {'task':task,'tags':tags,'parents':parents,'task_exists':task_exists}
-
-
+    
     def is_done(self):
         """
         :returns: True if this stage is finished successfully or failed, else False
@@ -1168,7 +1091,6 @@ class TaskTag(models.Model):
     task = models.ForeignKey('Task')
     key = models.CharField(max_length=63)
     value = models.CharField(max_length=255)
-    
     
     def __str__(self):
         return "TaskTag[self.id] {self.key}: {self.value} for Task[{task.id}]".format(self=self,task=self.task)

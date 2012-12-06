@@ -6,6 +6,10 @@ import make_data_dict
 from tools import *
 import json
 
+####################
+# Input
+####################
+
 if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
     data_dict = json.loads(make_data_dict.main(input_dir='/nas/erik/ngs_data/test_data3',depth=1))
 
@@ -18,10 +22,9 @@ for i in data_dict:
 
 
 ####################
-# Describe workflow
+# Configuration
 ####################
 
-#Configuration
 resource_bundle_path = '/nas/erik/bundle/1.5/b37'
 settings = {
     'GATK_path' : '/home/ch158749/tools/GenomeAnalysisTKLite-2.1-8-gbb7f038/GenomeAnalysisTKLite.jar',
@@ -44,11 +47,14 @@ parameters = {
 }
 
 # Tags
-intervals = ('interval',[3,4])
+intervals = ('interval',[2,3])
 glm = ('glm',['SNP','INDEL'])
 dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 
-# Describe Workflow
+####################
+# Workflow
+####################
+
 dag = DAG()
 dag = ( dag
     |Add| inputs

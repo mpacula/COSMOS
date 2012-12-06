@@ -21,6 +21,7 @@ class ALN(Tool):
     mem_req = 3.5*1024
     cpu_req = 2 #4
     forward_input = True
+    one_parent = True
     inputs = ['fastq']
     outputs = ['sai']
     
@@ -75,9 +76,9 @@ class MERGE_SAMS(Picard):
 class CLEAN_SAM(Picard):
     __verbose__ = "Clean Sams"
     mem_req = 2*1024
-    
     inputs = ['bam']
     outputs = ['bam']
+    one_parent = True
     
     jar = 'CleanSam.jar'
     
@@ -93,6 +94,7 @@ class DEDUPE(Picard):
     mem_req = 5*1024
     inputs = ['bam']
     outputs = ['bam','metrics']
+    one_parent = True
     
     jar = 'MarkDuplicates.jar'
     
@@ -110,6 +112,7 @@ class INDEX_BAM(Picard):
     mem_req = 2*1024
     forward_input = True
     inputs = ['bam']
+    one_parent = True
     
     jar = 'BuildBamIndex.jar'
     
@@ -123,9 +126,10 @@ class INDEX_BAM(Picard):
 class RTC(GATK):
     __verbose__ = "Indel Realigner Target Creator"
     mem_req = 2.5*1024
-    forward_input = True
     inputs = ['bam']
     outputs = ['intervals']
+    forward_input = True
+    one_parent = True
     
     def cmd(self,i,t,s,p):
         return r"""
@@ -145,6 +149,7 @@ class IR(GATK):
     mem_req = 2.5*1024
     inputs = ['bam','intervals']
     outputs = ['bam']
+    one_parent = True
     
     def cmd(self,i,t,s,p):
         return r"""
@@ -272,6 +277,7 @@ class VQSR(GATK):
     outputs = ['recal','tranches','R']
     
     forward_input = True
+    one_parent = True
     
     default_params = {
       'inbreeding_coeff' : False
@@ -316,6 +322,7 @@ class Apply_VQSR(GATK):
     
     inputs = ['vcf','recal','tranches']
     outputs = ['vcf']
+    one_parent = True
     
     def cmd(self,i,t,s,p):
         if t['glm'] == 'SNP': 
@@ -349,6 +356,7 @@ class ANNOVAR(Tool):
     __verbose__ = "Annovar"
     inputs = ['vcf']
     outputs = ['tsv']
+    one_parent = True
     
     def cmd(self,i,t,s,p):
         return 'annovar {i[vcf]} {t[database]}'
@@ -357,6 +365,7 @@ class PROCESS_ANNOVAR(Tool):
     __verbose__ = "Process Annovar"
     inputs = ['tsv']
     outputs = ['tsv']
+    one_parent = True
     
 #    @opoi
     def cmd(self,i,t,s,p):
@@ -366,6 +375,7 @@ class MERGE_ANNOTATIONS(Tool):
     __verbose__ = "Merge Annotations"
     inputs = ['tsv']
     outputs = ['tsv']
+    one_parent = True
     
     def cmd(self,i,t,s,p):
         return 'genomekey merge {0}'.format(','.join(map(lambda x:str(x),i['tsv'])))
@@ -374,6 +384,7 @@ class SQL_DUMP(Tool):
     __verbose__ = "SQL Dump"
     inputs = ['tsv']
     outputs = ['sql']
+    one_parent = True
     
     def cmd(self,i,t,s,p):
         return 'sql dump {i[tsv]}'
@@ -382,6 +393,7 @@ class ANALYSIS(Tool):
     __verbose__ = "Filtration And Analysis"
     inputs = ['sql']
     outputs = ['analysis']
+    one_parent = True
     
     def cmd(self,i,t,s,p):
         return 'analyze {i[sql]}'
