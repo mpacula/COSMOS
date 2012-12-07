@@ -1,3 +1,5 @@
+.. _getting_started:
+
 Getting Started
 ===============
 
@@ -8,11 +10,11 @@ Execute an Example Workflow
 ___________________________
    
 The console will generate a lot of output as the workflow runs.  This workflow tests out various
-features of Cosmos.  Again, the number beside each object inside brackets, `[#]`, is the ID of that object.
+features of Cosmos.  The number beside each object inside brackets, `[#]`, is the ID of that object.
 
 .. code-block:: bash
 
-   $ python /path/to/cosmos/examples/ex1.py
+   $ python $COSMOS_HOME_PATH/my_workflows/examples/ex1.py
    
    wrote to /tmp/ex1.svg
    INFO: 2012-12-06 16:45:51: Created Workflow Workflow[2] Example 1.
@@ -27,25 +29,20 @@ features of Cosmos.  Again, the number beside each object inside brackets, `[#]`
    INFO: 2012-12-06 16:45:51: Generating DAG...
    INFO: 2012-12-06 16:45:51: Running DAG.
    INFO: 2012-12-06 16:45:51: Running Task[91] ECHO {'word': 'hello'}
-   Job <4039> is submitted to default queue <medium_priority>.
    INFO: 2012-12-06 16:45:51: Submitted jobAttempt with drmaa jobid 4039.
    INFO: 2012-12-06 16:45:52: Running Task[94] ECHO {'word': 'world'}
    Job <4040> is submitted to default queue <medium_priority>.
    INFO: 2012-12-06 16:45:52: Submitted jobAttempt with drmaa jobid 4040.
    INFO: 2012-12-06 16:46:00: Task[91] ECHO {'word': 'hello'} Successful!
    INFO: 2012-12-06 16:46:00: Running Task[92] CAT {'i': 1, 'word': 'hello'}
-   Job <4041> is submitted to default queue <medium_priority>.
    INFO: 2012-12-06 16:46:00: Submitted jobAttempt with drmaa jobid 4041.
    INFO: 2012-12-06 16:46:00: Running Task[93] CAT {'i': 2, 'word': 'hello'}
-   Job <4042> is submitted to default queue <medium_priority>.
    INFO: 2012-12-06 16:46:00: Submitted jobAttempt with drmaa jobid 4042.
    INFO: 2012-12-06 16:46:01: Task[94] ECHO {'word': 'world'} Successful!
    INFO: 2012-12-06 16:46:01: Stage Stage[16] ECHO successful!
    INFO: 2012-12-06 16:46:01: Running Task[95] CAT {'i': 1, 'word': 'world'}
-   Job <4043> is submitted to default queue <medium_priority>.
    INFO: 2012-12-06 16:46:01: Submitted jobAttempt with drmaa jobid 4043.
    INFO: 2012-12-06 16:46:01: Running Task[96] CAT {'i': 2, 'word': 'world'}
-   Job <4044> is submitted to default queue <medium_priority>.
    INFO: 2012-12-06 16:46:01: Submitted jobAttempt with drmaa jobid 4044.
    INFO: 2012-12-06 16:46:12: Task[93] CAT {'i': 2, 'word': 'hello'} Successful!
    INFO: 2012-12-06 16:46:12: Task[92] CAT {'i': 1, 'word': 'hello'} Successful!
@@ -53,8 +50,6 @@ features of Cosmos.  Again, the number beside each object inside brackets, `[#]`
    INFO: 2012-12-06 16:46:14: Task[95] CAT {'i': 1, 'word': 'world'} Successful!
    INFO: 2012-12-06 16:46:14: Stage Stage[17] CAT successful!
    INFO: 2012-12-06 16:46:14: Finished.
-
-
 
 Launch the Web Interface
 ________________________
@@ -65,19 +60,18 @@ You can use the web interface to explore the history and debug all workflows.  T
 
    cosmos adm runweb -p 8080
   
-
 .. note:: Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the system you're running the workflow on.
    
 Visit http://your-ip:8080 to access it.  If you can't access the website, its likely firewalled off; fortunately, the Cosmos website
 works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080` 
 
-.. figure:: /imgs/webinterface.png
-   :width: 75%
+.. figure:: /imgs/web_interface.png
+   :width: 90%
    :align: center
 
 Terminating a Workflow
 ______________________
 
-To terminate a workflow, simply press ctrl+c (or send the process a SIGINT signal).  Cosmos will terminate running jobs and mark them as failed.  You can resume from the point
-in the workflow you left off later.
+To terminate a workflow, simply press ctrl+c (or send the process a SIGINT signal) in the terminal.  Cosmos will terminate running jobs and mark them as failed.
+You can resume from the point in the workflow you left off later.
 

@@ -3,7 +3,7 @@
 Command Line Interface
 ______________________
 
-Make sure your environment variables, are set.  In particular :file:`/path/to/Cosmos/bin` must be in your PATH
+Make sure your environment variables are properly set (see :ref:`config`).
 Use the shell command :command:`env` if you're not sure what's in your environment.
 
 .. code-block:: bash

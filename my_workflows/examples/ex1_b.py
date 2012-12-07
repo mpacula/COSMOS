@@ -10,6 +10,7 @@ from tools import ECHO, CAT, PASTE, WC
 dag = ( DAG()
     |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
     |Split| ([('i',[1,2])],CAT)
+    
 )
 dag.create_dag_img('/tmp/ex1.svg')
 
@@ -17,6 +18,7 @@ dag.create_dag_img('/tmp/ex1.svg')
 # Run Workflow
 #################
 
-WF = Workflow.start('Example 1',restart=True)
+# restart changed to False.  If True then all successful tasks will be deleted and re-executed.
+WF = Workflow.start('Example 1',restart=False) 
 dag.add_to_workflow(WF)
 WF.run()

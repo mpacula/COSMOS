@@ -55,8 +55,7 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 # Workflow
 ####################
 
-dag = DAG()
-dag = ( dag
+dag = ( DAG()
     |Add| inputs
     |Apply| ALN
     |Reduce| (['sample','lane','chunk'],SAMPE)
