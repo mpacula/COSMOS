@@ -85,5 +85,5 @@ dag.create_dag_img('/tmp/graph.svg')
 #################
 
 WF = Workflow.start('test',restart=False)
-dag.add_to_workflow(WF)
-WF.run()
+#dag.add_to_workflow(WF)
+#WF.run()

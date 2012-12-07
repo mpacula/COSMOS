@@ -10,10 +10,10 @@ Features
 ________
 
 * Written in python which is easy to learn, powerful, and popular.  A programmer with limited experience can begin writing Cosmos workflows right away.
-* Extremely powerful syntax and system for the creation of complex workflows
-* Keeps track of workflows, job information, and resource utilization in a SQL database
-* The ability to visualize all jobs and jobs dependencies as a convenient image
-* Monitor running workflows, and a history of all workflows via a webinterface
+* Powerful syntax and system for the creation of complex workflows.
+* Keeps track of workflows, job information, and resource utilization in a SQL database.
+* The ability to visualize all jobs and jobs dependencies as a convenient image.
+* Monitor running workflows, and a history of all workflows via a webinterface.
 
 Multi-platform Support
 ______________________
