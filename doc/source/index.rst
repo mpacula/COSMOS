@@ -4,12 +4,12 @@ Welcome
 Roughly in order of what you'll want to check out:
 
 * :ref:`introduction` -- What is Cosmos?
-* :ref:`install` -- How to install Cosmos.
-* :ref:`config` -- How to configure Cosmos.
-* :ref:`tutorial` -- How to use Cosmos.
-* :ref:`cli` -- Cosmos command line interface.
-* :ref:`shell` -- Cosmos shell.
-* :ref:`API` -- Theano's functionality, module by module.
+* :ref:`install` -- Installation instructions.
+* :ref:`config` -- Configuration instructions.
+* :ref:`tutorial` -- Workflow examples step by step.
+* :ref:`cli` -- Manage your workflows and database from the command line.
+* :ref:`shell` -- Explore your workflows interactively in an IPython shell.
+* :ref:`API` -- Module API.
 
 .. toctree::
    :maxdepth: 1

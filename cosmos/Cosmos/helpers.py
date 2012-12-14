@@ -7,6 +7,7 @@ import itertools
 import pprint
 import sys
 import signal
+from cosmos.session import settings
 
 real_stdout = os.dup(1)
 real_stderr = os.dup(2)
@@ -115,22 +116,24 @@ def spinning_cursor(i):
     while 1:
         return cursor[i % len(cursor)]
 
-def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_limit=None):
+def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_req=None):
     """Returns the DRM specific resource usage flags for the drmaa_native_specification
-    :param time_limit: as datetime.time object. not implemented
-    :param mem_req: memory required in MB
-    :param cpu_req: number of cpus required
-    :param queue: name of queue to submit to 
+    :param time_limit: (int) as datetime.time object.
+    :param mem_req: (int) memory required in MB
+    :param cpu_req: (int) number of cpus required
+    :param queue: (str) name of queue to submit to
     """
-    if DRM == 'LSF':  
+    if DRM == 'LSF':
         s = '-R "rusage[mem={0}] span[hosts=1]" -n {1}'.format(mem_req,cpu_req)
+        if time_req:
+            s += ' -W 0:{0}'.format(time_req)
         if queue:
             s += ' -q {0}'.format(queue)
         return s
-#    elif DRM == 'GE':
-#        return '-l h_vmem={0},virtual_free={0}'.format(mem_req)
+    elif DRM == 'GE':
+        return '-l h_vmem={0}M -pe {2} {3}'.format(mem_req,int(mem_req*.7),settings.parallel_environment_name,cpu_req)
     else:
-        return ''
+        raise Exception('DRM native specification not supported')
 
 def validate_name(txt,field_name=''):
     """
@@ -152,22 +155,6 @@ def check_and_create_output_dir(path):
             raise ValidationError('Path is not a directory')
     else:
         os.mkdir(path)
-    
-#def addExt(file_path,new_extension,remove_dir_path=True):
-#    """
-#    Adds an extension to a filename
-#    remove_dir_path will remove the directory path and return only the filename with the added extension
-#    """
-#    if remove_dir_path:
-#        dir,file_path = os.path.split(file_path)
-#    return re.sub(r'^(.*)(\..+)$', r'\1.{0}\2'.format(new_extension), file_path)
-
-#def sizeof_fmt(num):
-#    for x in ['bytes','KB','MB','GB']:
-#        if num < 1024.0 and num > -1024.0:
-#            return "%3.1f %s" % (num, x)
-#        num /= 1024.0
-#    return "%3.1f %s" % (num, 'TB')
 
 def execute(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

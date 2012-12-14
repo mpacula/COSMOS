@@ -1,3 +1,6 @@
+"""
+models.py
+"""
 from django.db import models, transaction
 from django.db.models import Q,Count
 from django.db.utils import IntegrityError
@@ -44,7 +47,10 @@ class TaskFile(models.Model):
     def __init__(self,*args,**kwargs):
         r = super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
-            self.fmt = re.search('\.(.+?)$',self.path).group(1)
+            try:
+                self.fmt = re.search('.+\.(.+?)$',self.path).group(1)
+            except AttributeError as e:
+                raise AttributeError('{0}. probably malformed path which == {1}'.format(e,self.path))
         if not self.name and self.fmt:
             self.name = self.fmt
         self.tmp_id = get_tmp_id()
@@ -139,11 +145,12 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
     
     @staticmethod
-    def start(name=None, restart=False, dry_run=False, root_output_dir=None, default_queue=None):
+    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None, default_queue=None):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
         
         :param name: (str) A unique name for this workflow. All spaces are converted to underscores. Required.
+        :param delete_unsuccessful: (bool) Deletes an unsuccessful tasks in the workflow before returning.
         :param restart: (bool) Restart the workflow by deleting it and creating a new one. Optional.
         :param dry_run: (bool) Don't actually execute jobs. Optional.
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
@@ -160,7 +167,10 @@ class Workflow(models.Model):
         if restart:
             wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
         elif Workflow.objects.filter(name=name).count() > 0:
-            wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue)
+            if delete_unsuccessful:
+                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue)
+            else:
+                wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue)
         else:
             wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue)
         
@@ -177,11 +187,10 @@ class Workflow(models.Model):
         
         return wf
         
-    
     @staticmethod
-    def __reload(name=None,dry_run=False, default_queue=None):
+    def __resume(name=None,dry_run=False, default_queue=None):
         """
-        Reloads a workflow, keeping successful tasks and deleting unsuccessful ones.
+        Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
         
         :param name: (str) A unique name for this workflow
         :param dry_run: (bool) Don't actually execute jobs. Optional.
@@ -190,15 +199,20 @@ class Workflow(models.Model):
         """
 
         if Workflow.objects.filter(name=name).count() == 0:
-            raise ValidationError('Workflow {0} does not exist, cannot reload it'.format(name))
+            raise ValidationError('Workflow {0} does not exist, cannot resumes it'.format(name))
         wf = Workflow.objects.get(name=name)
         wf.dry_run=dry_run
         wf.finished_on = None
         wf.default_queue=default_queue
         
         wf.save()
-        wf.log.info('Reloading workflow.')
+        wf.log.info('Resuming workflow.')
         Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
+        return wf
+    
+    @staticmethod
+    def __reload(name=None,dry_run=False, default_queue=None):
+        wf = Workflow.__resume(name,dry_run,default_queue)
         
         #Delete unsuccessful tasks
         utasks = wf.tasks.filter(successful=False)
@@ -506,14 +520,14 @@ class Workflow(models.Model):
                 raise ValueError('{0}.  Task is {1}. Taskfile str is {2}'.format(e,task,m[0]))
             except TypeError as e:
                 raise TypeError("{0}. m[0] is {0} and taskfile is {1}".format(m[0],taskfile))
-        
-        
+
         jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
                                      drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
                                      jobName="",
                                      drmaa_native_specification=get_drmaa_ns(DRM=session.settings.DRM,
                                                                              mem_req=task.memory_requirement,
                                                                              cpu_req=task.cpu_requirement,
+                                                                             time_req=task.time_requirement,
                                                                              queue=self.default_queue))
         
         task._jobAttempts.add(jobAttempt)
@@ -938,7 +952,7 @@ class Stage(models.Model):
         return newtask
         
 
-    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_limit=None, NOOP=False, hard_reset=False):
+    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_req=None, NOOP=False, hard_reset=False):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
@@ -948,7 +962,7 @@ class Stage(models.Model):
         :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
-        :param time_limit: (datetime.time) Not implemented.
+        :param time_req: (int) Time required in miinutes.  If a job exceeds this requirement, it will likely be killed.
         :param NOOP: (booean) No Operation, this task does not get executed.
         :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
         :returns: A new task instance.  The instance has not been saved to the database.
@@ -967,7 +981,7 @@ class Stage(models.Model):
                        'pre_command':pcmd,
                        'memory_requirement':mem_req,
                        'cpu_requirement':cpu_req,
-                       'time_limit':time_limit
+                       'time_requirement':time_req
                        }
         
         #delete if hard_reset
@@ -1116,14 +1130,15 @@ class Task(models.Model):
     name = models.CharField(max_length=255,null=True)
     memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=0,null=True)
     cpu_requirement = models.SmallIntegerField(help_text="Number of CPUs to reserve for this job",default=1)
-    time_limit = models.TimeField(help_text="Maximum time for a job to run",default=None,null=True)
+    time_requirement = models.IntegerField(help_text="Time required to run in minutes.  If a job runs longer it may be automatically killed.",default=None,null=True)
     stage = models.ForeignKey(Stage,null=True)
     successful = models.BooleanField(null=False)
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
     
-    class Meta:
-        unique_together = (('tags','stage'))
+    tags = PickledObjectField(null=False)
+    created_on = models.DateTimeField(null=True,default=None)
+    finished_on = models.DateTimeField(null=True,default=None)
     
     _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True) #dictionary of outputs
     @property
@@ -1133,10 +1148,9 @@ class Task(models.Model):
     @property
     def input_files(self): return self._input_files.all()
     
-    tags = PickledObjectField(null=False)
-    created_on = models.DateTimeField(null=True,default=None)
-    finished_on = models.DateTimeField(null=True,default=None)
-    
+#   Django has a bug that prevents indexing of BLOBs which is what tags is stored as    
+#    class Meta:
+#        unique_together = (('tags','stage'))
     
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
@@ -1157,9 +1171,8 @@ class Task(models.Model):
         check_and_create_output_dir(task.job_output_dir) #this is not in JobManager because JobManager should be not care about these details
             
         #Create task tags    
-        if type(task.tags) == dict:
-            for key,value in task.tags.items():
-                TaskTag.objects.create(task=task,key=key,value=value)
+        for key,value in task.tags.items():
+            TaskTag.objects.create(task=task,key=key,value=value)
                 
         return task
     

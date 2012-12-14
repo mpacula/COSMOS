@@ -33,8 +33,9 @@ class Tool(object):
     """
     NOOP = False #set to True if this Task should never actually be submitted to the Cosmos Workflow
     
-    mem_req = 1*1024
-    cpu_req = 1
+    mem_req = 1*1024 #(MB)
+    cpu_req = 1 #(cores)
+    time_req = None #
     inputs = []
     outputs = []
     forward_input = False
@@ -171,9 +172,13 @@ class INPUT(Tool):
     cpu_req = 0
     
     def __init__(self,*args,**kwargs):
-        filepaths = kwargs.pop('output_paths')
+        """
+        """
+        output_path=kwargs.pop('output_path',None)
+        output_paths=kwargs.pop('output_paths',[])
         super(INPUT,self).__init__(*args,**kwargs)
-        for fp in filepaths:
+        if output_path: output_paths.append(output_path)
+        for fp in output_paths:
             tf = TaskFile(path=fp)
             self.add_output(tf)
     

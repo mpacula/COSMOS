@@ -5,21 +5,25 @@ def list2input(l):
     return "-I " +" -I ".join(map(lambda x: str(x),l))
 
 class GATK(Tool):
+    time_req = 5*60
+
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req/2))
     
 class Picard(Tool):
-    
+    time_req = 120
+
     @property
     def bin(self):
-        return 'java -Xmx{self.mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req/2),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
 
 
 class ALN(Tool):
     __verbose__ = "Reference Alignment"
     mem_req = 3.5*1024
-    cpu_req = 2 #4
+    cpu_req = 1 #2
+    time_req = 100
     forward_input = True
     one_parent = True
     inputs = ['fastq']
@@ -27,12 +31,13 @@ class ALN(Tool):
     default_params = { 'q': 5 }
     
     def cmd(self,i,t,s,p):
-        return '{s[bwa_path]} -q {p[q]} aln -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq]} > $OUT.sai'
+        return '{s[bwa_path]} aln -q {p[q]} -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq]} > $OUT.sai'
     
 class SAMPE(Tool):
     __verbose__ = "Paired End Mapping"
     mem_req = 5*1024
     cpu_req = 1 #4
+    time_req = 120
     inputs = ['fastq','sai']
     outputs = ['sam']
 
@@ -168,6 +173,7 @@ class IR(GATK):
     
 class BQSR(GATK):
     __verbose__ = "Base Quality Score Recalibration"
+    cpu_req = 1
     mem_req = 2.5*1024
     inputs = ['bam']
     outputs = ['recal']
@@ -186,9 +192,10 @@ class BQSR(GATK):
             -cov QualityScoreCovariate
             -cov CycleCovariate
             -cov ContextCovariate
-            -nt {self.cpu_req}
+            -nct {nct}
         """, {
-            'inputs' : list2input(i['bam'])
+            'inputs' : list2input(i['bam']),
+            'nct': self.cpu_req +1
           }
     
 class PR(GATK):

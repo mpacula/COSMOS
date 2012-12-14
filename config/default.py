@@ -1,6 +1,6 @@
 import os 
-os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.Cosmos.django_settings'
-os.environ['COSMOS_HOME_PATH'] = '/home/erik/workspace/cosmos'
+#os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.Cosmos.django_settings'
+#os.environ['COSMOS_HOME_PATH'] = '/home/erik/workspace/cosmos'
 
 #######################
 # Cosmos

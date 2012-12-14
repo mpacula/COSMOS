@@ -57,7 +57,9 @@ class DAG(object):
         taskfiles = list(it.chain(*[ n.output_files for n in self.G.nodes() ]))
         v = map(lambda tf: tf.path,taskfiles)
         v = filter(lambda x:x,v)
-        if len(map(lambda t: t,v)) != len(map(lambda t: t,set(v))): raise DAGError('Multiple taskfiles refer to the same path.  Paths should be unique.')
+        if len(map(lambda t: t,v)) != len(map(lambda t: t,set(v))):
+            import pprint
+            raise DAGError('Multiple taskfiles refer to the same path.  Paths should be unique. taskfile.paths are:{0}'.format(pprint.pformat(sorted(v))))
         
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
@@ -104,19 +106,20 @@ class DAG(object):
         task_edges = [ (parent._task_instance,child._task_instance) for parent,child in new_edges ]
         WF.bulk_save_task_edges(task_edges)
     
-    def __new_task(self,workflow,stage,task):
+    def __new_task(self,workflow,stage,tool):
         """adds a task"""
         try:
             return stage.new_task(name = '',
-                                  pcmd = task.pcmd,
-                                  tags = task.tags,
-                                  input_files = task.input_files,
-                                  output_files = task.output_files,
-                                  mem_req = task.mem_req,
-                                  cpu_req = task.cpu_req,
-                                  NOOP = task.NOOP)
+                                  pcmd = tool.pcmd,
+                                  tags = tool.tags,
+                                  input_files = tool.input_files,
+                                  output_files = tool.output_files,
+                                  mem_req = tool.mem_req,
+                                  cpu_req = tool.cpu_req,
+                                  time_req = tool.time_req,
+                                  NOOP = tool.NOOP)
         except TaskError as e:
-            raise TaskError('{0}. Task is {1}.'.format(e,task))
+            raise TaskError('{0}. Task is {1}.'.format(e,tool))
             
 
 

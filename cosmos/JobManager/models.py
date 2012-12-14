@@ -190,7 +190,6 @@ class JobAttempt(models.Model):
         self.jobTemplate.jobName = 'ja-'+self.jobName
         self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stdout'.format(self.id))
         self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stderr'.format(self.id))
-        self.jobTemplate.blockEmail = True
         self.jobTemplate.nativeSpecification = self.drmaa_native_specification
         #create dir if doesn't exist
         check_and_create_output_dir(self.drmaa_output_dir)
