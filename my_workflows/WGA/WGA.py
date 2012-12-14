@@ -70,8 +70,8 @@ settings.update({
     'tmp_dir' : session.settings.tmp_dir,
     'reference_fasta_path' : os.path.join(resource_bundle_path,'human_g1k_v37.fasta'),
     'dbsnp_path' : os.path.join(resource_bundle_path,'dbsnp_137.b37.vcf'),
-    'hapmap_path' : os.path.join(resource_bundle_path,'hapmap_3.3.b37.sites.vcf'),
-    'omni_path' : os.path.join(resource_bundle_path,'1000G_omni2.5.b37.sites.vcf'),
+    'hapmap_path' : os.path.join(resource_bundle_path,'hapmap_3.3.b37.vcf'),
+    'omni_path' : os.path.join(resource_bundle_path,'1000G_omni2.5.b37.vcf'),
     'mills_path' : os.path.join(resource_bundle_path,'Mills_and_1000G_gold_standard.indels.b37.vcf'),
     'indels_1000g_phase1_path' : os.path.join(resource_bundle_path,'1000G_phase1.indels.b37.vcf')
 })

@@ -32,7 +32,7 @@ class ALN(Tool):
     
     def cmd(self,i,t,s,p):
         return '{s[bwa_path]} aln -q {p[q]} -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq]} > $OUT.sai'
-    
+
 class SAMPE(Tool):
     __verbose__ = "Paired End Mapping"
     mem_req = 5*1024
@@ -56,7 +56,6 @@ class SAMPE(Tool):
             't2' : t2,
             'RG_ID':'{0}.L{1}'.format(t2['flowcell'],t2['lane'])
         }
-
 class MERGE_SAMS(Picard):
     __verbose__ = "Merge Sam Files"
     mem_req = 3*1024
