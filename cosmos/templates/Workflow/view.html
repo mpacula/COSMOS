@@ -16,7 +16,7 @@
                      async:   true,
                 }); 
             }
-        update_html('#batches','{% url 'workflow_batch_table' workflow.id %}')
+        update_html('#stages','{% url 'workflow_stage_table' workflow.id %}')
     });
     </script>
 {% endblock %}
@@ -30,21 +30,25 @@
 <h1>{{workflow}}
 	<a href="{% url 'workflow_view_log' workflow.id %}"><button class="btn btn-info"><i class="icon-search icon-white"></i> Log</button></a>
 	<a href="{% url 'workflow_analysis' workflow.id %}"><button class="btn btn-info"><i class="icon-wrench icon-white"></i> Analyze</button></a>
+    <a href="{% url 'workflow_visualize' workflow.id %}"><button class="btn btn-info"><i class="icon-cog icon-white"></i> Visualize</button></a>
 </h1>
 
 <dl class="dl-horizontal">
 <dt>Output Dir</dt><dd>{{workflow.output_dir}}</dd>
+{% if workflow.default_queue %}
 <dt>Default Queue</dt><dd>{{workflow.default_queue}}</dd>
+{% endif %}
 <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
 <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
-<dt>Wall Time</dt><dd>{{workflow.wall_time}}</dd>
+<dt>Wall Time</dt><dd>{{workflow.wall_time.seconds|format_time}}</dd>
+<dt>Total Stage Wall Time</dt><dd>{{workflow.total_stage_wall_time.seconds|format_time}}</dd>
 </dl>
 
-<p><h3>Batches</h3>
+<p><h3>Stages</h3>
 </p>
-<div id="batches">
-{%with batches=batches_ordered%}
-    {%include "Workflow/Batch/table.html"%}
+<div id="stages">
+{%with stages=stages_ordered%}
+    {%include "Workflow/Stage/table.html"%}
 {%endwith%}
 </div>
 {%endblock%}

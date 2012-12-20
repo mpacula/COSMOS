@@ -1,3 +1,5 @@
+.. _shell:
+
 Cosmos Shell
 ============
 
@@ -13,19 +15,15 @@ Launch the IPython shell
    $ cosmos adm shell
  
 You can then interactively investigate and perform all sorts of operations.  This is really powerful when interacting with the
-:term:`Django` API, since all of the Cosmos objects are Django models. All of the Cosmos classes are automatically imported for you.
+:term:`Django` API, since most of the Cosmos objects are Django models. Most Cosmos classes are automatically imported for you.
 
 .. code-block:: python 
 
    >>> all_workflows = Workflow.objects.all()
-   
    >>> workflow = all_workflows[2]
-   
-   >>> batch = workflow.batches[3]
-   
-   >>> batch.file_size
-   
-   >>> batch.nodes[3].get_successful_jobAttempt().queue_status
+   >>> stage = workflow.stages[3]
+   >>> stage.file_size
+   >>> stage.tasks[3].get_successful_jobAttempt().queue_status
    
 
 Interactive Workflow
@@ -37,8 +35,8 @@ You can even run a workflow:
 
    >>> import cosmos_session
    >>> wf = Workflow.create("interactive workflow")
-   >>> b = wf.add_batch("batch1")
-   >>> b.add_node("hi","echo \"hello world\" > {output_dir}/out")
-   >>> wf.run_and_wait(b)
+   >>> s = wf.add_stage("stage1")
+   >>> s.add_task("hi","echo \"hello world\" > /tmp/out.txt")
+   >>> wf.run()
    >>> wf.finished()
    

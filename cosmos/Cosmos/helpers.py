@@ -5,9 +5,27 @@ import logging
 import subprocess
 import itertools
 import pprint
-
+import sys
 import signal
+from cosmos.session import settings
 
+real_stdout = os.dup(1)
+real_stderr = os.dup(2)
+#devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
+devnull = os.open('/dev/null', os.O_WRONLY)
+def disable_stderr():
+    sys.stderr.flush()
+    os.dup2(devnull,2)
+def enable_stderr():
+    sys.stderr.flush()
+    os.dup2(real_stderr,2)
+def disable_stdout():
+    sys.stderr.flush()
+    os.dup2(devnull,1)
+def enable_stdout():
+    sys.stderr.flush()
+    os.dup2(real_stdout,1)
+    
 def confirm(prompt=None, default=False, timeout=0):
     """prompts for yes or no defaultonse from the user. Returns True for yes and
     False for no.
@@ -79,17 +97,17 @@ def groupby(iterable,fxn):
     return itertools.groupby(sorted(iterable,key=fxn),fxn)
 
 def parse_cmd(txt,**kwargs):
-    """removes empty lines and white space.
+    """removes empty lines and white spaces, and appends a \ to the end of every line.
     also .format()s with the **kwargs dictioanry"""
-    x = txt.split('\n')
-    x = map(lambda x: x.strip(),x)
-    x = filter(lambda x: not x == '',x)
-    txt = '\n'.join(x)
     try:
-        s = txt.format(**kwargs)
-    except KeyError:
+        x = txt.format(**kwargs)
+        x = x.split('\n')
+        x = map(lambda x: re.sub(r"\\$",'',x.strip()).strip(),x)
+        x = filter(lambda x: not x == '',x)
+        x = ' \\\n'.join(x)
+    except (KeyError,TypeError):
         formatError(txt,kwargs)
-    return s
+    return x
 
 
 def spinning_cursor(i):
@@ -98,22 +116,24 @@ def spinning_cursor(i):
     while 1:
         return cursor[i % len(cursor)]
 
-def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_limit=None):
+def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_req=None):
     """Returns the DRM specific resource usage flags for the drmaa_native_specification
-    :param time_limit: as datetime.time object. not implemented
-    :param mem_req: memory required in MB
-    :param cpu_req: number of cpus required
-    :param queue: name of queue to submit to 
+    :param time_limit: (int) as datetime.time object.
+    :param mem_req: (int) memory required in MB
+    :param cpu_req: (int) number of cpus required
+    :param queue: (str) name of queue to submit to
     """
-    if DRM == 'LSF':  
+    if DRM == 'LSF':
         s = '-R "rusage[mem={0}] span[hosts=1]" -n {1}'.format(mem_req,cpu_req)
+        if time_req:
+            s += ' -W 0:{0}'.format(time_req)
         if queue:
             s += ' -q {0}'.format(queue)
         return s
-#    elif DRM == 'GE':
-#        return '-l h_vmem={0},virtual_free={0}'.format(mem_req)
+    elif DRM == 'GE':
+        return '-l h_vmem={0}M -pe {2} {3}'.format(mem_req,int(mem_req*.7),settings.parallel_environment_name,cpu_req)
     else:
-        return ''
+        raise Exception('DRM native specification not supported')
 
 def validate_name(txt,field_name=''):
     """
@@ -135,22 +155,6 @@ def check_and_create_output_dir(path):
             raise ValidationError('Path is not a directory')
     else:
         os.mkdir(path)
-    
-#def addExt(file_path,new_extension,remove_dir_path=True):
-#    """
-#    Adds an extension to a filename
-#    remove_dir_path will remove the directory path and return only the filename with the added extension
-#    """
-#    if remove_dir_path:
-#        dir,file_path = os.path.split(file_path)
-#    return re.sub(r'^(.*)(\..+)$', r'\1.{0}\2'.format(new_extension), file_path)
-
-#def sizeof_fmt(num):
-#    for x in ['bytes','KB','MB','GB']:
-#        if num < 1024.0 and num > -1024.0:
-#            return "%3.1f %s" % (num, x)
-#        num /= 1024.0
-#    return "%3.1f %s" % (num, 'TB')
 
 def execute(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

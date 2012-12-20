@@ -952,7 +952,7 @@
     }
 
   , validate: function () {
-      if (!this.$element[0].parentNode) {
+      if (!this.$element[0].parentTask) {
         this.hide()
         this.$element = null
         this.options = null

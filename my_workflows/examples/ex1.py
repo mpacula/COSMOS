@@ -1,14 +1,22 @@
-import cosmos.session
+from cosmos import session
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib import step
-import steps
+from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
+from tools import ECHO, CAT, PASTE, WC
 
-WF = Workflow.start('Example1',default_queue='i2b2_15m',restart=True)
-step.workflow = WF
+####################
+# Workflow
+####################
 
-echo = steps.Echo('Echo').many2many(input_batch=None,strings=['Hello World'])
-paste = steps.Paste("Paste").one2one(input_batch=echo)
-cat = steps.Cat("Cat o2m").one2many(paste,copies=2)
-cat2 = steps.Cat("Cat m2o",hard_reset=True).many2one(cat)
+dag = ( DAG()
+    |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
+    |Split| ([('i',[1,2])],CAT)
+)
+dag.create_dag_img('/tmp/ex1.svg')
 
-WF.finished()
+#################
+# Run Workflow
+#################
+
+WF = Workflow.start('Example 1',restart=True)
+dag.add_to_workflow(WF)
+WF.run()

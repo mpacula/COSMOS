@@ -6,9 +6,9 @@
 
 <ul class="breadcrumb">
   <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.node.batch.workflow.url }}">{{jobAttempt.node.batch.workflow}}</a> <span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.node.batch.url }}">{{jobAttempt.node.batch}}</a><span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.node.url }}">{{jobAttempt.node}}</a><span class="divider">/</span></li>
+  <li><a href="{{jobAttempt.task.stage.workflow.url }}">{{jobAttempt.task.stage.workflow}}</a> <span class="divider">/</span></li>
+  <li><a href="{{jobAttempt.task.stage.url }}">{{jobAttempt.task.stage}}</a><span class="divider">/</span></li>
+  <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task}}</a><span class="divider">/</span></li>
   <li class="active">{{jobAttempt}}</li>
 </ul>
 <div class="alert {% with qs=jobAttempt.queue_status %}
@@ -32,15 +32,14 @@
 
 <dl class="dl-horizontal">
 <dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
-<dt><em>time</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
-<dt>Output Directory</dt><dd><code>{{jobAttempt.node.job_output_dir}}</code></dd>
-<dt>Node File Size</dt><dd>{%if settings.show_jobAttempt_file_sizes%}{{jobAttempt.file_size}}{%else%}OFF{%endif%}</dd>
-<dt>Outputs<strong></strong></dt>
-{% for key,val in jobAttempt.node.output_paths.items %}
-<dd><em>{{key}}</em>: <a href="{% url jobAttempt_output jobAttempt.id key%}"><code>{{val}}</code></a></dd>
-{% empty %}
-<dd>None</dd>
-{%endfor%}
+<dt><em>Profile</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
+<dt>Output Directory</dt><dd><code>{{jobAttempt.task.job_output_dir}}</code></dd>
+<dt>Task File Size</dt><dd>{%if settings.show_jobAttempt_file_sizes%}{{jobAttempt.file_size}}{%else%}OFF{%endif%}</dd>
+<dt>Output Files</dt><dd>
+	{%for of in jobAttempt.task.output_files%}
+	<a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
+	{%empty%}None{%endfor%}
+</dd>
 
 <dt>Successful</dt>    <dd>{{jobAttempt.successful}}</dd>
 <dt>Queue_status</dt>  <dd>{{jobAttempt.queue_status}}</dd>

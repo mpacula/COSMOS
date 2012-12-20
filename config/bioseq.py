@@ -2,7 +2,7 @@ import os
 
 #Cosmos Settings
 home_path = '/home2/erik/workspace/Cosmos' #bioseq
-default_root_output_dir = '/mnt/cosmos_out'
+default_root_output_dir = '/cosmos/output'
 DRM = 'GE'
 tmp_dir = '/mnt/tmp'
 
@@ -15,10 +15,6 @@ DATABASE = {
     'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
     'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
 }
-#
-#
-####SGE
-#os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge6/lib/linux-x64/libdrmaa.so'
-#os.environ['SGE_ROOT'] = '/opt/sge6'
-#os.environ['SGE_EXECD_PORT'] = '63232'
-#os.environ['SGE_QMASTER_PORT'] = '63231'
+
+### SGE Specific
+parallel_environment_name = 'orte' #the name of the SGE parallel environment name.  Use "qconf -spl" to list available names

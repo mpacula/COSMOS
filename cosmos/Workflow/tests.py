@@ -1,4 +1,4 @@
-from Workflow.models import Workflow, Batch, Node
+from Workflow.models import Workflow, Stage, Task
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 
@@ -10,39 +10,39 @@ class Test_Workflow(TestCase):
     def tearDown(self):
         self.wF.delete()
         
-    def test_no_duplicate_batch_names(self):
-        self.wF.add_batch(name='Test_Batch')
+    def test_no_duplicate_stage_names(self):
+        self.wF.add_stage(name='Test_Stage')
         #import ipdb; ipdb.set_trace()
-        self.assertRaises(ValidationError,self.wF.add_batch,name='Test_Batch')
+        self.assertRaises(ValidationError,self.wF.add_stage,name='Test_Stage')
         
-    def test_no_duplicate_node_names(self):
-        b = self.wF.add_batch(name='Test_Batch')
-        b.add_node(pre_command='',outputs='',name='test_node')
-        self.assertRaises(ValidationError,b.add_node,pre_command='',outputs='',name='test_node')
+    def test_no_duplicate_task_names(self):
+        b = self.wF.add_stage(name='Test_Stage')
+        b.new_task(pre_command='',outputs='',name='test_task')
+        self.assertRaises(ValidationError,b.new_task,pre_command='',outputs='',name='test_task')
     
     
     def test_one_command(self):
-        b = self.wF.add_batch(name='Test_Batch')
-        b.add_node(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
-        self.wF.run_batch(b)
+        b = self.wF.add_stage(name='Test_Stage')
+        b.new_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
+        self.wF.run_stage(b)
         
     def test_resume(self):
         #run once
-        b = self.wF.add_batch(name='Test_Batch')
-        b.add_node(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
-        self.wF.run_batch(b)
+        b = self.wF.add_stage(name='Test_Stage')
+        b.new_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
+        self.wF.run_stage(b)
  
         #run second time, have to setup again
         self.wF  = Workflow.__resume(name='Test_WF')
-        assert self.wF.batches.count() == 1
+        assert self.wF.stages.count() == 1
         
-        #next command shouldn't __create a new node since it already exists
-        b = self.wF.add_batch(name='Test_Batch')
-        b.add_node(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
+        #next command shouldn't __create a new task since it already exists
+        b = self.wF.add_stage(name='Test_Stage')
+        b.new_task(pre_command='ls / > {output_dir}/{outputs[output_file]}',outputs={'output_file':'myls.out'},name='ls_test1')
         
-        assert self.wF.batches.count() == 1
+        assert self.wF.stages.count() == 1
         #next command should skip execution
-        self.wF.run_batch(b)
+        self.wF.run_stage(b)
          
 
 
@@ -71,19 +71,19 @@ class Test_Workflow(TestCase):
 #    def tearDown(self):
 #        self.JM.close()
 #        
-#    def test_add_node(self):
+#    def test_add_task(self):
 #        echo = Echo(text="test")
 #        echo.save()
 #        cat = Cat()
 #        cat.save()
-#        self.WF.add_node(cat)
-#        self.WF.add_node(echo)
-#        nodes = self.WF.get_nodes()
-#        assert nodes[0] == echo
-#        assert nodes[1] == cat
-#        assert len(nodes) == 2
-#        assert echo in nodes
-#        assert cat in nodes
+#        self.WF.new_task(cat)
+#        self.WF.new_task(echo)
+#        tasks = self.WF.get_tasks()
+#        assert tasks[0] == echo
+#        assert tasks[1] == cat
+#        assert len(tasks) == 2
+#        assert echo in tasks
+#        assert cat in tasks
 #        
 #    
 #    def test_add_edge(self):
@@ -97,12 +97,12 @@ class Test_Workflow(TestCase):
 #        assert edges[0][0] == echo
 #        assert edges[0][1] == cat
 #        assert edges[0][2] == {'source_field': u'output_file', 'destination_field': u'input_file'}
-#        #check nodes
-#        nodes = self.WF.get_nodes()
-#        nodes = self.WF.get_nodes()
-#        assert len(nodes) == 2
-#        assert echo in nodes
-#        assert cat in nodes
+#        #check tasks
+#        tasks = self.WF.get_tasks()
+#        tasks = self.WF.get_tasks()
+#        assert len(tasks) == 2
+#        assert echo in tasks
+#        assert cat in tasks
 #        import ipdb; ipdb.set_trace()
         
     

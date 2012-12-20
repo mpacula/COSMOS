@@ -1,18 +1,18 @@
 from django.contrib import admin
-from models import Batch,Node,Workflow
+from models import Stage,Task,Workflow
 
 
 
-class NodeInline(admin.TabularInline):
-    model = Node
+class TaskInline(admin.TabularInline):
+    model = Task
 
 
-class BatchAdmin(admin.ModelAdmin):
+class StageAdmin(admin.ModelAdmin):
     pass
 #        inlines = [
-#            NodeInline
+#            TaskInline
 #        ]
-admin.site.register(Batch, BatchAdmin)
+admin.site.register(Stage, StageAdmin)
 
 
 
@@ -21,4 +21,4 @@ class WorkflowAdmin(admin.ModelAdmin):
     pass
 admin.site.register(Workflow, WorkflowAdmin)
 
-admin.site.register(Node)
+admin.site.register(Task)

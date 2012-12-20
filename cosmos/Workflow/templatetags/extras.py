@@ -9,13 +9,13 @@ def aslist(o):
     return [o]
 
 @register.simple_tag
-def get_sjob_stat(batch,field,statistic,pipe=None):
-    r = batch.get_sjob_stat(field,statistic)
+def get_sjob_stat(stage,field,statistic,pipe=None):
+    r = stage.get_sjob_stat(field,statistic)
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
 @register.simple_tag
-def get_node_stat(batch,field,statistic,pipe=None):
-    r =  batch.get_node_stat(field,statistic)
+def get_task_stat(stage,field,statistic,pipe=None):
+    r =  stage.get_task_stat(field,statistic)
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
 @register.simple_tag
@@ -29,6 +29,8 @@ def convert2int(x):
 def format_percent(x):
     if x:
         return '{0}%'.format(int(x))
+    elif x == 0:
+        return '0%'
     else: return ''
 
 @register.filter
@@ -104,6 +106,6 @@ def format_memory_mb(mb):
 
 @register.filter
 def format_time(seconds):
-    if seconds == None or seconds == '': return ''
+    if seconds == None or seconds == '': return '0'
     return datetime.timedelta(seconds=int(seconds))
         

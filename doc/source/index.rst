@@ -1,23 +1,27 @@
-.. Cosmos documentation master file, created by
-   sphinx-quickstart on Wed Sep 26 10:43:23 2012.
+Welcome
+=======
 
-Welcome to Cosmos's documentation!
-==================================
+Roughly in order of what you'll want to check out:
 
+* :ref:`introduction` -- What is Cosmos?
+* :ref:`install` -- Installation instructions.
+* :ref:`config` -- Configuration instructions.
+* :ref:`tutorial` -- Workflow examples step by step.
+* :ref:`cli` -- Manage your workflows and database from the command line.
+* :ref:`shell` -- Explore your workflows interactively in an IPython shell.
+* :ref:`API` -- Module API.
 
 .. toctree::
-   :numbered:
-   :maxdepth: 2
+   :maxdepth: 1
+   :hidden:
    
-   intro
+   introduction
    install
    config
-   getting_started.rst
-   first_workflow.rst
-   advanced_workflows.rst
+   tutorial/index
    cli
    shell
-   API/api.rst
+   API/index
    glossary
 
 Indices and tables

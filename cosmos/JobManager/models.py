@@ -3,7 +3,7 @@ import os,re,json,time,sys
 from picklefield.fields import PickledObjectField
 from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
-from cosmos.Cosmos.helpers import check_and_create_output_dir,spinning_cursor
+from cosmos.Cosmos.helpers import check_and_create_output_dir,spinning_cursor,enable_stderr,disable_stderr
 from cosmos import session
 from django.utils import timezone
 import drmaa
@@ -22,23 +22,13 @@ decode_drmaa_state = SortedDict([
         ]) #this is a sorted dictionary
 
 
-#real_stdout = os.dup(1)
-real_stderr = os.dup(2)
-#devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
-devnull = os.open('/dev/null', os.O_WRONLY)
-def disable_stderr():
-    sys.stderr.flush()
-    os.dup2(devnull,2)
-def enable_stderr():
-    sys.stderr.flush()
-    os.dup2(real_stderr,2)
   
 class JobStatusError(Exception):
     pass
        
 class JobAttempt(models.Model):
     """
-    An attempt at running a node.
+    An attempt at running a task.
     """
     queue_status_choices = (
         ('not_queued','JobAttempt has not been submitted to the JobAttempt Queue yet'),
@@ -142,9 +132,9 @@ class JobAttempt(models.Model):
         super(JobAttempt,self).__init__(*args,**kwargs)
         
     @property
-    def node(self):
-        "This job's node"
-        return self.node_set.get()
+    def task(self):
+        "This job's task"
+        return self.task_set.get()
 
     @staticmethod
     def profile_fields_as_list():
@@ -200,7 +190,6 @@ class JobAttempt(models.Model):
         self.jobTemplate.jobName = 'ja-'+self.jobName
         self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stdout'.format(self.id))
         self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stderr'.format(self.id))
-        self.jobTemplate.blockEmail = True
         self.jobTemplate.nativeSpecification = self.drmaa_native_specification
         #create dir if doesn't exist
         check_and_create_output_dir(self.drmaa_output_dir)
@@ -325,7 +314,6 @@ class JobManager(models.Model):
     def __init__(self,*args,**kwargs):
         kwargs['created_on'] = timezone.now()
         super(JobManager,self).__init__(*args,**kwargs)
-    
             
 #    def close_session(self):
 #        #TODO delete all jobtemplates
@@ -337,7 +325,11 @@ class JobManager(models.Model):
 #        
     def terminate_jobAttempt(self,jobAttempt):
         "Terminates a jobAttempt"
-        session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+        try:
+            session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+            return True
+        except drmaa.errors.InternalException:
+            False
 
     def __create_command_sh(self,jobAttempt):
         """Create a sh script that will execute command"""

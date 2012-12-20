@@ -1,4 +1,6 @@
+.idea
 .gitignore
+.spyderproject
 .pydevproject
 *.*~
 quickCommit.bash
@@ -8,7 +10,6 @@ lsync.conf*
 .git/
 build/
 doc/build
-my_workflows/gatk/data/
 .metadata/
 migrations/
 .settings/
