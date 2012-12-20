@@ -121,7 +121,8 @@ class Tool(object):
         input_files = { }
         try:
             for i in self.inputs:
-                input_files[i] = map(lambda tf: str(tf),[ p.get_output(i) for p in self.parents ])
+               # input_files[i] = map(lambda tf: str(tf),[ p.get_output(i) for p in self.parents ])
+                input_files[i] = [ p.get_output(i) for p in self.parents ]
                 if self.one_parent:
                     for k in input_files:
                         if len(input_files[k]) == 1: input_files[k] = input_files[k][0]

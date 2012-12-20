@@ -6,6 +6,7 @@ def list2input(l):
 
 class GATK(Tool):
     time_req = 5*60
+    mem_req = 5*1024
 
     @property
     def bin(self):
@@ -13,10 +14,33 @@ class GATK(Tool):
     
 class Picard(Tool):
     time_req = 120
+    mem_req = 2*1024
 
     @property
     def bin(self):
         return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req/2),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
+
+class BamToFastq(Picard):
+    inputs = ['bam']
+#    outputs = ['dir']
+    one_parent = True
+    time_req = 4*60
+
+    jar = 'SamToFastq.jar'
+
+    def cmd(self,i,t,s,p):
+        import re
+        from cosmos.Cosmos import helpers
+        out_dir = os.path.join(os.path.dirname(i['bam'].path),re.search('NA\d+',i['bam'].path).group())
+        helpers.check_and_create_output_dir(out_dir)
+        return r"""
+            {self.bin}
+            INPUT={i[bam]}
+            OUTPUT_DIR={out_dir}
+            OUTPUT_PER_RG=true
+            VALIDATION_STRINGENCY=LENIENT
+        """, { 'out_dir':out_dir}
+
 
 
 class ALN(Tool):

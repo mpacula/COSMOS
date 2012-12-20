@@ -50,7 +50,7 @@ class TaskFile(models.Model):
             try:
                 self.fmt = re.search('.+\.(.+?)$',self.path).group(1)
             except AttributeError as e:
-                raise AttributeError('{0}. probably malformed path which == {1}'.format(e,self.path))
+                raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
         if not self.name and self.fmt:
             self.name = self.fmt
         self.tmp_id = get_tmp_id()
@@ -552,12 +552,12 @@ class Workflow(models.Model):
         numAttempts = task.jobAttempts.count()
         if not task.successful: #ReRun jobAttempt
             if numAttempts < self.max_reattempts:
-                self.log.warning("JobAttempt {0} of task {1} failed, on attempt # {2}, so deleting failed output files and retrying".format(failed_jobAttempt, task,numAttempts))
+                self.log.warning("{0} of {1} failed, on attempt # {2}, so deleting failed output files and retrying.\nSTDERR: {3}".format(failed_jobAttempt, task,numAttempts,failed_jobAttempt.STDERR_txt))
                 os.system('rm -rf {0}/*'.format(task.job_output_dir))
                 self._run_task(task)
                 return True
             else:
-                self.log.warning("Task {0} has reached max_reattempts of {0}.  This task has failed".format(self, self.max_reattempts))
+                self.log.warning("{0} has failed and reached max_reattempts of {1}.\nSTDERR: {2}".format(self, self.max_reattempts,failed_jobAttempt.STDERR_txt))
                 self.status = 'failed'
                 self.save()
                 return False
