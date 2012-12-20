@@ -17,6 +17,7 @@ from settings import settings
 ####################
 
 indir = '/groups/lpm/erik/WGA/ngs_data/CEU_WGS_Trio'
+indir = '/cosmos/WGA/bundle/2.2/b37/'
 
 dag_inputs = [ INPUT(tags={'i':i+1},output_path=os.path.join(indir,p)) for i,p in enumerate(filter(lambda f: f[-4:] == '.bam', os.listdir(indir))) ]
 dag = (DAG()

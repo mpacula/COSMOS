@@ -509,6 +509,8 @@ class Workflow(models.Model):
         for f in task.output_files:
             if not f.path:
                 f.path = os.path.join(task.job_output_dir,'{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt))
+                if f.fmt == 'dir':
+                    os.mkdir(f.path)
                 f.save()
         
         #Replace TaskFile hashes with their paths        

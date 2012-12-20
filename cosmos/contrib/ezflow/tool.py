@@ -25,7 +25,8 @@ class Tool(object):
     :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
     :property dag: The dag that is keeping track of this Tool
     :property id: A unique identifier.  Useful for debugging.
-    :property output_files: This Tool's TaskFiles
+    :property input_files: This Tool's input TaskFiles
+    :property output_files: This Tool's output TaskFiles
     :property tags: This Tool's tags
     :property inputs: a list of input names, must be specified by user
     :property outputs: a list of output names, must be specified by user
