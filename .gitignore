@@ -1,3 +1,4 @@
+.idea
 .gitignore
 .spyderproject
 .pydevproject
@@ -9,7 +10,6 @@ lsync.conf*
 .git/
 build/
 doc/build
-my_workflows/gatk/data/
 .metadata/
 migrations/
 .settings/
