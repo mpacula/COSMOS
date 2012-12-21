@@ -10,6 +10,7 @@ home_path = os.environ['COSMOS_HOME_PATH']
 default_root_output_dir = '/tmp/cosmos_out' # The directory to output all files to
 DRM = 'GE' #LSF, or GE
 tmp_dir = '/tmp'
+default_queue = None #Default Queue name to use if a workflow's default_queue is set to None.
 
 ########################
 # Web interface

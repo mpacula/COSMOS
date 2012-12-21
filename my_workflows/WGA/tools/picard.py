@@ -7,7 +7,7 @@ class GATK(Tool):
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req/2))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req))
     
 class Picard(Tool):
     time_req = 120
@@ -15,7 +15,7 @@ class Picard(Tool):
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req/2),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
 
 
 class FIXMATE(Picard):
@@ -24,6 +24,7 @@ class FIXMATE(Picard):
     outputs = ['bam']
     one_parent = True
     time_req = 4*60
+    mem_req = 5*1024
 
     jar = 'FixMateInformation.jar'
 
@@ -32,7 +33,6 @@ class FIXMATE(Picard):
             {self.bin}
             INPUT={i[bam]}
             OUTPUT=$OUT.bam
-            OUTPUT_PER_RG=true
             VALIDATION_STRINGENCY=LENIENT
         """
 
@@ -41,6 +41,7 @@ class BAM2FASTQ(Picard):
     outputs = ['dir']
     one_parent = True
     time_req = 4*60
+    mem_req = 8*1024
 
     jar = 'SamToFastq.jar'
 

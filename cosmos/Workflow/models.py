@@ -175,7 +175,7 @@ class Workflow(models.Model):
             wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue)
         
         #remove stale objects
-        wf._delete_stale_objects()
+        #wf._delete_stale_objects_depr()
         
         #terminate on ctrl+c
         def ctrl_c(signal,frame):
@@ -302,16 +302,16 @@ class Workflow(models.Model):
                 
         b, created = Stage.objects.get_or_create(workflow=self,name=name)
         if created:
-            self.log.info('Creating {0} from scratch.'.format(b))
+            self.log.info('Creating {0}.'.format(b))
         else:
-            self.log.info('{0} already exists, loading it from history...'.format(b))
+            self.log.info('Loading {0}.'.format(b))
             self.finished_on = None #reloading, so reset this
             
         b.order_in_workflow = order_in_workflow
         b.save()
         return b
 
-    def _delete_stale_objects(self):
+    def _delete_stale_objects_depr(self):
         """
         Deletes objects that are stale from the database.  This should only happens when the program exists ungracefully.
         """
@@ -510,7 +510,7 @@ class Workflow(models.Model):
             if not f.path:
                 f.path = os.path.join(task.job_output_dir,'{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt))
                 if f.fmt == 'dir':
-                    os.mkdir(f.path)
+                    check_and_create_output_dir(f.path)
                 f.save()
         
         #Replace TaskFile hashes with their paths        
@@ -530,7 +530,7 @@ class Workflow(models.Model):
                                                                              mem_req=task.memory_requirement,
                                                                              cpu_req=task.cpu_requirement,
                                                                              time_req=task.time_requirement,
-                                                                             queue=self.default_queue))
+                                                                             queue=self.default_queue if self.default_queue else session.settings.default_queue))
         
         task._jobAttempts.add(jobAttempt)
         if self.dry_run:
