@@ -7,6 +7,8 @@ from tool import INPUT
 from picklefield.fields import dbsafe_decode
 import textwrap
 
+import collections
+
 class DAGError(Exception): pass
 
 class DAG(object):
@@ -52,22 +54,45 @@ class DAG(object):
     def add_to_workflow(self,WF):
         #add new tasks and related objects to WF
         WF.log.info('Adding tasks to workflow.')
+
         
         #Validation
         taskfiles = list(it.chain(*[ n.output_files for n in self.G.nodes() ]))
+        #check paths
         v = map(lambda tf: tf.path,taskfiles)
         v = filter(lambda x:x,v)
         if len(map(lambda t: t,v)) != len(map(lambda t: t,set(v))):
             import pprint
             raise DAGError('Multiple taskfiles refer to the same path.  Paths should be unique. taskfile.paths are:{0}'.format(pprint.pformat(sorted(v))))
-        
+        #check output_file relationships
+        for t in self.G.nodes():
+            print t
+            print t.output_files
+            print '*'*72
+#        if hasattr(collections,'Counter'):
+        import pprint
+        pprint.pprint(sorted(taskfiles))
+#            for dupe in dupes:
+#                for tool in self.G.nodes():
+#                    if dupe in tool.output_files:
+#                        print tool.output_files.index(dupe)
+#                        print tool.output_files.index(dupe) == dupe
+#                        print tool
+#                        print tool.output_files
+#                        print tool.output_files[0]
+#                        print dupe
+#                        print dupe in tool.output_files
+#                        print '*'*72
+#                print dupe
+#            raise DAGError('Multiple task reference the following taskfiles as their outputs: {0}'.format(dupes))
+
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
         for tool in nx.topological_sort(self.G):
-                stage_name = tool.stage_name
-                if stage_name not in stages: #have not seen this stage yet
-                    stages[stage_name] = WF.add_stage(stage_name)
-                tool.stage = stages[stage_name]
+            stage_name = tool.stage_name
+            if stage_name not in stages: #have not seen this stage yet
+                stages[stage_name] = WF.add_stage(stage_name)
+            tool.stage = stages[stage_name]
         
         #update tool._task_instance and tool._output_files with existing data
         stasks = list(WF.tasks.select_related('_output_files','stage'))
@@ -88,6 +113,7 @@ class DAG(object):
         #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs.
         #Must come before adding tasks, since taskfile.ids must be populated to compute the proper pcmd.
         taskfiles = list(it.chain(*[ n.output_files for n in new_nodes ]))
+
         WF.bulk_save_task_files(taskfiles)
         
         #bulk save tasks
@@ -117,7 +143,8 @@ class DAG(object):
                                   mem_req = tool.mem_req,
                                   cpu_req = tool.cpu_req,
                                   time_req = tool.time_req,
-                                  NOOP = tool.NOOP)
+                                  NOOP = tool.NOOP,
+                                  succeed_on_failure = tool.succeed_on_failure)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e,tool))
             

@@ -48,14 +48,20 @@ class TaskFile(models.Model):
         r = super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
             try:
-                self.fmt = re.search('.+\.(.+?)$',self.path).group(1)
+                p = self.path[:-3] if self.path[-3:] == '.gz' else self.path
+                self.fmt = re.search('.+\.(.+?)$',p).group(1)
             except AttributeError as e:
                 raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
         if not self.name and self.fmt:
             self.name = self.fmt
         self.tmp_id = get_tmp_id()
         return r
-        
+
+    @property
+    def task(self):
+        "The task this TaskFile is an output for"
+        return Task.objects.get(_output_files__in = [self])
+
     @property
     def sha1sum(self):
         return hashlib.sha1(file(self.path).read())
@@ -78,6 +84,7 @@ class Workflow(models.Model):
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
+    delete_intermediaries = models.BooleanField(default=False,help_text="Delete intermediary files")
     
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
@@ -145,7 +152,8 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
     
     @staticmethod
-    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None, default_queue=None):
+    @transaction.commit_on_success
+    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None, default_queue=None, delete_intermediaries = False):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
         
@@ -155,6 +163,7 @@ class Workflow(models.Model):
         :param dry_run: (bool) Don't actually execute jobs. Optional.
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
+        :param delete_intermediaries: (str) Delete intermediary files.
         """
         
         if name is None:
@@ -165,17 +174,18 @@ class Workflow(models.Model):
             root_output_dir = session.settings.default_root_output_dir
             
         if restart:
-            wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
+            wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediaries=delete_intermediaries)
         elif Workflow.objects.filter(name=name).count() > 0:
             if delete_unsuccessful:
-                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue)
+                #TODO make sure user didn't try to change unsupported params like root_output_dir when resuming or reloading
+                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediaries=delete_intermediaries)
             else:
-                wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue)
+                wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediaries=delete_intermediaries)
         else:
-            wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue)
+            wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue, delete_intermediaries=delete_intermediaries)
         
         #remove stale objects
-        #wf._delete_stale_objects_depr()
+        wf._delete_stale_objects()
         
         #terminate on ctrl+c
         def ctrl_c(signal,frame):
@@ -188,14 +198,11 @@ class Workflow(models.Model):
         return wf
         
     @staticmethod
-    def __resume(name=None,dry_run=False, default_queue=None):
+    def __resume(name,dry_run, default_queue, delete_intermediaries):
         """
-        Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
-        
-        :param name: (str) A unique name for this workflow
-        :param dry_run: (bool) Don't actually execute jobs. Optional.
-        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
-        :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
+        Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be used by the average user.
+
+        see :py:method:`start` for parameter definitions
         """
 
         if Workflow.objects.filter(name=name).count() == 0:
@@ -204,6 +211,7 @@ class Workflow(models.Model):
         wf.dry_run=dry_run
         wf.finished_on = None
         wf.default_queue=default_queue
+        wf.delete_intermediaries = delete_intermediaries
         
         wf.save()
         wf.log.info('Resuming workflow.')
@@ -211,14 +219,19 @@ class Workflow(models.Model):
         return wf
     
     @staticmethod
-    def __reload(name=None,dry_run=False, default_queue=None):
-        wf = Workflow.__resume(name,dry_run,default_queue)
+    def __reload(name, dry_run, default_queue, delete_intermediaries,prompt_confirm=True):
+        """
+        Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
+
+        see :py:method:`start` for parameter definitions
+        """
+        wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediaries)
         
         #Delete unsuccessful tasks
         utasks = wf.tasks.filter(successful=False)
         num_utasks = len(utasks)
         if num_utasks > 0:
-            if not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
+            if prompt_confirm and not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
                 print "Exiting."
                 sys.exit(1)
             wf.bulk_delete_tasks(utasks)
@@ -228,46 +241,40 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __restart(name=None,root_output_dir=None,dry_run=False,default_queue=None,prompt_confirm=True):
+    def __restart(name,root_output_dir,dry_run,default_queue,delete_intermediaries,prompt_confirm=True):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
-        
-        :param name: (name) A unique name for this workflow. All spaces are converted to underscores. 
-        :param dry_run: (bool) Don't actually execute jobs. Optional.
-        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
-        :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
-        :param prompt_confirm: (bool) If True, will prompt the user for a confirmation before deleting the workflow.
+
+        see :py:method:`start` for parameter definitions
+
         """
         wf_id = None
         if Workflow.objects.filter(name=name).count():
-            if prompt_confirm:
-                if not helpers.confirm("Are you sure you want to restart Workflow '{0}'?  All files will be deleted.".format(name),default=True,timeout=30):
-                    print "Exiting."
-                    sys.exit(1)
+            if prompt_confirm and not helpers.confirm("Are you sure you want to restart Workflow '{0}'?  All files will be deleted.".format(name),default=True,timeout=30):
+                print "Exiting."
+                sys.exit(1)
             old_wf = Workflow.objects.get(name=name)
             wf_id = old_wf.id
             old_wf.delete()
         
-        new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue)
+        new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue,delete_intermediaries=delete_intermediaries)
         
         return new_wf
                 
     @staticmethod
-    def __create(name=None,dry_run=False,root_output_dir=None,_wf_id=None,default_queue=None):
+    def __create(name,dry_run,root_output_dir,default_queue,delete_intermediaries,_wf_id=None):
         """
         Creates a new workflow
-        
-        :param name: (str) A unique name for this workflow
-        :param dry_run: (bool) Don't actually execute jobs. Optional.
-        :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
-        :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
+
+        see :py:method:`start` for parameter definitions
+        :param _wf_id: the ID to use for creating a workflow
         """
         if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
         
-        wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue)
+        wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediaries=delete_intermediaries)
         wf.log.info('Created Workflow {0}.'.format(wf))
         return wf
             
@@ -311,12 +318,15 @@ class Workflow(models.Model):
         b.save()
         return b
 
-    def _delete_stale_objects_depr(self):
+    def _delete_stale_objects(self):
         """
         Deletes objects that are stale from the database.  This should only happens when the program exists ungracefully.
         """
         #TODO implement a catch all exception so that this never happens.  i think i can only do this if scripts are not run directly
-        for ja in JobAttempt.objects.filter(task_set=None): ja.delete()
+        JobAttempt.objects.filter(task_set=None).delete()
+        TaskFile.objects.filter(task_output_set=None).delete()
+        TaskTag.objects.filter(task=None).delete()
+
     
     def terminate(self):
         """
@@ -424,9 +434,12 @@ class Workflow(models.Model):
         self.log.info("Bulk adding {0} TaskFiles...".format(len(taskfiles)))
         m = TaskFile.objects.all().aggregate(models.Max('id'))['id__max']
         id_start =  m + 1 if m else 1
-        for i,t in enumerate(taskfiles): t.id = id_start + i
-        TaskFile.objects.bulk_create(taskfiles)
-        return
+        for i,t in enumerate(taskfiles):
+            t.id = id_start + i
+        try:
+            TaskFile.objects.bulk_create(taskfiles)
+        except IntegrityError as e:
+            return '{0}.  There are probably multiple tasks with the same output files'.format(e)
     
     @transaction.commit_on_success
     def bulk_save_task_edges(self,edges):
@@ -509,9 +522,9 @@ class Workflow(models.Model):
         for f in task.output_files:
             if not f.path:
                 f.path = os.path.join(task.job_output_dir,'{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt))
-                if f.fmt == 'dir':
-                    check_and_create_output_dir(f.path)
                 f.save()
+            if f.fmt == 'dir':
+                check_and_create_output_dir(f.path)
         
         #Replace TaskFile hashes with their paths        
         for m in re.findall('(#F\[(.+?):(.+?):(.+?)\])',task.exec_command):
@@ -589,7 +602,7 @@ class Workflow(models.Model):
         for jobAttempt in self.jobManager.yield_all_queued_jobs():
             task = jobAttempt.task
             #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
-            if jobAttempt.successful:
+            if jobAttempt.successful or task.succeed_on_failure:
                 task._has_finished(jobAttempt)
                 wfDAG.complete_task(task)
                 run_ready_tasks()
@@ -954,7 +967,7 @@ class Stage(models.Model):
         return newtask
         
 
-    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_req=None, NOOP=False, hard_reset=False):
+    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_req=None, NOOP=False, succeed_on_failure = False, hard_reset=False):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
@@ -966,6 +979,7 @@ class Stage(models.Model):
         :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
         :param time_req: (int) Time required in miinutes.  If a job exceeds this requirement, it will likely be killed.
         :param NOOP: (booean) No Operation, this task does not get executed.
+        :param succeed_on_failure: (booean) Succeed even if JobAttempts fails.
         :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
         :returns: A new task instance.  The instance has not been saved to the database.
         """
@@ -980,6 +994,7 @@ class Stage(models.Model):
                        'name':name,
                        'tags':tags,
                        'NOOP': NOOP,
+                       'succeed_on_failure':succeed_on_failure,
                        'pre_command':pcmd,
                        'memory_requirement':mem_req,
                        'cpu_requirement':cpu_req,
@@ -1137,7 +1152,8 @@ class Task(models.Model):
     successful = models.BooleanField(null=False)
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
-    
+    succeed_on_failure = models.BooleanField(default=False, help_text="Task will succeed and workflow will progress even if its JobAttempts fail.")
+
     tags = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
@@ -1260,7 +1276,7 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        if jobAttempt == 'NOOP' or self._jobAttempts.filter(successful=True).count():
+        if jobAttempt == 'NOOP' or jobAttempt.task.succeed_on_failure or self._jobAttempts.filter(successful=True).count():
             self.status = 'successful'
             self.successful = True
             if not jobAttempt == 'NOOP': self.log.info("{0} Successful!".format(self,jobAttempt))        

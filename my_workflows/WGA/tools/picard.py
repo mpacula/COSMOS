@@ -42,6 +42,7 @@ class BAM2FASTQ(Picard):
     one_parent = True
     time_req = 4*60
     mem_req = 8*1024
+    succeed_on_failure = True
 
     jar = 'SamToFastq.jar'
 

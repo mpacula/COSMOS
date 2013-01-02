@@ -2,6 +2,7 @@ from helpers import getcallargs,cosmos_format
 import re
 from cosmos.Workflow.models import TaskFile
 from cosmos.Cosmos.helpers import parse_cmd
+import itertools
 
 i = 0
 def get_id():
@@ -23,14 +24,14 @@ class Tool(object):
     Otherwise, intialize with keyword arguments to make it behave like a regular class.
     
     :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
-    :property dag: The dag that is keeping track of this Tool
-    :property id: A unique identifier.  Useful for debugging.
-    :property input_files: This Tool's input TaskFiles
-    :property output_files: This Tool's output TaskFiles
-    :property tags: This Tool's tags
-    :property inputs: a list of input names, must be specified by user
-    :property outputs: a list of output names, must be specified by user
-    :property default_params: a dictionary of default parameters
+    :property dag: (DAG) The dag that is keeping track of this Tool
+    :property id: (int) A unique identifier.  Useful for debugging.
+    :property input_files: (list) This Tool's input TaskFiles
+    :property output_files: (list) This Tool's output TaskFiles
+    :property tags: (dict) This Tool's tags
+    :property inputs: (list of strs) a list of input names, must be specified by user
+    :property outputs: (list of strs) a list of output names, must be specified by user
+    :property default_params: (dict) a dictionary of default parameters
     """
     NOOP = False #set to True if this Task should never actually be submitted to the Cosmos Workflow
     
@@ -40,6 +41,7 @@ class Tool(object):
     inputs = []
     outputs = []
     forward_input = False
+    succeed_on_failure = False
     one_parent = False
     settings = {}
     parameters = {}
@@ -52,8 +54,8 @@ class Tool(object):
         :param dag: the dag this task belongs to.
         """
         if not hasattr(self,'output_files'): self.output_files = []
-        self.tags = tags
         if not hasattr(self,'__verbose__'): self.__verbose__ = self.__class__.__name__
+        self.tags = tags
         self.stage_name = stage_name if stage_name else self.__verbose__
         self.dag = dag
         
@@ -77,19 +79,27 @@ class Tool(object):
         else:
             return ps[0]
     
-    def get_output(self,name):
+    def get_outputs(self,name):
         """
         Returns a list of output TaskFiles who's name == name.  If list is of size one, return the first element.
         
-        :param name: the name of the output files.
+        :param name: the name of the output files.  If name == '*' then return all outputs
         """
-        outputs = filter(lambda x: x.name == name,self.output_files)
+        if name == '*':
+            outputs = self.output_files
+        else:
+            outputs = filter(lambda x: x.name == name,self.output_files)
+
+        if self.forward_input:
+            try:
+                outputs += self.parent.get_outputs(name)
+            except GetOutputError as e:
+                pass
+
         if len(outputs) == 0:
-            if self.forward_input:
-                return self.parent.get_output(name)
-            else:
-                raise GetOutputError('No output file in {0} with name {1}'.format(self,name))
-        return outputs if len(outputs) >1 else outputs[0]
+            x = [ x.name for x in self.get_outputs('*') ]
+            raise GetOutputError('No output file in {0} with name {1}.  Available output names are {2}'.format(self,name,x))
+        return outputs
     
     def get_output_file_names(self):
         return set(map(lambda x: x.name, self.output_files))
@@ -119,17 +129,17 @@ class Tool(object):
         """
         if not self.inputs:
             return {}
-        input_files = { }
-        try:
-            for i in self.inputs:
-               # input_files[i] = map(lambda tf: str(tf),[ p.get_output(i) for p in self.parents ])
-                input_files[i] = [ p.get_output(i) for p in self.parents ]
-                if self.one_parent:
-                    for k in input_files:
-                        if len(input_files[k]) == 1: input_files[k] = input_files[k][0]
-        except GetOutputError as e:
-            raise GetOutputError("Error in {0}.  {1}".format(self,e))
-        return input_files
+
+        all_inputs = []
+        input_dict = {}
+        for name in self.inputs:
+            for p in self.parents:
+                all_inputs += p.get_outputs(name)
+
+        for input_file in all_inputs:
+            input_dict.setdefault(input_file.name,[]).append(input_file)
+
+        return input_dict
         
         
     @property
@@ -153,7 +163,7 @@ class Tool(object):
         #replace $OUT with taskfile    
         for out_name in re.findall('\$OUT\.([\w]+)',pcmd):
             try:
-                pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
+                pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_outputs(out_name)))
             except KeyError as e:
                 raise KeyError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.get_output_file_names()))
                 
@@ -176,11 +186,17 @@ class INPUT(Tool):
     def __init__(self,*args,**kwargs):
         """
         """
-        output_path=kwargs.pop('output_path',None)
-        output_paths=kwargs.pop('output_paths',[])
+#        output_path=kwargs.pop('output_path',None)
+#        output_paths=kwargs.pop('output_paths',[])
+#        super(INPUT,self).__init__(*args,**kwargs)
+#        if output_path: output_paths.append(output_path)
+#        for fp in output_paths:
+#            tf = TaskFile(path=fp)
+#            self.add_output(tf)
+        taskfile=kwargs.pop('taskfile',None)
+        taskfiles=kwargs.pop('taskfiles',[])
         super(INPUT,self).__init__(*args,**kwargs)
-        if output_path: output_paths.append(output_path)
-        for fp in output_paths:
-            tf = TaskFile(path=fp)
+        if taskfile: taskfiles.append(taskfile)
+        for tf in taskfiles:
             self.add_output(tf)
     

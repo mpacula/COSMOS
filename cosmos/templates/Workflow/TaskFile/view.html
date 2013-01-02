@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{%block content%}
+{% with task=taskfile.task %}
+<ul class="breadcrumb">
+  <li><a href="/">Home</a> <span class="divider">/</span></li>
+  <li><a href="{{task.stage.workflow.url}}">{{task.stage.workflow}}</a> <span class="divider">/</span></li>
+  <li><a href="{{task.stage.url}}">{{task.stage}}</a><span class="divider">/</span></li>
+  <li><a href="{{task.url}}">{{task}}</a><span class="divider">/</span></li>
+  <li class="active">{{taskfile.name}}</li>
+</ul>
+{% endwith %}
+<h1>Viewing File <small>(first .1MB of it)</small></h1>
+<p>
+{{taskfile.name}} : <code>{{taskfile.path}}</code>
+</p>
+<pre class="pre-scrollable">{{output|safe}}</pre>
+{%endblock%}

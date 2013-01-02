@@ -88,9 +88,9 @@ class PR(GATK):
     outputs = ['bam']
     
     def map_inputs(self):
-        input_bams = [p.get_output('bam') for p in self.parent.parents ] 
+        input_bams = [p.get_outputs('bam') for p in self.parent.parents ]
         return {'bam' : input_bams,
-               'recal' : self.parent.get_output('recal')
+               'recal' : self.parent.get_outputs('recal')
               }
     
     def cmd(self,i,t,s,p):
