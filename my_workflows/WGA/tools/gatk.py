@@ -15,6 +15,7 @@ class GATK(Tool):
 class RTC(GATK):
     __verbose__ = "Indel Realigner Target Creator"
     mem_req = 2.5*1024
+    cpu_req = 4
     inputs = ['bam']
     outputs = ['intervals']
     forward_input = True
@@ -56,7 +57,7 @@ class IR(GATK):
     
 class BQSR(GATK):
     __verbose__ = "Base Quality Score Recalibration"
-    cpu_req = 1
+    cpu_req = 4
     mem_req = 2.5*1024
     inputs = ['bam']
     outputs = ['recal']

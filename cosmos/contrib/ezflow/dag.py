@@ -9,9 +9,15 @@ class DAGError(Exception): pass
 
 class DAG(object):
     
-    def __init__(self):
+    def __init__(self,cpu_req_override=False,mem_req_factor=1):
+        """
+        :param: set to an integer to override all task cpu_requirements.  Useful when a :term:`DRM` does not support requesting multiple cpus
+        :param mem_req_factor: multiply all task mem_reqs by this number.
+        """
         self.G = nx.DiGraph()
         self.last_tools = []
+        self.cpu_req_override = cpu_req_override
+        self.mem_req_factor = mem_req_factor
         
     def create_dag_img(self,path):
         dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
@@ -115,8 +121,8 @@ class DAG(object):
                                   tags = tool.tags,
                                   input_files = tool.input_files,
                                   output_files = tool.output_files,
-                                  mem_req = tool.mem_req,
-                                  cpu_req = tool.cpu_req,
+                                  mem_req = tool.mem_req * self.mem_req_factor,
+                                  cpu_req = tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
                                   time_req = tool.time_req,
                                   NOOP = tool.NOOP,
                                   succeed_on_failure = tool.succeed_on_failure)

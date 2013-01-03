@@ -65,7 +65,7 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 # Create DAG
 ####################
 
-dag = (DAG()
+dag = (DAG(mem_req_factor=1.2)
     |Add| inputs
     |Apply| bwa.ALN
     |Reduce| (['sample','lane','chunk'],bwa.SAMPE)

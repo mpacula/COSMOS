@@ -4,7 +4,7 @@ import os
 class ALN(Tool):
     __verbose__ = "Reference Alignment"
     mem_req = 3.5*1024
-    cpu_req = 1 #2
+    cpu_req = 2
     time_req = 100
     forward_input = True
     one_parent = True
@@ -21,7 +21,7 @@ class ALN(Tool):
 class SAMPE(Tool):
     __verbose__ = "Paired End Mapping"
     mem_req = 5*1024
-    cpu_req = 1 #4
+    cpu_req = 1
     time_req = 120
     inputs = ['fastq.gz','sai']
     outputs = ['sam']
