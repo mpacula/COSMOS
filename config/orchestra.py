@@ -6,6 +6,7 @@ default_root_output_dir = '/groups/cbmi/erik/cosmos_out' #orchestra
 default_root_output_dir = '/scratch/esg21/cosmos_out' #orchestra
 DRM = 'LSF'
 tmp_dir='/scratch/esg21/tmp'
+default_queue = "i2b2_unlimited"
 
 DATABASE = {
     'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.

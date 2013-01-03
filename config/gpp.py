@@ -5,6 +5,7 @@ home_path = '/home/ch158749/workspace/Cosmos' #gpp
 default_root_output_dir = '/nas/erik/cosmos_output3' #gpp
 DRM = 'LSF' #LSF, or GE
 tmp_dir = '/nas/erik/tmp'
+default_queue = None
 
 # Web interface settings
 show_stage_file_sizes = False # on some systems, file i/o slows down a lot when running a lot of jobs making this feature very slow

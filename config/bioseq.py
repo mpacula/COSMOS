@@ -5,6 +5,7 @@ home_path = '/home2/erik/workspace/Cosmos' #bioseq
 default_root_output_dir = '/cosmos/output'
 DRM = 'GE'
 tmp_dir = '/mnt/tmp'
+default_queue = None
 
 #starcluster
 DATABASE = {

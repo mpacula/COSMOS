@@ -8,9 +8,10 @@ from cosmos.Workflow.models import Workflow
 from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.tool import INPUT
 import make_data_dict
-from tools import *
+from tools import gatk,picard,bwa
 import json
 from settings import settings
+import os
 
 ####################
 # Input
@@ -58,25 +59,25 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 
 dag = (DAG()
     |Add| inputs
-    |Apply| ALN
-    |Reduce| (['sample','lane','chunk'],SAMPE)
-    |Reduce| (['sample'],MERGE_SAMS)
-    |Apply| CLEAN_SAM
-    |Apply| INDEX_BAM
-    |Split| ([intervals],RTC)
-    |Apply| IR
-    |Reduce| (['sample'],BQSR)
-    |Apply| PR
-    |ReduceSplit| ([],[glm,intervals], UG)
-    |Reduce| (['glm'],CV)
-    |Apply| VQSR
-    |Apply| Apply_VQSR
-    |Reduce| ([],CV,"CV 2")
-#    |Split| ([dbs],ANNOVAR)
-#    |Apply| PROCESS_ANNOVAR
-#    |Reduce| ([],MERGE_ANNOTATIONS)
-#    |Apply| SQL_DUMP
-#    |Apply| ANALYSIS
+    |Apply| bwa.ALN
+    |Reduce| (['sample','lane','chunk'],bwa.SAMPE)
+    |Reduce| (['sample'],picard.MERGE_SAMS)
+    |Apply| picard.CLEAN_SAM
+    |Apply| picard.INDEX_BAM
+    |Split| ([intervals],gatk.RTC)
+    |Apply| gatk.IR
+    |Reduce| (['sample'],gatk.BQSR)
+    |Apply| gatk.PR
+    |ReduceSplit| ([],[glm,intervals], gatk.UG)
+    |Reduce| (['glm'],gatk.CV)
+    |Apply| gatk.VQSR
+    |Apply| gatk.Apply_VQSR
+    |Reduce| ([],gatk.CV,"CV 2")
+#    |Split| ([dbs],annotate.ANNOVAR)
+#    |Apply| annotate.PROCESS_ANNOVAR
+#    |Reduce| ([],annotate.MERGE_ANNOTATIONS)
+#    |Apply| annotate.SQL_DUMP
+#    |Apply| annotate.ANALYSIS
 )
 dag.configure(settings,parameters)
 dag.create_dag_img('/tmp/graph.svg')
