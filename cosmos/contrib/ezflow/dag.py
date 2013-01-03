@@ -2,12 +2,8 @@ from cosmos.Cosmos.helpers import groupby
 import itertools as it
 import networkx as nx
 import pygraphviz as pgv
-from cosmos.Workflow.models import Task,TaskError,TaskFile
-from tool import INPUT
+from cosmos.Workflow.models import Task,TaskError
 from picklefield.fields import dbsafe_decode
-import textwrap
-
-import collections
 
 class DAGError(Exception): pass
 
@@ -64,27 +60,6 @@ class DAG(object):
         if len(map(lambda t: t,v)) != len(map(lambda t: t,set(v))):
             import pprint
             raise DAGError('Multiple taskfiles refer to the same path.  Paths should be unique. taskfile.paths are:{0}'.format(pprint.pformat(sorted(v))))
-        #check output_file relationships
-        for t in self.G.nodes():
-            print t
-            print t.output_files
-            print '*'*72
-#        if hasattr(collections,'Counter'):
-        import pprint
-        pprint.pprint(sorted(taskfiles))
-#            for dupe in dupes:
-#                for tool in self.G.nodes():
-#                    if dupe in tool.output_files:
-#                        print tool.output_files.index(dupe)
-#                        print tool.output_files.index(dupe) == dupe
-#                        print tool
-#                        print tool.output_files
-#                        print tool.output_files[0]
-#                        print dupe
-#                        print dupe in tool.output_files
-#                        print '*'*72
-#                print dupe
-#            raise DAGError('Multiple task reference the following taskfiles as their outputs: {0}'.format(dupes))
 
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
@@ -181,7 +156,7 @@ WF = None
 def infix(func,*args,**kwargs):
     """
     1) If the second argument is a tuple (ie multiple args submitted with infix notation), submit it as *args
-    2) The decorated function should return a genorator, evaluate it
+    2) The decorated function should return a generator, so evaluate it
     3) Set the dag.last_tools to the decorated function's return value
     4) Return the dag
     """

@@ -28,6 +28,15 @@ elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.bioseq':
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/cosmos/WGA/bwa_reference/human_g1k_v37.fasta',
         }
+elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.default':
+    resource_bundle_path = '/cosmos/WGA/bundle/2.2/b37/'
+    tools_dir = '/cosmos/WGA/tools'
+    settings = {
+        'GATK_path' :os.path.join(tools_dir,'GenomeAnalysisTKLite-2.2-16-g2cc9ef8/GenomeAnalysisTKLite.jar'),
+        'Picard_dir' : os.path.join(tools_dir,'picard-tools-1.81'),
+        'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
+        'bwa_reference_fasta_path' : '/cosmos/WGA/bwa_reference/human_g1k_v37.fasta',
+        }
 settings.update({
     'resource_bundle_path' : resource_bundle_path,
     'tmp_dir' : session.settings.tmp_dir,

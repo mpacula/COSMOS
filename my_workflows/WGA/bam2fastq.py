@@ -13,11 +13,11 @@ from settings import settings
 
 
 class GZIP(Tool):
-    inputs = ['*']
+    inputs = ['dir']
     time_req = 60
 
     def cmd(self,i,t,s,p):
-        return "gzip -r {i[*][0]}"
+        return "gzip -r {i[dir]}"
 
 
 ####################

@@ -38,8 +38,8 @@
             <ul class="nav">
               <li class="{% navactive request "home"%}"><a href="/">Home</a></li>
               <li class="{% navactive request "Workflow"%}"><a href="/Workflow/">Workflows</a></li>
-              {%if cosmos_settings.DRM == 'SGE'%}
-              <li class="{% navactive request "SGE"%}"><a href="/SGE/">SGE</a></li>
+              {%if cosmos_settings.DRM == 'GE'%}
+              <li class="{% navactive request "GridEngine"%}"><a href="/GridEngine/">GridEngine</a></li>
               {%endif%}
               {%if cosmos_settings.DRM == 'LSF'%}
               <li class="{% navactive request "LSF"%}"><a href="/LSF/">LSF</a></li>

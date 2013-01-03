@@ -27,7 +27,7 @@ class Tool(object):
     :property dag: (DAG) The dag that is keeping track of this Tool
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
-    :property output_files: (list) This Tool's output TaskFiles
+    :property output_files: (list) This Tool's output TaskFiles.  A tool's output taskfile names should be unique.
     :property tags: (dict) This Tool's tags
     :property inputs: (list of strs) a list of input names, must be specified by user
     :property outputs: (list of strs) a list of output names, must be specified by user
@@ -79,34 +79,33 @@ class Tool(object):
         else:
             return ps[0]
     
-    def get_outputs(self,name):
+    def get_output(self,name):
         """
-        Returns a list of output TaskFiles who's name == name.  If list is of size one, return the first element.
+        Returns the output TaskFiles who's name == name.  This should always be one element.
         
-        :param name: the name of the output files.  If name == '*' then return all outputs
+        :param name: the name of the output file.
         """
-        if name == '*':
-            outputs = self.output_files
-        else:
-            outputs = filter(lambda x: x.name == name,self.output_files)
+        outputs = filter(lambda x: x.name == name,self.output_files)
+        if len(outputs) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self))
 
-        if self.forward_input:
+        if len(outputs) == 0 and self.forward_input:
             try:
-                outputs += self.parent.get_outputs(name)
+                outputs +=  [ self.parent.get_output(name) ]
             except GetOutputError as e:
                 pass
 
         if len(outputs) == 0:
-            x = [ x.name for x in self.get_outputs('*') ]
-            raise GetOutputError('No output file in {0} with name {1}.  Available output names are {2}'.format(self,name,x))
-        return outputs
+            #x = [ x.name for x in self.get_output('*') ]
+            raise GetOutputError('No output file in {0} with name {1}.')
+
+        return outputs[0]
     
     def get_output_file_names(self):
         return set(map(lambda x: x.name, self.output_files))
         
     def add_output(self,taskfile):
         """
-        Adds an output file to this Task
+        Adds an taskfile to self.output_files
         
         :param taskfile: an instance of a TaskFile
         """
@@ -131,13 +130,18 @@ class Tool(object):
             return {}
 
         all_inputs = []
-        input_dict = {}
         for name in self.inputs:
             for p in self.parents:
-                all_inputs += p.get_outputs(name)
+                all_inputs += [ p.get_output(name) ]
 
+        input_dict = {}
         for input_file in all_inputs:
             input_dict.setdefault(input_file.name,[]).append(input_file)
+
+        if self.one_parent:
+            for key in input_dict:
+                if len(input_dict[key]) == 1:
+                    input_dict[key] = input_dict[key][0]
 
         return input_dict
         
@@ -163,7 +167,7 @@ class Tool(object):
         #replace $OUT with taskfile    
         for out_name in re.findall('\$OUT\.([\w]+)',pcmd):
             try:
-                pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_outputs(out_name)))
+                pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
             except KeyError as e:
                 raise KeyError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.get_output_file_names()))
                 

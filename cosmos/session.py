@@ -7,6 +7,8 @@ from django.utils import importlib
 #import Cosmos Settings
 if 'COSMOS_SETTINGS_MODULE' not in os.environ:
     os.environ['COSMOS_SETTINGS_MODULE'] = 'config.default' #default location for settings
+if 'DJANGO_SETTINGS_MODULE' not in os.environ:
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.Cosmos.django_settings' #default location for settings
 
 try:
     settings = importlib.import_module(os.environ['COSMOS_SETTINGS_MODULE'])

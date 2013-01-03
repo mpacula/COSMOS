@@ -1,6 +1,7 @@
 """
 models.py
 """
+from cosmos import session
 from django.db import models, transaction
 from django.db.models import Q,Count
 from django.db.utils import IntegrityError
@@ -10,7 +11,6 @@ from cosmos.Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, 
 from cosmos.Cosmos import helpers
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField, dbsafe_decode
-from cosmos import session
 from django.utils import timezone
 import networkx as nx
 import pygraphviz as pgv
