@@ -288,25 +288,14 @@ class Workflow(models.Model):
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
-        #self.log.info("Adding stage {0}.".format(name))
+
         #determine order in workflow
         m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
         if m is None:
             order_in_workflow = 1
         else:
             order_in_workflow = m+1
-        
-#        stage_exists = Stage.objects.filter(workflow=self,name=name).count()>0
-#        _old_id = None
-#        if stage_exists:
-#            old_stage = Stage.objects.get(workflow=self,name=name)
-#            _old_id = old_stage.id
-#            if old_stage.status == 'failed' or old_stage.status == 'in_progress':
-#                unadded_stages = list(self.stages.filter(order_in_workflow=None)) + [ old_stage ] #TODO filter using DAG, so that only dependent stages are deleted
-#                unadded_stages_str = ', '.join(map(lambda x: x.__str__(), unadded_stages))
-#                if helpers.confirm('{0} has a status of failed.  Would you like to restart the workflow from here?  Answering yes will delete the following stages: {1}. Answering no will only delete and re-run unsuccessful jobs.'.format(old_stage,unadded_stages_str),default=True):
-#                    map(lambda b: b.delete(),unadded_stages)
-                
+
         b, created = Stage.objects.get_or_create(workflow=self,name=name)
         if created:
             self.log.info('Creating {0}.'.format(b))
@@ -344,7 +333,7 @@ class Workflow(models.Model):
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
         
-        stages = Stage.objects.filter(Q(task__in=tasks)|Q(status="in_progress"))
+        stages = Stage.objects.filter(Q(task__in=tasks)&Q(status="in_progress"))
         self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
         stages.update(status = 'failed',finished_on = timezone.now())
         
@@ -422,7 +411,11 @@ class Workflow(models.Model):
                 tasktags.append(TaskTag(task=t,key=k,value=v))
         self.log.info("Bulk adding {0} TaskTags...".format(len(tasktags)))
         TaskTag.objects.bulk_create(tasktags)
-        
+
+        ### Reset status of stages with new tasks
+#        reset_stages_pks = set(map(lambda t: t.stage.pk, tasks))
+#        Stage.objects.filter(id__in=reset_stages_pks).update(status="no_attempt",finished_on=None)
+
         return
     
     @transaction.commit_on_success
@@ -987,7 +980,7 @@ class Stage(models.Model):
         if (pcmd == '' or pcmd) is None and not NOOP:
             raise TaskError('pre_command cannot be blank if NOOP==False')
         
-        #TODO validate that this task has the same tag keys as all other tasks
+        #TODO validate that this task has the same tag keys as all other tasks?
         
         task_kwargs = {
                        'stage':self,
@@ -1010,7 +1003,7 @@ class Stage(models.Model):
                 raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
             task.delete()
     
-        #Just instantiate a task
+        #Instantiate a task
         t= Task(**task_kwargs)
         t.input_files_list = input_files
         t.output_files_list = output_files
@@ -1039,10 +1032,10 @@ class Stage(models.Model):
         if num_tasks_successful == num_tasks:
             self.successful = True
             self.status = 'successful'
-            self.log.info('Stage {0} successful!'.format(self))
+            self.log.info('{0} successful!'.format(self))
         elif num_tasks_failed + num_tasks_successful == num_tasks:
             self.status='failed'
-            self.log.warning('Stage {0} failed!'.format(self))
+            self.log.warning('{0} failed!'.format(self))
         else:
             #jobs are not done so this shouldn't happen
             raise Exception('Stage._has_finished() called, but not all tasks are completed.')

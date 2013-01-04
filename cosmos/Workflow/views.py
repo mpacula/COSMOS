@@ -9,6 +9,7 @@ from django.utils.datastructures import SortedDict
 import os
 from django.views.decorators.cache import never_cache
 from django.utils.safestring import mark_safe
+import math
 
 @never_cache
 def _get_stages_dict(workflow):
