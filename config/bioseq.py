@@ -17,5 +17,17 @@ DATABASE = {
     'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
 }
 
+
+
+########################
+# Web interface
+########################
+
+# on some systems, file i/o slows down a lot when running a lot of jobs making file_size calculations very slow.
+show_stage_file_sizes = True
+show_jobAttempt_file_sizes = True
+show_task_file_sizes = True
+
+
 ### SGE Specific
 parallel_environment_name = 'orte' #the name of the SGE parallel environment name.  Use "qconf -spl" to list available names

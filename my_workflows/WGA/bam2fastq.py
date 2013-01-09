@@ -15,10 +15,19 @@ from settings import settings
 class GZIP(Tool):
     inputs = ['dir']
     time_req = 60
+    one_parent = True
 
     def cmd(self,i,t,s,p):
         return "gzip -r {i[dir]}"
 
+class SplitFastq(Tool):
+    outputs = ['dir']
+    time_req = 120
+    mem_req = 1000
+    one_parent=True
+
+    def cmd(self,i,t,s,p):
+        return "python scripts/splitfastq.py {t[input]} $OUT.dir"
 
 ####################
 # Create DAG
@@ -37,13 +46,22 @@ dag_inputs = [ INPUT(tags={'i':i+1},output_path=os.path.join(indir,p)) for i,p i
 dag = (DAG()
         |Add| dag_inputs
         |Apply| picard.BAM2FASTQ
-        |Apply| GZIP
+        #|Apply| GZIP
     )
 dag.configure(settings=settings)
 
 #################
 # Run Workflow
 #################
+
+dag.add_to_workflow(WF)
+WF.run(finish=False)
+
+#Split Fastqs
+for input_tool in filter(lambda tool: tool.__class__.__name__ == 'BAM2FASTQ',dag.G.nodes()):
+    input_dir = WF.stages.get(name='BAM2FASTQ').tasks.get(tags=input_tool.tags).output_files[0].path
+    for fq in os.listdir(input_dir):
+        dag.G.add_edge(input_tool,SplitFastq(dag=dag,tags={'input':os.path.join(input_dir,fq)}))
 
 dag.add_to_workflow(WF)
 WF.run()

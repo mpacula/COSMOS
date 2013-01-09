@@ -54,13 +54,14 @@ parameters = {
 }
 
 # Tags
-intervals = ('interval',[2,3])
+intervals = ('interval',range(1,23)+['X','Y'])
 glm = ('glm',['SNP','INDEL'])
 dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 
 ####################
 # Create DAG
 ####################
+
 
 dag = (DAG(mem_req_factor=1)
     |Add| inputs

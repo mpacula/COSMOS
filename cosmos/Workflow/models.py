@@ -237,6 +237,7 @@ class Workflow(models.Model):
             wf.bulk_delete_tasks(utasks)
             #delete empty stages
             Stage.objects.filter(pk__in=map(lambda d:d['id'],filter(lambda d:d['task__count'] == 0,Stage.objects.annotate(Count('task')).values('id','task__count')))).delete()
+            #.update(started_on=None,successful=False,status='no_attempt',finished_on=None)
         
         return wf
 
@@ -571,7 +572,7 @@ class Workflow(models.Model):
                 return False
 
 
-    def run(self,terminate_on_fail=False):
+    def run(self,terminate_on_fail=False,finish=True):
         """
         Runs a workflow using the DAG of jobs
         
@@ -606,7 +607,7 @@ class Workflow(models.Model):
                         self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
                         self.terminate()
                     
-        self.finished()
+        if finish: self.finished()
         return
     
     def finished(self):
@@ -960,7 +961,7 @@ class Stage(models.Model):
         return newtask
         
 
-    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_req=None, NOOP=False, succeed_on_failure = False, hard_reset=False):
+    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, on_success = None, mem_req=0, cpu_req=1, time_req=None, NOOP=False, succeed_on_failure = False, hard_reset=False):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
@@ -968,6 +969,7 @@ class Stage(models.Model):
         :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
         :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
         :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
+        :param on_success: (method) A method to run when this task succeeds.  Method is called with one parameter named 'task', the successful task.
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
         :param time_req: (int) Time required in miinutes.  If a job exceeds this requirement, it will likely be killed.
@@ -986,6 +988,7 @@ class Stage(models.Model):
                        'stage':self,
                        'name':name,
                        'tags':tags,
+                       #'on_success':on_success,
                        'NOOP': NOOP,
                        'succeed_on_failure':succeed_on_failure,
                        'pre_command':pcmd,
@@ -1148,6 +1151,7 @@ class Task(models.Model):
     succeed_on_failure = models.BooleanField(default=False, help_text="Task will succeed and workflow will progress even if its JobAttempts fail.")
 
     tags = PickledObjectField(null=False)
+    #on_success = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     

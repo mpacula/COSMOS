@@ -56,7 +56,6 @@ class DAG(object):
     def add_to_workflow(self,WF):
         #add new tasks and related objects to WF
         WF.log.info('Adding tasks to workflow.')
-
         
         #Validation
         taskfiles = list(it.chain(*[ n.output_files for n in self.G.nodes() ]))
