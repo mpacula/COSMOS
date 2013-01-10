@@ -33,3 +33,8 @@ DATABASE = {
     'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
     'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
 }
+
+
+
+### SGE Specific
+parallel_environment_name = 'orte' #the name of the SGE parallel environment name.  Use "qconf -spl" to list available names

@@ -237,6 +237,7 @@ class Workflow(models.Model):
             wf.bulk_delete_tasks(utasks)
             #delete empty stages
             Stage.objects.filter(pk__in=map(lambda d:d['id'],filter(lambda d:d['task__count'] == 0,Stage.objects.annotate(Count('task')).values('id','task__count')))).delete()
+            #.update(started_on=None,successful=False,status='no_attempt',finished_on=None)
         
         return wf
 
@@ -288,25 +289,14 @@ class Workflow(models.Model):
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
-        #self.log.info("Adding stage {0}.".format(name))
+
         #determine order in workflow
         m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
         if m is None:
             order_in_workflow = 1
         else:
             order_in_workflow = m+1
-        
-#        stage_exists = Stage.objects.filter(workflow=self,name=name).count()>0
-#        _old_id = None
-#        if stage_exists:
-#            old_stage = Stage.objects.get(workflow=self,name=name)
-#            _old_id = old_stage.id
-#            if old_stage.status == 'failed' or old_stage.status == 'in_progress':
-#                unadded_stages = list(self.stages.filter(order_in_workflow=None)) + [ old_stage ] #TODO filter using DAG, so that only dependent stages are deleted
-#                unadded_stages_str = ', '.join(map(lambda x: x.__str__(), unadded_stages))
-#                if helpers.confirm('{0} has a status of failed.  Would you like to restart the workflow from here?  Answering yes will delete the following stages: {1}. Answering no will only delete and re-run unsuccessful jobs.'.format(old_stage,unadded_stages_str),default=True):
-#                    map(lambda b: b.delete(),unadded_stages)
-                
+
         b, created = Stage.objects.get_or_create(workflow=self,name=name)
         if created:
             self.log.info('Creating {0}.'.format(b))
@@ -344,7 +334,7 @@ class Workflow(models.Model):
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
         
-        stages = Stage.objects.filter(Q(task__in=tasks)|Q(status="in_progress"))
+        stages = Stage.objects.filter(task__in=tasks)
         self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
         stages.update(status = 'failed',finished_on = timezone.now())
         
@@ -422,7 +412,11 @@ class Workflow(models.Model):
                 tasktags.append(TaskTag(task=t,key=k,value=v))
         self.log.info("Bulk adding {0} TaskTags...".format(len(tasktags)))
         TaskTag.objects.bulk_create(tasktags)
-        
+
+        ### Reset status of stages with new tasks
+#        reset_stages_pks = set(map(lambda t: t.stage.pk, tasks))
+#        Stage.objects.filter(id__in=reset_stages_pks).update(status="no_attempt",finished_on=None)
+
         return
     
     @transaction.commit_on_success
@@ -578,7 +572,7 @@ class Workflow(models.Model):
                 return False
 
 
-    def run(self,terminate_on_fail=False):
+    def run(self,terminate_on_fail=False,finish=True):
         """
         Runs a workflow using the DAG of jobs
         
@@ -613,7 +607,7 @@ class Workflow(models.Model):
                         self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
                         self.terminate()
                     
-        self.finished()
+        if finish: self.finished()
         return
     
     def finished(self):
@@ -967,7 +961,7 @@ class Stage(models.Model):
         return newtask
         
 
-    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, mem_req=0, cpu_req=1, time_req=None, NOOP=False, succeed_on_failure = False, hard_reset=False):
+    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, on_success = None, mem_req=0, cpu_req=1, time_req=None, NOOP=False, succeed_on_failure = False, hard_reset=False):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
@@ -975,6 +969,7 @@ class Stage(models.Model):
         :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
         :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
         :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
+        :param on_success: (method) A method to run when this task succeeds.  Method is called with one parameter named 'task', the successful task.
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
         :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
         :param time_req: (int) Time required in miinutes.  If a job exceeds this requirement, it will likely be killed.
@@ -987,12 +982,13 @@ class Stage(models.Model):
         if (pcmd == '' or pcmd) is None and not NOOP:
             raise TaskError('pre_command cannot be blank if NOOP==False')
         
-        #TODO validate that this task has the same tag keys as all other tasks
+        #TODO validate that this task has the same tag keys as all other tasks?
         
         task_kwargs = {
                        'stage':self,
                        'name':name,
                        'tags':tags,
+                       #'on_success':on_success,
                        'NOOP': NOOP,
                        'succeed_on_failure':succeed_on_failure,
                        'pre_command':pcmd,
@@ -1010,7 +1006,7 @@ class Stage(models.Model):
                 raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
             task.delete()
     
-        #Just instantiate a task
+        #Instantiate a task
         t= Task(**task_kwargs)
         t.input_files_list = input_files
         t.output_files_list = output_files
@@ -1039,10 +1035,10 @@ class Stage(models.Model):
         if num_tasks_successful == num_tasks:
             self.successful = True
             self.status = 'successful'
-            self.log.info('Stage {0} successful!'.format(self))
+            self.log.info('{0} successful!'.format(self))
         elif num_tasks_failed + num_tasks_successful == num_tasks:
             self.status='failed'
-            self.log.warning('Stage {0} failed!'.format(self))
+            self.log.warning('{0} failed!'.format(self))
         else:
             #jobs are not done so this shouldn't happen
             raise Exception('Stage._has_finished() called, but not all tasks are completed.')
@@ -1155,6 +1151,7 @@ class Task(models.Model):
     succeed_on_failure = models.BooleanField(default=False, help_text="Task will succeed and workflow will progress even if its JobAttempts fail.")
 
     tags = PickledObjectField(null=False)
+    #on_success = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
     

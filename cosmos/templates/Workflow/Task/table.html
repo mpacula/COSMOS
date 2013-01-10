@@ -33,7 +33,7 @@
         <th>Parents</th>
         <th>Status</th>
         <th>Wall Time</th>
-        <th>File_Size</th>
+        <th>Output File Size</th>
         <th>Job Attempts</th>
     </tr>
     {% for task in paged_tasks %}
@@ -53,7 +53,7 @@
                 {{task.wall_time|format_time}}
             </td>
             <td>
-                {%if settings.show_task_file_sizes%}{{task.file_size}}{%else%}off{%endif%}
+                {%if cosmos_settings.show_task_file_sizes%}{{task.file_size}}{%else%}off{%endif%}
             </td>
             <td>
                 {% for j in task.jobAttempts %}

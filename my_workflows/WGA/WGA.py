@@ -1,7 +1,6 @@
 """
 WGA Workflow
 """
-from my_workflows.WGA.inputs import batch1
 
 _author_ = 'Erik Gafni'
 
@@ -36,6 +35,7 @@ if 'inputs' not in locals():
     if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.default':
         data_dict = [{u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R1_001.fastq.gz'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R2_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R1_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R2_001.fastq.gz'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R1_001.fastq.gz'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R2_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R1_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R2_001.fastq.gz'}]
     else:
+        from my_workflows.WGA.inputs import batch1
         data_dict = json.loads(batch1.main(input_dir=indir,depth=1))
 
     inputs = []
@@ -48,16 +48,13 @@ if 'inputs' not in locals():
 # Configuration
 ####################
 
-
-
-
 #parameter keywords can be the name of the tool class, or its default __verbose__
 parameters = {
   'ALN': { 'q': 5 },
 }
 
 # Tags
-intervals = ('interval',[2,3])
+intervals = ('interval',range(1,23)+['X','Y'])
 glm = ('glm',['SNP','INDEL'])
 dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 
@@ -65,10 +62,11 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 # Create DAG
 ####################
 
-dag = (DAG(mem_req_factor=1.2)
+
+dag = (DAG(mem_req_factor=1)
     |Add| inputs
     |Apply| bwa.ALN
-    |Reduce| (['sample','lane','chunk'],bwa.SAMPE)
+    |Reduce| (['sample','flowcell','lane','chunk'],bwa.SAMPE)
     |Reduce| (['sample'],picard.MERGE_SAMS)
     |Apply| picard.CLEAN_SAM
     |Apply| picard.INDEX_BAM
@@ -93,6 +91,7 @@ dag.create_dag_img('/tmp/graph.svg')
 #################
 # Run Workflow
 #################
-WF = Workflow.start(wf_name,restart=True)
+
+WF = Workflow.start(wf_name,restart=False)
 dag.add_to_workflow(WF)
 WF.run()

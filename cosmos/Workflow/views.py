@@ -9,6 +9,7 @@ from django.utils.datastructures import SortedDict
 import os
 from django.views.decorators.cache import never_cache
 from django.utils.safestring import mark_safe
+import math
 
 @never_cache
 def _get_stages_dict(workflow):
@@ -126,7 +127,7 @@ def taskfile_view(request,tfid):
         if output.strip() == '': output = 'Empty Directory'
 
     else:
-        output = file(tf.path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
+        output = file(tf.path,'rb').read(int(math.pow(2,30))) #read at most 100kb
     return render_to_response('Workflow/TaskFile/view.html', { 'request':request,'taskfile': tf, 'output':output, 'jobAttempt':None }, context_instance=RequestContext(request))
 
 

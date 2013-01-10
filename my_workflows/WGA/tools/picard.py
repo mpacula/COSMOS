@@ -1,21 +1,13 @@
 from cosmos.contrib.ezflow.tool import Tool
 import os
 
-class GATK(Tool):
-    time_req = 5*60
-    mem_req = 5*1024
-
-    @property
-    def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req))
-    
 class Picard(Tool):
     time_req = 120
     mem_req = 2*1024
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req*.9),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
 
 
 class FIXMATE(Picard):
@@ -40,7 +32,7 @@ class BAM2FASTQ(Picard):
     inputs = ['bam']
     outputs = ['dir']
     one_parent = True
-    time_req = 4*60
+    time_req = 12*60
     mem_req = 8*1024
     succeed_on_failure = True
 

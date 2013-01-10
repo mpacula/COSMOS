@@ -26,6 +26,7 @@
         <th>Started</th>
         <th>Finished</th>
         {% endif %}
+        <th>Output File Size</th>
     </tr>
     {% for stage in stages %}
         <tr onclick="window.location.href = '{{stage.url}}';" style="cursor:pointer">
@@ -61,6 +62,7 @@
            <td>{{stage.started_on|date:"SHORT_DATETIME_FORMAT"}}</td>
            <td>{{stage.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
             {% endif %}
+            <td>{%if cosmos_settings.show_stage_file_sizes%}{{stage.file_size}}{%else%}off{%endif%}</td>
         </tr>
     {% endfor %}
     </tbody>

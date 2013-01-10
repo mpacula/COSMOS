@@ -11,8 +11,8 @@ ipython
 
 #optional
 pygraphviz
+south
 
-#South
 #django-debug-toolbar
 #gunicorn
 #django-pdb

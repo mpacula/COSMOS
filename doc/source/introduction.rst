@@ -3,7 +3,7 @@
 Introduction
 ============
 
-Cosmos is a workflow management system for Python.  It allows you to efficiently program complex workflows of command line tools that take
+Cosmos is a workflow management system for Python.  It allows you to efficiently program complex workflows of command line tools that automatically take
 advantage of a compute cluster, and provides a web interface to monitor, debug, and analyze your jobs.
 
 Features

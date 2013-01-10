@@ -183,6 +183,7 @@ class Tool(object):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
     
 class INPUT(Tool):
+    __verbose__ = "Load Input Files"
     NOOP = True
     mem_req = 0
     cpu_req = 0
@@ -190,16 +191,17 @@ class INPUT(Tool):
     def __init__(self,*args,**kwargs):
         """
         """
-#        output_path=kwargs.pop('output_path',None)
-#        output_paths=kwargs.pop('output_paths',[])
-#        super(INPUT,self).__init__(*args,**kwargs)
-#        if output_path: output_paths.append(output_path)
-#        for fp in output_paths:
-#            tf = TaskFile(path=fp)
-#            self.add_output(tf)
+        output_path=kwargs.pop('output_path',None)
+        output_paths=kwargs.pop('output_paths',[])
         taskfile=kwargs.pop('taskfile',None)
         taskfiles=kwargs.pop('taskfiles',[])
         super(INPUT,self).__init__(*args,**kwargs)
+
+        if output_path: output_paths.append(output_path)
+        for fp in output_paths:
+            tf = TaskFile(path=fp)
+            self.add_output(tf)
+
         if taskfile: taskfiles.append(taskfile)
         for tf in taskfiles:
             self.add_output(tf)
