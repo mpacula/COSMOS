@@ -42,6 +42,7 @@ class Tool(object):
     outputs = []
     forward_input = False
     succeed_on_failure = False
+    dont_delete_output_files = False
     one_parent = False
     settings = {}
     parameters = {}

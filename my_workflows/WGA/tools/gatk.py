@@ -10,7 +10,7 @@ class GATK(Tool):
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req/2))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req*.8))
 
 class RTC(GATK):
     __verbose__ = "Indel Realigner Target Creator"
@@ -58,7 +58,7 @@ class IR(GATK):
 class BQSR(GATK):
     __verbose__ = "Base Quality Score Recalibration"
     cpu_req = 1
-    mem_req = 6*1024
+    mem_req = 9*1024
     inputs = ['bam']
     outputs = ['recal']
 
@@ -85,7 +85,7 @@ class BQSR(GATK):
     
 class PR(GATK):
     __verbose__ = "Apply BQSR"
-    mem_req = 5*1024
+    mem_req = 8*1024
     inputs = ['bam','recal']
     outputs = ['bam']
     
