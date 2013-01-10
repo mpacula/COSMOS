@@ -63,6 +63,11 @@ class TaskFile(models.Model):
         return Task.objects.get(_output_files__in = [self])
 
     @property
+    def file_size(self,human_readable=True):
+        "Size of the taskfile's output_dir"
+        return folder_size(self.path,human_readable=human_readable)
+
+    @property
     def sha1sum(self):
         return hashlib.sha1(file(self.path).read())
     
@@ -142,9 +147,9 @@ class Workflow(models.Model):
         return self.stage_set.all()
     
     @property
-    def file_size(self):
+    def file_size(self,human_readable=True):
         """Size of the output directory"""
-        return folder_size(self.output_dir)
+        return folder_size(self.output_dir,human_readable=human_readable)
         
     @property
     def log_txt(self):
@@ -921,9 +926,9 @@ class Stage(models.Model):
         
 
     @property
-    def file_size(self):
+    def file_size(self,human_readable=True):
         "Size of the stage's output_dir"
-        return folder_size(self.output_dir)
+        return folder_size(self.output_dir,human_readable=human_readable)
     
     @property
     def wall_time(self):

@@ -14,7 +14,7 @@ class GATK(Tool):
 
 class RTC(GATK):
     __verbose__ = "Indel Realigner Target Creator"
-    mem_req = 2.5*1024
+    mem_req = 4.5*1024
     cpu_req = 4
     inputs = ['bam']
     outputs = ['intervals']
@@ -36,7 +36,7 @@ class RTC(GATK):
     
 class IR(GATK):
     __verbose__ = "Indel Realigner"
-    mem_req = 2.5*1024
+    mem_req = 4.5*1024
     inputs = ['bam','intervals']
     outputs = ['bam']
     one_parent = True
@@ -135,7 +135,7 @@ class UG(GATK):
     
 class CV(GATK):
     __verbose__ = "Combine Variants"
-    mem_req = 2*1024
+    mem_req = 4*1024
     
     inputs = ['vcf']
     outputs = ['vcf']
@@ -165,7 +165,7 @@ class CV(GATK):
     
 class VQSR(GATK):
     __verbose__ = "Variant Quality Score Recalibration"
-    mem_req = 3.5*1024
+    mem_req = 4*1024
     inputs = ['vcf']
     outputs = ['recal','tranches','R']
     
@@ -211,7 +211,7 @@ class VQSR(GATK):
     
 class Apply_VQSR(GATK):
     __verbose__ = "Apply VQSR"
-    mem_req = 2*1024
+    mem_req = 4*1024
     
     inputs = ['vcf','recal','tranches']
     outputs = ['vcf']
@@ -259,8 +259,7 @@ class PROCESS_ANNOVAR(Tool):
     inputs = ['tsv']
     outputs = ['tsv']
     one_parent = True
-    
-#    @opoi
+
     def cmd(self,i,t,s,p):
         return 'genomekey {i[tsv]}'
     
