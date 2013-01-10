@@ -38,24 +38,17 @@
 <dt>File_size</dt><dd>{%if settings.show_task_file_sizes%}{{task.file_size}}{%else%}off{%endif%}</dd>
 <dt>Wall time</dt><dd>{{task.wall_time|format_time}}</dd>
 <dt>Successful</dt><dd>{{task.successful}}</dd>
+<dt>NOOP</dt><dd>{{task.NOOP}}</dd>
+<dt>Succeed On Failure</dt><dd>{{task.succeed_on_failure}}</dd>
 <dt>Created On</dt><dd>{{task.created_on}}</dd>
 <dt>Finished On</dt><dd>{{task.finished_on}}</dd>
 <dt>Pre Command</dt><dd><pre class="pre-scrollable">{{task.pre_command}}</pre></dd>
 <dt>Output Directory</dt><dd><code>{{task.output_dir}}</code></dd>
-<dt>Outputs<strong></strong></dt>
-{% for key,val in task.output_paths.items %}
-<dd><em>{{key}}</em>:
-<code>
-{%if task.successful%}
-    <a href="{% url jobAttempt_output task.get_successful_jobAttempt.id key%}">{{val}}</a>
-{%else %}
-    {{val}}
-{% endif %}
-</code>
+<dt>Output Files</dt><dd>
+    {%for of in task.output_files%}
+        <a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
+    {%empty%}None{%endfor%}
 </dd>
-{% empty %}
-<dd>None</dd>
-{%endfor%}
 
 
 </dl>

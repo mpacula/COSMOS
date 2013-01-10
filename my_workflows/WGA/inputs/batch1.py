@@ -1,3 +1,7 @@
+"""
+Reads input data from gpp's Batch1
+"""
+
 import re,os,csv,itertools,sys
 
 #Get fastq_pair info

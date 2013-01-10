@@ -115,7 +115,7 @@ TEMPLATE_DIRS = (
 INSTALLED_APPS = (
     'django_extensions',
     #'django_pdb',
-    #'south',
+    'south',
     'Workflow',
     #'gunicorn',
     'JobManager',

@@ -16,3 +16,13 @@ DATABASE = {
     'HOST': 'mysql.orchestra',                      # Set to empty string for localhost. Not used with sqlite3.
     'PORT': '',                      # Set to empty string for default. Not used with sqlite3e
     }
+
+
+########################
+# Web interface
+########################
+
+# on some systems, file i/o slows down a lot when running a lot of jobs making file_size calculations very slow.
+show_stage_file_sizes = True
+show_jobAttempt_file_sizes = True
+show_task_file_sizes = True

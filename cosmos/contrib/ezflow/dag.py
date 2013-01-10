@@ -2,18 +2,22 @@ from cosmos.Cosmos.helpers import groupby
 import itertools as it
 import networkx as nx
 import pygraphviz as pgv
-from cosmos.Workflow.models import Task,TaskError,TaskFile
-from tool import INPUT
+from cosmos.Workflow.models import Task,TaskError
 from picklefield.fields import dbsafe_decode
-import textwrap
 
 class DAGError(Exception): pass
 
 class DAG(object):
     
-    def __init__(self):
+    def __init__(self,cpu_req_override=False,mem_req_factor=1):
+        """
+        :param: set to an integer to override all task cpu_requirements.  Useful when a :term:`DRM` does not support requesting multiple cpus
+        :param mem_req_factor: multiply all task mem_reqs by this number.
+        """
         self.G = nx.DiGraph()
         self.last_tools = []
+        self.cpu_req_override = cpu_req_override
+        self.mem_req_factor = mem_req_factor
         
     def create_dag_img(self,path):
         dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
@@ -55,19 +59,20 @@ class DAG(object):
         
         #Validation
         taskfiles = list(it.chain(*[ n.output_files for n in self.G.nodes() ]))
+        #check paths
         v = map(lambda tf: tf.path,taskfiles)
         v = filter(lambda x:x,v)
         if len(map(lambda t: t,v)) != len(map(lambda t: t,set(v))):
             import pprint
             raise DAGError('Multiple taskfiles refer to the same path.  Paths should be unique. taskfile.paths are:{0}'.format(pprint.pformat(sorted(v))))
-        
+
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
         for tool in nx.topological_sort(self.G):
-                stage_name = tool.stage_name
-                if stage_name not in stages: #have not seen this stage yet
-                    stages[stage_name] = WF.add_stage(stage_name)
-                tool.stage = stages[stage_name]
+            stage_name = tool.stage_name
+            if stage_name not in stages: #have not seen this stage yet
+                stages[stage_name] = WF.add_stage(stage_name)
+            tool.stage = stages[stage_name]
         
         #update tool._task_instance and tool._output_files with existing data
         stasks = list(WF.tasks.select_related('_output_files','stage'))
@@ -88,6 +93,7 @@ class DAG(object):
         #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs.
         #Must come before adding tasks, since taskfile.ids must be populated to compute the proper pcmd.
         taskfiles = list(it.chain(*[ n.output_files for n in new_nodes ]))
+
         WF.bulk_save_task_files(taskfiles)
         
         #bulk save tasks
@@ -114,10 +120,11 @@ class DAG(object):
                                   tags = tool.tags,
                                   input_files = tool.input_files,
                                   output_files = tool.output_files,
-                                  mem_req = tool.mem_req,
-                                  cpu_req = tool.cpu_req,
+                                  mem_req = tool.mem_req * self.mem_req_factor,
+                                  cpu_req = tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
                                   time_req = tool.time_req,
-                                  NOOP = tool.NOOP)
+                                  NOOP = tool.NOOP,
+                                  succeed_on_failure = tool.succeed_on_failure)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e,tool))
             
@@ -154,7 +161,7 @@ WF = None
 def infix(func,*args,**kwargs):
     """
     1) If the second argument is a tuple (ie multiple args submitted with infix notation), submit it as *args
-    2) The decorated function should return a genorator, evaluate it
+    2) The decorated function should return a generator, so evaluate it
     3) Set the dag.last_tools to the decorated function's return value
     4) Return the dag
     """

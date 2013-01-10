@@ -1,7 +1,7 @@
 from django.shortcuts import render_to_response,render
 from django.template import RequestContext
 from django.http import HttpResponse
-from cosmos.Workflow.models import Workflow, Stage, Task, TaskTag, WorkflowManager
+from cosmos.Workflow.models import Workflow, Stage, Task, TaskTag, WorkflowManager, TaskFile
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from cosmos.Cosmos.helpers import groupby
 from models import status_choices
@@ -9,6 +9,7 @@ from django.utils.datastructures import SortedDict
 import os
 from django.views.decorators.cache import never_cache
 from django.utils.safestring import mark_safe
+import math
 
 @never_cache
 def _get_stages_dict(workflow):
@@ -114,6 +115,21 @@ def task_view(request,pid):
     task = Task.objects.get(pk=pid)
     jobAttempts_list = task._jobAttempts.all()
     return render_to_response('Workflow/Task/view.html', { 'request':request,'task': task, 'jobAttempts_list':jobAttempts_list }, context_instance=RequestContext(request))
+
+
+@never_cache
+def taskfile_view(request,tfid):
+    tf = TaskFile.objects.get(pk=tfid)
+    if tf.fmt == 'dir':
+        import subprocess
+        proc = subprocess.Popen(["ls", "-lh", "{0}".format(tf.path)], stdout=subprocess.PIPE)
+        output, err = proc.communicate()
+        if output.strip() == '': output = 'Empty Directory'
+
+    else:
+        output = file(tf.path,'rb').read(int(math.pow(2,30))) #read at most 100kb
+    return render_to_response('Workflow/TaskFile/view.html', { 'request':request,'taskfile': tf, 'output':output, 'jobAttempt':None }, context_instance=RequestContext(request))
+
 
 @never_cache
 def view_log(request,pid):

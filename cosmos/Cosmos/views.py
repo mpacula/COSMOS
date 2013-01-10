@@ -10,11 +10,11 @@ def __exec(cmd):
     #return 'stdout:\n' +c[0]+'\nstderr:\n'+c[1]
     return c[0]+c[1]
 
-def SGE(request):
+def GridEngine(request):
     qhost = __exec("qhost")
     qstat = __exec("qstat")
 
-    return render_to_response('Cosmos/SGE/index.html', { 'request':request,'qhost': qhost, 'qstat':qstat }, context_instance=RequestContext(request))
+    return render_to_response('Cosmos/GridEngine/index.html', { 'request':request,'qhost': qhost, 'qstat':qstat }, context_instance=RequestContext(request))
 
 def LSF(request):
     bjobs = __exec("bjobs")
