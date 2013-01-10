@@ -12,7 +12,7 @@ class CAT(Tool):
     
     def cmd(self,i,t,s,p):
         return 'cat {input} > $OUT.txt', {
-                'input':' '.join(i['text'])
+                'input':' '.join(map(lambda x: str(x),i['text']))
                 }
     
 class PASTE(Tool):
@@ -21,7 +21,7 @@ class PASTE(Tool):
     
     def cmd(self,i,t,s,p):
         return 'paste {input} > $OUT.txt', {
-                'input':' '.join(i['text'])
+                'input':' '.join(map(lambda x: str(x),i['text']))
                 }
     
 class WC(Tool):
@@ -30,5 +30,5 @@ class WC(Tool):
     
     def cmd(self,i,t,s,p):
         return 'wc{p[args]} {0input} > $OUT.txt', {
-                'input':' '.join(i['text'])
+                'input':' '.join(map(lambda x: str(x),i['text']))
                 }
