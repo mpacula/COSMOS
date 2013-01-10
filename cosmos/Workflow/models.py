@@ -710,6 +710,33 @@ class WorkflowManager():
     
     def complete_task(self,task):
         self.dag_queue.remove_node(task.id)
+
+    def get_intermediary_tasks(self):
+        """
+        Returns a list of tasks who have at least 1 child and 1 parent, and all children are all successful.
+        These tasks' output files can be safely deleted if desired.
+        """
+        intermediate_tasks = []
+        for node in self.dag.nodes():
+            successors = self.dag.successors(node)
+            if len(self.dag.predecessors(node)) > 0 and len(successors) > 0:
+                if any( self.dag.node[s]['status'] == 'successful' for s in successors ):
+                    intermediate_tasks.append(node)
+        return self.workflow.tasks.filter(id__in=intermediate_tasks)
+
+    def delete_intermediary_output_files(self):
+        """
+        Deletes all intermediary output files
+        """
+        for task in self.get_intermediary_tasks():
+            task.clear_job_output_dir()
+
+    """
+from Workflow.models import WorkflowManager
+wf = Workflow.objects.all()[1]
+wm = WorkflowManager(wf)
+wm.get_intermediate_tasks()
+    """
         
     def get_ready_tasks(self):
         degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
@@ -1300,7 +1327,15 @@ class Task(models.Model):
                 tasktag.value = value
             tasktag.save()
             self.tags[key] = value
-            
+
+    def clear_job_output_dir(self):
+        """
+        Removes all files in this task's output directory
+        """
+        self.log.info('Clearing outputs for {0}'.format(self))
+        os.system('rm -rf {0}'.format(os.path.join(self.job_output_dir,'*')))
+        return self
+
     @models.permalink    
     def url(self):
         "This task's url."
