@@ -39,14 +39,13 @@ if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.bioseq':
     WF = Workflow.start('BamToFastq NA12878 Chr20',restart=False)
 elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
     indir = '/groups/lpm/erik/WGA/ngs_data/CEU_WGS_Trio'
-    WF = Workflow.start('CEU Trio BamToFastq',restart=False)
+    WF = Workflow.start('CEU Trio BamToFastq',restart=True)
 
 
 dag_inputs = [ INPUT(tags={'i':i+1},output_path=os.path.join(indir,p)) for i,p in enumerate(filter(lambda f: f[-4:] == '.bam', os.listdir(indir))) ]
 dag = (DAG()
         |Add| dag_inputs
         |Apply| picard.BAM2FASTQ
-        #|Apply| GZIP
     )
 dag.configure(settings=settings)
 

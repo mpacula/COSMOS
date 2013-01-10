@@ -334,7 +334,7 @@ class Workflow(models.Model):
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
         
-        stages = Stage.objects.filter(Q(task__in=tasks)&Q(status="in_progress"))
+        stages = Stage.objects.filter(task__in=tasks)
         self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
         stages.update(status = 'failed',finished_on = timezone.now())
         
