@@ -706,38 +706,46 @@ class WorkflowManager():
         for n in ready_tasks:
             self.queue_task(n)
             self.workflow._run_task(n)
+        if self.workflow.delete_intermediaries:
+            self.clear_intermediate_tasks()  #TODO could just check the parent node of successful job for clearing instead of the whole graph
         return ready_tasks
     
     def complete_task(self,task):
         self.dag_queue.remove_node(task.id)
+        self.dag.node[task.id]['status'] = task.status
+        return self
 
-    def get_intermediary_tasks(self):
+    def is_task_intermediate(self,task_id):
         """
-        Returns a list of tasks who have at least 1 child and 1 parent, and all children are all successful.
-        These tasks' output files can be safely deleted if desired.
+        Checks to see if a task_id is an intermediary task.
+        An intermediary task is has at least 1 child and 1 parent, and all of its children are all successful.
         """
+        successors = self.dag.successors(task_id)
+        if len(self.dag.predecessors(task_id)) > 0 and len(successors) > 0:
+            return any( self.dag.node[s]['status'] == 'successful' for s in successors )
+
+    def clear_intermediate_tasks(self):
+        """
+        Deletes all intermediary task output files.
+
+        Example:
+        from Workflow.models import WorkflowManager
+        wf = Workflow.objects.all()[1]
+        wm = WorkflowManager(wf)
+        wm.clear_intermediary_tasks()
+        """
+        # get a list of intermediary tasks
         intermediate_tasks = []
-        for node in self.dag.nodes():
-            successors = self.dag.successors(node)
-            if len(self.dag.predecessors(node)) > 0 and len(successors) > 0:
-                if any( self.dag.node[s]['status'] == 'successful' for s in successors ):
-                    intermediate_tasks.append(node)
-        return self.workflow.tasks.filter(id__in=intermediate_tasks)
+        nodes_not_cleared = [x[0] for x in filter(lambda x: not x[1]['cleared_output_files'],self.dag.node.items())]
+        for task_id in nodes_not_cleared:
+            if self.is_task_intermediate(task_id):
+                intermediate_tasks.append(task_id)
 
-    def delete_intermediary_output_files(self):
-        """
-        Deletes all intermediary output files
-        """
-        for task in self.get_intermediary_tasks():
+        #delete output files
+        for task in self.workflow.tasks.filter(id__in=intermediate_tasks):
             task.clear_job_output_dir()
+            self.dag.node[task.id]['cleared_output_files'] = True
 
-    """
-from Workflow.models import WorkflowManager
-wf = Workflow.objects.all()[1]
-wm = WorkflowManager(wf)
-wm.get_intermediate_tasks()
-    """
-        
     def get_ready_tasks(self):
         degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
         return Task.objects.filter(id__in=filter(lambda x: x not in self.queued_tasks,degree_0_tasks))
@@ -748,8 +756,8 @@ wm.get_intermediate_tasks()
         dag.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.task_edges.values('parent','child')])
         for stage in self.workflow.stages:
             stage_name = stage.name
-            for n in stage.tasks.values('id','tags','status'):
-                dag.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name)
+            for n in stage.tasks.values('id','tags','status','cleared_output_files'):
+                dag.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name,cleared_output_files=n['cleared_output_files'])
         return dag
     
     def createAGraph(self):
@@ -988,7 +996,11 @@ class Stage(models.Model):
         return newtask
         
 
-    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, on_success = None, mem_req=0, cpu_req=1, time_req=None, NOOP=False, succeed_on_failure = False, hard_reset=False):
+    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, on_success = None, mem_req=0, cpu_req=1, time_req=None,
+                 NOOP=False,
+                 succeed_on_failure = False,
+                 hard_reset=False,
+                 dont_delete_output_files=False):
         """
         Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
@@ -1002,6 +1014,7 @@ class Stage(models.Model):
         :param time_req: (int) Time required in miinutes.  If a job exceeds this requirement, it will likely be killed.
         :param NOOP: (booean) No Operation, this task does not get executed.
         :param succeed_on_failure: (booean) Succeed even if JobAttempts fails.
+        :param dont_delete_output_files: (boolean) Prevents output files from being deleted, even when this task becomes an intermediate.
         :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
         :returns: A new task instance.  The instance has not been saved to the database.
         """
@@ -1016,6 +1029,7 @@ class Stage(models.Model):
                        'name':name,
                        'tags':tags,
                        #'on_success':on_success,
+                       'dont_delete_output_files':dont_delete_output_files,
                        'NOOP': NOOP,
                        'succeed_on_failure':succeed_on_failure,
                        'pre_command':pcmd,
@@ -1176,6 +1190,8 @@ class Task(models.Model):
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
     succeed_on_failure = models.BooleanField(default=False, help_text="Task will succeed and workflow will progress even if its JobAttempts fail.")
+    cleared_output_files = models.BooleanField(default=False,help_text="Output files have been cleared.")
+    dont_delete_output_files = models.BooleanField(default=False,help_text="Prevents output files from being deleted, even when this task becomes an intermediate.")
 
     tags = PickledObjectField(null=False)
     #on_success = PickledObjectField(null=False)
@@ -1245,6 +1261,11 @@ class Task(models.Model):
     def file_size(self,human_readable=True):
         "Task filesize"
         return folder_size(self.output_dir,human_readable=human_readable)
+
+    @property
+    def output_file_size(self,human_readable=True):
+        "Task filesize"
+        return folder_size(self.job_output_dir,human_readable=human_readable)
     
     @property
     def output_dir(self):
@@ -1332,8 +1353,11 @@ class Task(models.Model):
         """
         Removes all files in this task's output directory
         """
-        self.log.info('Clearing outputs for {0}'.format(self))
-        os.system('rm -rf {0}'.format(os.path.join(self.job_output_dir,'*')))
+        if not self.dont_delete_output_files:
+            self.log.info('Clearing outputs for {0}'.format(self))
+            os.system('rm -rf {0}'.format(os.path.join(self.job_output_dir,'*')))
+        self.cleared_output_files = True
+        self.save()
         return self
 
     @models.permalink    

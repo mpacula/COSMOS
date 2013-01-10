@@ -124,6 +124,7 @@ class DAG(object):
                                   cpu_req = tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
                                   time_req = tool.time_req,
                                   NOOP = tool.NOOP,
+                                  dont_delete_output_files = tool.dont_delete_output_files,
                                   succeed_on_failure = tool.succeed_on_failure)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e,tool))

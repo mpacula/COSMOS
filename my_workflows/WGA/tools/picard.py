@@ -7,7 +7,7 @@ class Picard(Tool):
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req*.9),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req*.8),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
 
 
 class FIXMATE(Picard):
