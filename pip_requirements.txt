@@ -1,7 +1,6 @@
 decorator
 Django
 MySQL-python
-argh
 networkx
 argparse
 django-extensions
