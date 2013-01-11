@@ -3,7 +3,7 @@ import os
 
 class ALN(Tool):
     __verbose__ = "Reference Alignment"
-    mem_req = 3.5*1024
+    mem_req = 4*1024
     cpu_req = 2
     time_req = 100
     forward_input = True

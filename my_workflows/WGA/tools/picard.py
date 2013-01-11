@@ -74,7 +74,7 @@ class MERGE_SAMS(Picard):
                 
 class CLEAN_SAM(Picard):
     __verbose__ = "Clean Sams"
-    mem_req = 2*1024
+    mem_req = 3*1024
     inputs = ['bam']
     outputs = ['bam']
     one_parent = True
@@ -108,7 +108,7 @@ class DEDUPE(Picard):
 
 class INDEX_BAM(Picard):
     __verbose__ = "Index Bam Files"
-    mem_req = 2*1024
+    mem_req = 3*1024
     forward_input = True
     inputs = ['bam']
     one_parent = True
