@@ -4,7 +4,7 @@ from cosmos.Workflow.models import Workflow
 def cli():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Workflow CLI')
     parser.add_argument('-n','--name',help="A unique name for this workflow. All spaces are converted to underscores.",required=True)
     parser.add_argument('-r','--restart',help="Complete restart the workflow by deleting it and creating a new one. Optional.")
     parser.add_argument('-q','--default_queue',help="Deletes unsuccessful tasks in the workflow.")
