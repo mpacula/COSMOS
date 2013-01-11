@@ -19,7 +19,7 @@ def syncdb(args):
     "Sets up the SQL database"
     os.system('manage syncdb')
     
-def resetentiredb():
+def resetentiredb(args):
     "DELETE ALL DATA in the database and then run a syncdb"
     os.system('manage reset_db -R default')
     os.system('manage syncdb')
