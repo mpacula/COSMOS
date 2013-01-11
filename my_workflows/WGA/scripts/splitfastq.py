@@ -47,17 +47,15 @@ def main(input_fastq,output_dir,chunksize=4000000,buffersize=100000):
         #Read/Write
         total_read=0
         outfile = gzip.open(output_path,'wb')
-        while total_read < chunksize:
-            # Read the minimum of whats left in this chunk and buffersize*4 lines
-            read_amt = min(chunksize-total_read,buffersize*4)
-            data = list(islice(infile,read_amt))
+        while total_read < chunksize*4:
+            data = list(islice(infile,buffersize*4))
             if len(data) == 0:
                 log.info('Done')
                 return
 
             # Write what was read
             outfile.writelines(data)
-            log.info('wrote {0} lines'.format(len(read_amt)))
+            log.info('wrote {0} lines'.format(len(data)))
             del(data)
             total_read += buffersize*4
         outfile.close()

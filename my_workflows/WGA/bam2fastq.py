@@ -11,7 +11,6 @@ from tools import picard
 import os
 from settings import settings
 
-
 class GZIP(Tool):
     inputs = ['dir']
     time_req = 60
@@ -32,7 +31,6 @@ class SplitFastq(Tool):
 ####################
 # Create DAG
 ####################
-
 
 if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.bioseq':
     indir = '/cosmos/WGA/bundle/2.2/b37/'
