@@ -7,7 +7,7 @@ class Picard(Tool):
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {jar}'.format(self=self,mem_req=int(self.mem_req*.8),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -Dsnappy.loader.verbosity=true -jar {jar}'.format(self=self,mem_req=int(self.mem_req*.8),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
 
 
 class FIXMATE(Picard):
@@ -28,11 +28,30 @@ class FIXMATE(Picard):
             VALIDATION_STRINGENCY=LENIENT
         """
 
+
+class REVERTSAM(Picard):
+    inputs = ['bam']
+    outputs = ['bam']
+    one_parent = True
+    time_req = 0
+    mem_req = 12*1024
+    succeed_on_failure = True
+
+    jar = 'RevertSam.jar'
+
+    def cmd(self,i,t,s,p):
+        import re
+        return r"""
+            {self.bin}
+            INPUT={i[bam]}
+            OUTPUT=$OUT.bam
+        """
+
 class BAM2FASTQ(Picard):
     inputs = ['bam']
     outputs = ['dir']
     one_parent = True
-    time_req = 12*60
+    time_req = 0
     mem_req = 12*1024
     succeed_on_failure = True
 

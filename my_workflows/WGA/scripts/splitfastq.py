@@ -3,6 +3,10 @@
 Chunks a fastq file
 
 TODO implement a producer/consumer pattern
+
+..note:: This is nicer than the unix split command because everything is gzipped which means less scratch space and i/o (at the cost of CPU)
+
+.. note:: The closest unix split command equivalent is `split -a 3 -l 2 -d input.txt /tmp/input_`
 """
 
 import re
