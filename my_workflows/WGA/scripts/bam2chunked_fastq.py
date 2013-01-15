@@ -1,16 +1,19 @@
 #!/usr/bin/env python
-# split a bam file by read group ID
-# Sean Davis <seandavi@gmail.com>
-# March 10, 2012
-#
-# Modified by Erik Gafni
-#
+"""
+Split the output of Picard's RevertBam to Chunked Fastq Files
+"""
 import pysam
 import argparse
 import os
 import logging as log
 import pprint
 import copy
+from itertools import izip
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s2,s3), (s4, s5), ..."
+    a = iter(iterable)
+    return izip(a, a)
 
 class BamChunk:
     """
@@ -32,9 +35,9 @@ class BamChunk:
     def __str__(self):
         return self.samfile.filename
 
-class BamChunkManager:
+class BamReadGroupManager:
     """
-    A manager of Chunked Bams
+    Manages a Bam limited to one read group specified in header['RG'][0]
     """
     def __init__(self,chunk_size,output_directory,header):
         self.chunk_size = chunk_size
@@ -62,13 +65,14 @@ class BamChunkManager:
             self.chunks.append(BamChunk(self.output_directory,self.header,self.current_chunk_num))
 
 def splitBam(input_filename,output_directory,chunk_size):
-    infile = pysam.Samfile(input_filename,'rb')
+    pysam.view(input_filename)
+    with open(input_filename,'rb') as infile:
 
     chunkManagers = {}
     for rg in infile.header['RG']:
         new_header = copy.copy(infile.header)
         new_header['RG'] = [rg]
-        chunkManagers[rg['ID']] = BamChunkManager(chunk_size,output_directory,new_header)
+        chunkManagers[rg['ID']] = BamReadGroupManager(chunk_size,output_directory,new_header)
 
     log.info('{0} Readgroups identified.'.format(len(chunkManagers)))
 
