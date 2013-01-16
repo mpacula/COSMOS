@@ -14,12 +14,14 @@ class CLI(object):
 
 
     def parse_args(self):
+        """
+        runs the argument parser
+        """
         self.parsed_args = self.parser.parse_args()
         kwargs = dict(self.parsed_args._get_kwargs())
         self.kwargs = kwargs
-
-        print kwargs
         wf = Workflow.start(**kwargs)
-        wf.log.info('Starting working with args:\n{0}'.format(pprint.pprint(kwargs)))
+        wf.log.info('Args:\n{0}'.format(pprint.pformat(kwargs)))
+        return wf
 
 

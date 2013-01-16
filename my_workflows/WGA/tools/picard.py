@@ -45,6 +45,7 @@ class REVERTSAM(Picard):
             {self.bin}
             INPUT={i[bam]}
             OUTPUT=$OUT.bam
+            VALIDATION_STRINGENCY=LENIENT
         """
 
 class BAM2FASTQ(Picard):

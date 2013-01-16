@@ -10,7 +10,8 @@ from cosmos.contrib.ezflow.tool import INPUT,Tool
 from tools import picard
 import os
 from settings import settings
-from cosmos.Workflow import cli
+from cosmos.Workflow.cli import CLI
+
 
 class GZIP(Tool):
     inputs = ['dir']
@@ -53,7 +54,7 @@ dag.configure(settings=settings)
 # Run Workflow
 #################
 
-WF = cli()
+WF = CLI().parse_args()
 dag.add_to_workflow(WF)
 WF.run(finish=False)
 
