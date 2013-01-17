@@ -540,7 +540,9 @@ class Workflow(models.Model):
                                                                              mem_req=task.memory_requirement,
                                                                              cpu_req=task.cpu_requirement,
                                                                              time_req=task.time_requirement,
-                                                                             queue=self.default_queue if self.default_queue else session.settings.default_queue))
+                                                                             queue=self.default_queue if self.default_queue else session.settings.default_queue,
+                                                                             parallel_environment_name=session.settings.parallel_environment_name
+                                     ))
 
         task._jobAttempts.add(jobAttempt)
         if self.dry_run:

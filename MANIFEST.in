@@ -1,0 +1,4 @@
+include README.rst
+include *.py
+recursive-include docs *
+recursive-include cosmos/templates *

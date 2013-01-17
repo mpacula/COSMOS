@@ -14,16 +14,15 @@ Use the shell command :command:`env` if you're not sure what's in your environme
     Cosmos CLI
 
     optional arguments:
-      -h, --help     show this help message and exit
+      -h, --help  show this help message and exit
 
     Commands:
       <command>
-        resetentiredb
-                     DELETE ALL DATA in the database and then run a syncdb
-        shell        Open up an ipython shell with Cosmos objects preloaded
-        syncdb       Sets up the SQL database
-        list         List all workflows :return:
-        runweb       Start the webserver
+        resetdb   DELETE ALL DATA in the database and then run a syncdb
+        shell     Open up an ipython shell with Cosmos objects preloaded
+        syncdb    Sets up the SQL database
+        list      List all workflows
+        runweb    Start the webserver
 
          
 Explore the available commands, using -h if you wish.  Or see the :ref:`cli` for more info.  Note that when
@@ -44,7 +43,7 @@ Reset the SQL database
 
 .. code-block:: bash
 
-   $ cosmos resetentiredb
+   $ cosmos resetdb
 
 List workflows
 ++++++++++++++

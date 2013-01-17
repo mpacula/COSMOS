@@ -6,7 +6,6 @@ import os
 # Cosmos
 #######################
 
-home_path = os.environ['COSMOS_HOME_PATH']
 default_root_output_dir = '/tmp/cosmos_out' # The directory to output all files to
 DRM = 'GE' #LSF, or GE
 tmp_dir = '/tmp'
@@ -27,13 +26,12 @@ show_task_file_sizes = False
 
 DATABASE = {
     'ENGINE': 'django.db.backends.sqlite3', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-    'NAME': '/home/erik/workspace/Cosmos/sqlite.db',                      # Or path to database file if using sqlite3.
+    'NAME': '~/.cosmos/sqlite.db',                      # Or path to database file if using sqlite3.
     'USER': '',                      # Not used with sqlite3.
     'PASSWORD': '',                  # Not used with sqlite3.
     'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
     'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
 }
-
 
 
 ### SGE Specific

@@ -18,11 +18,12 @@ The following will:
    cd Cosmos
    virtualenv --no-site-packages venv
    source venv/bin/activate
-   pip install -r pip_requirements.txt
+   pip install -r requirements.txt
   
 .. note:: Many python libraries won't be able to install unless their dependent software is already installed on the system.  For example, pygraphviz requires graphviz-dev and python-mysql require python-dev libmysqlclient-dev.
    
-The only other requirement is that :term:`DRMAA` is installed on the system.
+The only other requirement is that :term:`DRMAA` is installed on the system.  If you use multiple python virtual environments, we highly recommend
+using `virtualenvwrapper`<http://www.doughellmann.com/projects/virtualenvwrapper/>.
 
 Optionally, if you want the graphing capabilities, R and the R package ggplot2 are required:
 

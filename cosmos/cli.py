@@ -18,7 +18,6 @@ def shell():
 def list():
     """
     List all workflows
-    :return:
     """
     for w in Workflow.objects.all():
         print w
@@ -27,7 +26,7 @@ def syncdb():
     "Sets up the SQL database"
     os.system('manage syncdb')
     
-def resetentiredb():
+def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"
     os.system('manage reset_db -R default')
     os.system('manage syncdb')
@@ -38,7 +37,7 @@ def main():
     parser = argparse.ArgumentParser(description='Cosmos CLI')
     subparsers = parser.add_subparsers(title="Commands", metavar="<command>")
 
-    subparsers.add_parser('resetentiredb',help=resetentiredb.__doc__).set_defaults(func=resetentiredb)
+    subparsers.add_parser('resetdb',help=resetdb.__doc__).set_defaults(func=resetdb)
 
     subparsers.add_parser('shell',help=shell.__doc__).set_defaults(func=shell)
 
