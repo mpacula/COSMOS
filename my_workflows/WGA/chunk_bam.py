@@ -16,7 +16,7 @@ cli = CLI()
 cli.parser.add_argument('-i','--input_file',required=True,help="Input Bam file")
 WF = cli.parse_args()
 
-dag_inputs = [ INPUT(output_path=cli.kwargs['input_file']) ]
+dag_inputs = [ INPUT(output_path=cli.parsed_kwargs['input_file']) ]
 
 class BamChunk(Tool):
     inputs = ['bam']

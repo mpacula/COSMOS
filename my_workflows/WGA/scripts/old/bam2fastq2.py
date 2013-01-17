@@ -67,14 +67,30 @@ class ChunkManager:
         chunk = self.get_chunk(chunk_key)
         chunk.write(data)
 
+def get_pair(itrbl):
+    one = itrbl.next()
+    two = itrbl.next()
+
+
+import pysam
+
 def bam2fastq(input_filename,chunk_size,output_directory):
     CM = ChunkManager(chunk_class=FastqChunk,chunk_size=chunk_size,output_directory=output_directory)
-    cmd = 'java -Xmx9830m -Djava.io.tmpdir=/mnt/tmp -jar /cosmos/WGA/tools/picard-tools-1.81/RevertSam.jar INPUT=/home2/erik/data.bam OUTPUT=/dev/stdout QUIET=true COMPRESSION_LEVEL=0 | /cosmos/WGA/tools/samtools-0.1.18/samtools view /dev/stdin'.split(" ")
-    data_stream = Popen(cmd, stdout=PIPE)
 
+    #Revert Sam
+    cmd1 = 'java -Xmx9830m -Djava.io.tmpdir=/mnt/tmp -jar /cosmos/WGA/tools/picard-tools-1.81/RevertSam.jar INPUT=/home2/erik/data.bam OUTPUT=/dev/stdout QUIET=true COMPRESSION_LEVEL=0'.split(" ")
+    log.info('Executing {0}'.format(cmd1))
+    p1 = Popen(cmd1, stdout=PIPE)
+
+#    cmd2 = '/cosmos/WGA/tools/samtools-0.1.18/samtools view /dev/stdin'.split(" ")
+#    log.info('Executing {0}'.format(cmd2))
+#    p2 = Popen(cmd2, stdin=p1.stdout,stdout=PIPE)
+
+    infile = pysam.Samfile("-", "r",check_header=False,check_sq=False)
+    print 'test'
     i=0
-    for line in data_stream.stdout:
-        next_line = data_stream.stdout.next()
+    for line in infile:
+        next_line = infile.stdout.next()
         print line, next_line
         i+=1
         if i == 6:

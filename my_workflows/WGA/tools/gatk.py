@@ -21,7 +21,7 @@ class RTC(GATK):
     forward_input = True
     one_parent = True
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T RealignerTargetCreator
@@ -31,7 +31,7 @@ class RTC(GATK):
             --known {s[indels_1000g_phase1_path]}
             --known {s[mills_path]}
             -nt {self.cpu_req}
-            -L {t[interval]}
+            -L {p[interval]}
         """
     
 class IR(GATK):
@@ -41,7 +41,7 @@ class IR(GATK):
     outputs = ['bam']
     one_parent = True
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T IndelRealigner
@@ -52,7 +52,7 @@ class IR(GATK):
             -known {s[indels_1000g_phase1_path]}
             -known {s[mills_path]}
             -model USE_READS
-            -L {t[interval]}
+            -L {p[interval]}
         """
     
 class BQSR(GATK):
@@ -64,7 +64,7 @@ class BQSR(GATK):
 
     # -nct {nct}
 
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T BaseRecalibrator
@@ -95,7 +95,7 @@ class PR(GATK):
                'recal' : self.parent.get_output('recal')
               }
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T PrintReads
@@ -114,20 +114,20 @@ class UG(GATK):
     inputs = ['bam']
     outputs = ['vcf']
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T UnifiedGenotyper
             -R {s[reference_fasta_path]}
             --dbsnp {s[dbsnp_path]}
-            -glm {t[glm]}
+            -glm {p[glm]}
             {inputs}
             -o $OUT.vcf
             -A DepthOfCoverage
             -A HaplotypeScore
             -A InbreedingCoeff
             -baq CALCULATE_AS_NECESSARY
-            -L {t[interval]}
+            -L {p[interval]}
             -nt {self.cpu_req}
         """, {
             'inputs' : list2input(i['bam']) 
@@ -144,7 +144,7 @@ class CV(GATK):
       'genotypeMergeOptions':'UNSORTED'       
     }
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         """
         :param genotypemergeoptions: select from the following:
             UNIQUIFY - Make all sample genotypes unique by file. Each sample shared across RODs gets named sample.ROD.
@@ -176,8 +176,8 @@ class VQSR(GATK):
       'inbreeding_coeff' : False
     }
     
-    def cmd(self,i,t,s,p):
-        if t['glm'] == 'SNP': 
+    def cmd(self,i,s,p):
+        if p['glm'] == 'SNP': 
             cmd = r"""
             {self.bin}
             -T VariantRecalibrator
@@ -193,7 +193,7 @@ class VQSR(GATK):
             -tranchesFile $OUT.tranches
             -rscriptFile $OUT.R
             """
-        elif t['glm'] == 'INDEL':
+        elif p['glm'] == 'INDEL':
             cmd = r"""
             {self.bin}
             -T VariantRecalibrator
@@ -217,8 +217,8 @@ class Apply_VQSR(GATK):
     outputs = ['vcf']
     one_parent = True
     
-    def cmd(self,i,t,s,p):
-        if t['glm'] == 'SNP': 
+    def cmd(self,i,s,p):
+        if p['glm'] == 'SNP': 
             cmd = r"""
             {self.bin}
             -T ApplyRecalibration
@@ -230,7 +230,7 @@ class Apply_VQSR(GATK):
             --ts_filter_level 99.0
             -mode SNP
             """
-        elif t['glm'] == 'INDEL':
+        elif p['glm'] == 'INDEL':
             cmd = r"""
             {self.bin}
             -T ApplyRecalibration
@@ -251,8 +251,8 @@ class ANNOVAR(Tool):
     outputs = ['tsv']
     one_parent = True
     
-    def cmd(self,i,t,s,p):
-        return 'annovar {i[vcf]} {t[database]}'
+    def cmd(self,i,s,p):
+        return 'annovar {i[vcf]} {p[database]}'
     
 class PROCESS_ANNOVAR(Tool):
     __verbose__ = "Process Annovar"
@@ -260,7 +260,7 @@ class PROCESS_ANNOVAR(Tool):
     outputs = ['tsv']
     one_parent = True
 
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return 'genomekey {i[tsv]}'
     
 class MERGE_ANNOTATIONS(Tool):
@@ -269,7 +269,7 @@ class MERGE_ANNOTATIONS(Tool):
     outputs = ['tsv']
     one_parent = True
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return 'genomekey merge {0}'.format(','.join(map(lambda x:str(x),i['tsv'])))
     
 class SQL_DUMP(Tool):
@@ -278,7 +278,7 @@ class SQL_DUMP(Tool):
     outputs = ['sql']
     one_parent = True
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return 'sql dump {i[tsv]}'
     
 class ANALYSIS(Tool):
@@ -287,7 +287,7 @@ class ANALYSIS(Tool):
     outputs = ['analysis']
     one_parent = True
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return 'analyze {i[sql]}'
         
     

@@ -52,7 +52,7 @@ def main(input_fastq,output_dir,chunksize=4000000,buffersize=100000):
         total_read=0
         outfile = gzip.open(output_path,'wb')
         while total_read < chunksize*4:
-            data = list(islice(infile,buffersize*4))
+            data = list(islice(infile,buffersize*4)) #read data
             if len(data) == 0:
                 log.info('Done')
                 return

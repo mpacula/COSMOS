@@ -52,6 +52,7 @@ class DAG(object):
                 self.parameters[tool.stage_name].update(parameters.get(tool.stage_name,{}))
                 
             tool.parameters = self.parameters[tool.stage_name]
+        return self
             
     def add_to_workflow(self,WF):
         #add new tasks and related objects to WF

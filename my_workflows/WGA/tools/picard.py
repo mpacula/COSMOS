@@ -20,7 +20,7 @@ class FIXMATE(Picard):
 
     jar = 'FixMateInformation.jar'
 
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             INPUT={i[bam]}
@@ -34,18 +34,19 @@ class REVERTSAM(Picard):
     outputs = ['bam']
     one_parent = True
     time_req = 0
-    mem_req = 12*1024
+    mem_req = 20*1024
     succeed_on_failure = True
 
     jar = 'RevertSam.jar'
 
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         import re
         return r"""
             {self.bin}
             INPUT={i[bam]}
             OUTPUT=$OUT.bam
-            VALIDATION_STRINGENCY=LENIENT
+            VALIDATION_STRINGENCY=SILENT
+            MAX_RECORDS_IN_RAM=2000000
         """
 
 class BAM2FASTQ(Picard):
@@ -58,7 +59,7 @@ class BAM2FASTQ(Picard):
 
     jar = 'SamToFastq.jar'
 
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         import re
         return r"""
             {self.bin}
@@ -80,7 +81,7 @@ class MERGE_SAMS(Picard):
     jar = 'MergeSamFiles.jar'
     
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             {inputs}
@@ -101,7 +102,7 @@ class CLEAN_SAM(Picard):
     
     jar = 'CleanSam.jar'
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             I={i[bam]}
@@ -117,7 +118,7 @@ class DEDUPE(Picard):
     
     jar = 'MarkDuplicates.jar'
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             I={i[bam]}
@@ -135,7 +136,7 @@ class INDEX_BAM(Picard):
     
     jar = 'BuildBamIndex.jar'
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         return r"""
             {self.bin}
             INPUT={i[bam]}

@@ -1,5 +1,5 @@
 """
-models.py
+Workflow models
 """
 from cosmos import session
 from django.db import models, transaction
@@ -14,11 +14,8 @@ from picklefield.fields import PickledObjectField, dbsafe_decode
 from django.utils import timezone
 import networkx as nx
 import pygraphviz as pgv
-from cosmos.contrib.step import _unnest
 import hashlib
 import pprint
-from argh import dispatch, arg
-import copy
 
 status_choices=(
                 ('successful','Successful'),
@@ -106,10 +103,6 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
             raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
 
-        check_and_create_output_dir(self.output_dir)
-
-        self.log, self.log_path = get_workflow_logger(self)
-
     @property
     def tasks(self):
         """Tasks in this Workflow"""
@@ -159,7 +152,7 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
 
     @staticmethod
-    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None, default_queue=None, delete_intermediates = False,*args,**kwargs):
+    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None, default_queue=None, delete_intermediates = False,prompt_confirm=True,*args,**kwargs):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
 
@@ -180,13 +173,13 @@ class Workflow(models.Model):
             root_output_dir = session.settings.default_root_output_dir
 
         if restart:
-            wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
+            wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
         elif Workflow.objects.filter(name=name).count() > 0:
             if delete_unsuccessful:
                 #TODO make sure user didn't try to change unsupported params like root_output_dir when resuming or reloading
-                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
+                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
             else:
-                wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
+                wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
         else:
             wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue, delete_intermediates=delete_intermediates)
 
@@ -283,6 +276,10 @@ class Workflow(models.Model):
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
         wf.log.info('Created Workflow {0}.'.format(wf))
+        check_and_create_output_dir(wf.output_dir)
+
+        wf.log, wf.log_path = get_workflow_logger(wf)
+
         return wf
 
 
@@ -784,52 +781,6 @@ class WorkflowManager():
             
         return dag
     
-    def simple_path(self,head,vtasks,vedges):
-        """
-        task is the current task, vs is visited tasks
-        """
-        ss = self.dag.successors(head)[0:3]
-        vtasks.append(head)
-        if len(ss) > 0:
-            vedges.append((head,ss[0]))
-            self.simple_path(ss[0],vtasks,vedges)
-        if len(ss) > 1:
-            vedges.append((head,ss[1]))
-            self.simple_path(ss[1],vtasks,vedges)
-        
-        ps = self.dag.predecessors(head)
-        ps = filter(lambda n: n not in vtasks,ps) #TODO might be slow
-        if len(ps) > 0:
-            vedges.append((ps[0],head))
-#        if len(ps) > 0:
-#            ps = map(lambda n: (n,self.dag.task[n]),ps) #append attr dict
-#            for stage, ps_b in helpers.groupby(ps,lambda p: p[1]['stage']):
-#                print stage
-#                print list(ps_b)
-#                print '*'*72
-#                try:
-#                    p = ps_b.next()
-#                    vedges.append((p[0],head))
-#                    vtasks.append(p[0])
-#                except StopIteration:
-#                    pass
-            
-        return vedges
-    
-    def get_simple_dag(self):
-        root = None
-        for task,degree in self.dag.in_degree_iter():
-            if degree == 0:
-                root = task
-                break
-        edges = self.simple_path(root,[],[])
-        g= nx.DiGraph()
-        tasks = set(_unnest(edges))
-        g.add_nodes_from(map(lambda n: (n,self.dag.task[n]),tasks))
-        g.add_edges_from(edges)
-        return g
-        #return self.dag.subgraph(nx.dfs_tree(self.dag,root).tasks())
-    
     
     def as_img(self,format="svg"):      
         g = self.createAGraph()
@@ -868,7 +819,6 @@ class Stage(models.Model):
         super(Stage,self).__init__(*args,**kwargs)
         
         validate_not_null(self.workflow)
-        check_and_create_output_dir(self.output_dir)
         
         validate_name(self.name,self.name)
         #validate unique name

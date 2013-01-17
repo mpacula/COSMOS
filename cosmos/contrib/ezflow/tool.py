@@ -153,11 +153,11 @@ class Tool(object):
     
     def process_cmd(self):
         """
-        Stuff that happens inbetween map_inputs() and cmd()
+        Stuff that happens in between map_inputs() and cmd()
         :param *args: input file parameters
         :param **kwargs: Named input file parameters
         """
-        callargs = getcallargs(self.cmd,i=self.input_files,t=self.tags,s=self.settings,p=self.parameters)
+        callargs = getcallargs(self.cmd,i=self.input_files,s=self.settings,p=self.parameters.update(self.tags))
         del callargs['self']
         r = self.cmd(**callargs)
         
@@ -176,10 +176,16 @@ class Tool(object):
         callargs['self'] = self
         callargs.update(extra_format_dict)
         return parse_cmd(cosmos_format(pcmd,callargs))
-        
-    def cmd(self,*args,**kwargs):
+
+
+    def cmd(self, i, s, p):
+        """
+        :param i: (dict) inputs
+        :param s: (dict) settings
+        :param p: (dict) parameters (includes tags)
+        """
         raise NotImplementedError("{0}.cmd is not implemented.".format(self.__class__.__name__))
-    
+
     def __str__(self):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
     
