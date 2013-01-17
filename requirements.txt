@@ -1,0 +1,16 @@
+decorator
+Django
+MySQL-python
+networkx
+django-extensions
+django-picklefield
+drmaa
+
+#optional
+pygraphviz
+south
+ipython
+
+#django-debug-toolbar
+#gunicorn
+#django-pdb

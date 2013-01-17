@@ -36,17 +36,17 @@ def resetentiredb():
 
 def main():
     parser = argparse.ArgumentParser(description='Cosmos CLI')
-    subparsers = parser.add_subparsers(help='')
+    subparsers = parser.add_subparsers(title="Commands", metavar="<command>")
 
-    subparsers.add_parser('resetentiredb',description=resetentiredb.__doc__).set_defaults(func=resetentiredb)
+    subparsers.add_parser('resetentiredb',help=resetentiredb.__doc__).set_defaults(func=resetentiredb)
 
-    subparsers.add_parser('shell',description=shell.__doc__).set_defaults(func=shell)
+    subparsers.add_parser('shell',help=shell.__doc__).set_defaults(func=shell)
 
-    subparsers.add_parser('syncdb',description=syncdb.__doc__).set_defaults(func=syncdb)
+    subparsers.add_parser('syncdb',help=syncdb.__doc__).set_defaults(func=syncdb)
 
-    wf_sp = subparsers.add_parser('list',description=list.__doc__).set_defaults(func=list)
+    wf_sp = subparsers.add_parser('list',help=list.__doc__).set_defaults(func=list)
 
-    runweb_sp = subparsers.add_parser('runweb',description=runweb.__doc__)
+    runweb_sp = subparsers.add_parser('runweb',help=runweb.__doc__)
     runweb_sp.set_defaults(func=runweb)
     runweb_sp.add_argument('-p','--port',help='port to serve on',default='8080')
 

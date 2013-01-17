@@ -8,16 +8,23 @@ Use the shell command :command:`env` if you're not sure what's in your environme
 
 .. code-block:: bash
 
-   $ cosmos -h
-   usage: cli.py [-h] {adm,wf} ...
-   
-   positional arguments:
-     {adm,wf}
-       adm       Admin
-       wf        Workflow
-   
-   optional arguments:
-     -h, --help  show this help message and exit
+    $ cosmos -h
+    usage: cosmos [-h] <command> ...
+
+    Cosmos CLI
+
+    optional arguments:
+      -h, --help     show this help message and exit
+
+    Commands:
+      <command>
+        resetentiredb
+                     DELETE ALL DATA in the database and then run a syncdb
+        shell        Open up an ipython shell with Cosmos objects preloaded
+        syncdb       Sets up the SQL database
+        list         List all workflows :return:
+        runweb       Start the webserver
+
          
 Explore the available commands, using -h if you wish.  Or see the :ref:`cli` for more info.  Note that when
 listing workflows, the number beside each Workflow inside brackets, `[#]`, is the ID of that object.
@@ -37,26 +44,14 @@ Reset the SQL database
 
 .. code-block:: bash
 
-   $ cosmos adm resetentiredb
+   $ cosmos resetentiredb
 
 List workflows
 ++++++++++++++
 .. code-block:: bash
 
-   $ cosmos wf list
+   $ cosmos ls
 
-
-List the DRMAA specific jobids of the queued jobs in workflow with id 1
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-.. code-block:: bash
-
-   $ cosmos wf jobs -jid -q 1
-
-Manually send a bkill to above jobs (note, Cosmos will reattempt a failed job 3 times by default)
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-.. code-block:: bash
-
-   $ cosmos wf jobs -jid -q 1 |xargs bkill
 
 API
 ___
