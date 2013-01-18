@@ -1,3 +1,6 @@
+"""
+Configuration
+"""
 from configobj import ConfigObj
 import shutil
 import os,sys

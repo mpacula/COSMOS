@@ -1,4 +1,6 @@
-# Django settings for Cosmos project.
+"""
+Django settings for Cosmos project.
+"""
 import sys,os
 #path = os.environ['COSMOS_HOME_PATH']
 #if path not in sys.path:

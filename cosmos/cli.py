@@ -1,3 +1,6 @@
+"""
+Cosmos command line interface
+"""
 import argparse
 from cosmos.Workflow.models import Workflow
 import os,sys
