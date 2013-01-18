@@ -536,7 +536,7 @@ class Workflow(models.Model):
         jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
                                      drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
                                      jobName="",
-                                     drmaa_native_specification=get_drmaa_ns(DRM=session.settings.DRM,
+                                     drmaa_native_specification=get_drmaa_ns(DRM=session.settings.drm,
                                                                              mem_req=task.memory_requirement,
                                                                              cpu_req=task.cpu_requirement,
                                                                              time_req=task.time_requirement,
