@@ -1,7 +1,5 @@
 include README.rst
 include *.py
-include cosmos/config.ini
+include cosmos/default_config.ini
 recursive-include cosmos/Cosmos/static *
-recursive-include cosmos/templates *
-recursive-include docs *
 recursive-include cosmos/templates *

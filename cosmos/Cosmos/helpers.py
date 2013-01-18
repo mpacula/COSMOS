@@ -1,5 +1,4 @@
 import re
-from django.core.exceptions import ValidationError
 import os
 import logging
 import subprocess
@@ -7,6 +6,8 @@ import itertools
 import pprint
 import sys
 import signal
+
+class ValidationException(Exception): pass
 
 real_stdout = os.dup(1)
 real_stderr = os.dup(2)
@@ -140,11 +141,11 @@ def validate_name(txt,field_name=''):
     Validates that txt is alphanumeric and underscores, decimals, or hyphens only
     """ 
     if re.match('^[a-zA-Z0-9_\.\s-]+$',txt) == None:
-        raise ValidationError('Field {0} must be alphanumeric and underscores, periods, spaces, or hyphens only.  Text that failed: {1}'.format(field_name,txt))
+        raise ValidationException('Field {0} must be alphanumeric and underscores, periods, spaces, or hyphens only.  Text that failed: {1}'.format(field_name,txt))
     
 def validate_not_null(field):
     if field == None:
-        raise ValidationError('Required field left blank')
+        raise ValidationException('Required field left blank')
     
 def check_and_create_output_dir(path):
     """
@@ -152,7 +153,7 @@ def check_and_create_output_dir(path):
     """
     if os.path.exists(path):
         if not os.path.isdir(path):
-            raise ValidationError('Path is not a directory')
+            raise ValidationException('Path is not a directory')
     else:
         os.mkdir(path)
 

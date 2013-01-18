@@ -150,7 +150,7 @@ def visualize_as_img(request,pid):
 def analysis(request,pid):
     #from rpy2.robjects import r as R
     from django.conf import settings as django_settings
-    from cosmos.session import settings as cosmos_settings
+    from cosmos import config as cosmos_settings
     
     wf = Workflow.objects.get(pk=pid)
     

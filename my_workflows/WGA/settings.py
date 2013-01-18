@@ -1,7 +1,7 @@
 import os
 from cosmos import session
 
-if session.settings.server_name == 'gpp':
+if session.config.server_name == 'gpp':
     resource_bundle_path = '/nas/erik/bundle/1.5/b37'
     tools_dir = '/home/ch158749/tools'
     settings = {
@@ -10,7 +10,7 @@ if session.settings.server_name == 'gpp':
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/nas/erik/bwa_reference/human_g1k_v37.fasta',
         }
-elif session.settings.server_name  == 'orchestra':
+elif session.config.server_name  == 'orchestra':
     resource_bundle_path = '/groups/lpm/erik/WGA/bundle/2.2/b37'
     tools_dir = '/groups/lpm/erik/WGA/tools'
     settings = {
@@ -19,7 +19,7 @@ elif session.settings.server_name  == 'orchestra':
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/groups/lpm/erik/WGA/bwa_reference/human_g1k_v37.fasta',
         }
-elif session.settings.server_name  == 'bioseq':
+elif session.config.server_name  == 'bioseq':
     resource_bundle_path = '/cosmos/WGA/bundle/2.2/b37/'
     tools_dir = '/cosmos/WGA/tools'
     settings = {
@@ -28,7 +28,7 @@ elif session.settings.server_name  == 'bioseq':
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/cosmos/WGA/bwa_reference/human_g1k_v37.fasta',
         }
-elif session.settings.server_name  == 'default':
+elif session.config.server_name  == 'default':
     resource_bundle_path = '/cosmos/WGA/bundle/2.2/b37/'
     tools_dir = '/cosmos/WGA/tools'
     settings = {
@@ -39,7 +39,7 @@ elif session.settings.server_name  == 'default':
         }
 settings.update({
     'resource_bundle_path' : resource_bundle_path,
-    'tmp_dir' : session.settings.tmp_dir,
+    'tmp_dir' : session.config.tmp_dir,
     'reference_fasta_path' : os.path.join(resource_bundle_path,'human_g1k_v37.fasta'),
     'dbsnp_path' : os.path.join(resource_bundle_path,'dbsnp_137.b37.vcf'),
     'hapmap_path' : os.path.join(resource_bundle_path,'hapmap_3.3.b37.vcf'),

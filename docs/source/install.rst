@@ -9,16 +9,11 @@ ________________________________________
 The following will:
 
 1. Download Cosmos
-2. Enable virtualenv
 3. Install required python libraries
 
 .. code-block:: bash
 
-   git clone github@git:path/to/Cosmos
-   cd Cosmos
-   virtualenv --no-site-packages venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+   pip install github@git:path/to/Cosmos
   
 .. note:: Many python libraries won't be able to install unless their dependent software is already installed on the system.  For example, pygraphviz requires graphviz-dev and python-mysql require python-dev libmysqlclient-dev.
    

@@ -3,5 +3,5 @@ from cosmos import session
 
 def contproc(request):
     return {
-        'cosmos_settings' : session.settings,
+        'cosmos_settings' : session.config,
     }

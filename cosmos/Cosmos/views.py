@@ -2,7 +2,7 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 import os
 import subprocess
-from Workflow.models import Workflow
+from cosmos.Workflow.models import Workflow
 
 def __exec(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

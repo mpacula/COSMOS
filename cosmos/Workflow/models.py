@@ -2,6 +2,7 @@
 Workflow models
 """
 from cosmos import session
+from cosmos.config import settings
 from django.db import models, transaction
 from django.db.models import Q,Count
 from django.db.utils import IntegrityError
@@ -170,7 +171,7 @@ class Workflow(models.Model):
         name = re.sub("\s","_",name)
 
         if root_output_dir is None:
-            root_output_dir = session.settings.default_root_output_dir
+            root_output_dir = settings['default_root_output_dir']
 
         if restart:
             wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
@@ -536,12 +537,12 @@ class Workflow(models.Model):
         jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
                                      drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
                                      jobName="",
-                                     drmaa_native_specification=get_drmaa_ns(DRM=session.settings.drm,
+                                     drmaa_native_specification=get_drmaa_ns(DRM=settings['DRM'],
                                                                              mem_req=task.memory_requirement,
                                                                              cpu_req=task.cpu_requirement,
                                                                              time_req=task.time_requirement,
-                                                                             queue=self.default_queue if self.default_queue else session.settings.default_queue,
-                                                                             parallel_environment_name=session.settings.parallel_environment_name
+                                                                             queue=self.default_queue if self.default_queue else settings['default_queue'],
+                                                                             parallel_environment_name=settings['parallel_environment_name']
                                      ))
 
         task._jobAttempts.add(jobAttempt)

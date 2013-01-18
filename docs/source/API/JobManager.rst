@@ -1,5 +1,5 @@
 JobManager
 ==========
 
-.. automodule:: cosmos.JobManager.models
+.. automodule:: workflows.JobManager.models
    :members: JobAttempt
