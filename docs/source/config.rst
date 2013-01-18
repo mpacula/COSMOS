@@ -6,7 +6,7 @@ Configuration
 1. Setup Your Shell Environment
 _______________________________
 
-Type `cosmos` at the command line, and generate a default configuration file in :filepath:`~/.cosmos/config.ini`.
+Type `cosmos` at the command line, and generate a default configuration file in :file:`~/.cosmos/config.ini`.
 Edit :file:`~/.cosmos/config.ini`, and configure it to your liking.  There are only a few variables to set.
 
 SGE specific environment variables
@@ -32,5 +32,5 @@ these two commands after you've configured the database to your liking
    $ cosmos syncdb
    $ cosmos collectstatic
 
-If you ever switch to a different database in your :filepath:`~/.cosmos/config.ini`, be sure to run `cosmos syncdb`
+If you ever switch to a different database in your :file:`~/.cosmos/config.ini`, be sure to run `cosmos syncdb`
 to recreate your tables.

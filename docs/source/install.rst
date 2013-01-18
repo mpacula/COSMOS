@@ -20,9 +20,10 @@ The following will:
 .. note:: Many python libraries won't be able to install unless their dependent software is already installed on the system.  For example, pygraphviz requires graphviz-dev and python-mysql require python-dev libmysqlclient-dev.
    
 The only other requirement is that :term:`DRMAA` is installed on the system.  If you use multiple python virtual environments, we highly recommend
-using `virtualenvwrapper`<http://www.doughellmann.com/projects/virtualenvwrapper/>.
+using `virtualenvwrapper <http://www.doughellmann.com/projects/virtualenvwrapper/>`_.
 
-Optionally, if you want the graphing capabilities, R and the R package ggplot2 are required:
+Optionally, if you want the experimental graphing capabilities to automatically summarize
+computational resource usage, R and the R package ggplot2 are required:
 
 .. code-block:: bash
 
