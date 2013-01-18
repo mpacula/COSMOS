@@ -3,7 +3,7 @@ import os,re,json,time,sys
 from picklefield.fields import PickledObjectField
 from django.utils.datastructures import SortedDict
 from django.core.validators import RegexValidator
-from cosmos.Cosmos.helpers import check_and_create_output_dir,spinning_cursor,enable_stderr,disable_stderr
+from cosmos.utils.helpers import check_and_create_output_dir,spinning_cursor,enable_stderr,disable_stderr
 from cosmos import session
 from cosmos.config import settings
 from django.utils import timezone
@@ -176,7 +176,7 @@ class JobAttempt(models.Model):
         ``base_template`` must be passed down by the JobManager
         """
         
-        cmd = "python {profile} -d {db} -f {profile_out} {command_script_path}".format(profile = os.path.join(settings['cosmos_library_path'],'cosmos/Cosmos/profile/profile.py'),
+        cmd = "python {profile} -d {db} -f {profile_out} {command_script_path}".format(profile = os.path.join(settings['cosmos_library_path'],'cosmos/contrib/profile/profile.py'),
                                                                                        db = self.profile_output_path+'.sqlite',
                                                                                        profile_out = self.profile_output_path,
                                                                                        command_script_path = self.command_script_path

@@ -62,7 +62,7 @@ STATIC_URL = '/static/'
 
 # Additional locations of static files
 STATICFILES_DIRS = (
-    os.path.join(cosmos_settings['cosmos_library_path'],'Cosmos/static/'),
+    os.path.join(cosmos_settings['cosmos_library_path'],'static/'),
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
@@ -97,10 +97,10 @@ MIDDLEWARE_CLASSES = (
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'Cosmos.urls'
+ROOT_URLCONF = 'cosmos.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'cosmos.Cosmos.wsgi.application'
+WSGI_APPLICATION = 'cosmos.utils.wsgi.application'
 
 TEMPLATE_DIRS = (
     os.path.join(cosmos_settings['cosmos_library_path'],'templates'),

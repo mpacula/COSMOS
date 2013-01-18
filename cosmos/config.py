@@ -1,11 +1,7 @@
 from configobj import ConfigObj
 import shutil
 import os,sys
-from Cosmos.helpers import confirm
-
-#######################
-# Configuration
-#######################
+from cosmos.utils.helpers import confirm
 
 user_home_path = os.path.expanduser('~')
 cosmos_path = os.path.join(user_home_path,'.cosmos/')
@@ -20,11 +16,10 @@ if not os.path.exists(config_path):
         shutil.copyfile(default_config_path,config_path)
     else:
         sys.exit(1)
-
+# Creating settings dictionary
 co = ConfigObj(config_path)
 settings = co.dict()
 settings['cosmos_library_path'] = cosmos_library_path
 settings['cosmos_path'] = cosmos_path
 settings['config_path'] = config_path
 settings['user_home_path'] = user_home_path
-#collapse all sections except Database and make accessible as attributes

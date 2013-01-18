@@ -8,8 +8,8 @@ from django.db.models import Q,Count
 from django.db.utils import IntegrityError
 from cosmos.JobManager.models import JobAttempt,JobManager
 import os,sys,re,signal
-from cosmos.Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
-from cosmos.Cosmos import helpers
+from cosmos.utils.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
+from cosmos.utils import helpers
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField, dbsafe_decode
 from django.utils import timezone

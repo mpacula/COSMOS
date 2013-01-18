@@ -1,8 +1,9 @@
 import time
+from cosmos.contrib.profile import read_man_proc
+
 start_time = time.time()
 
-import subprocess,time,sys,re,os,sqlite3,json,signal
-import read_man_proc
+import subprocess, sys,re,os,sqlite3,json,signal
 import logging
 import argparse
 

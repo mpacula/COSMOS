@@ -2,7 +2,7 @@
 A Cosmos session.  Must be the first import of any cosmos script.
 """
 import os,sys
-from cosmos.Cosmos.helpers import confirm
+from cosmos.utils.helpers import confirm
 from cosmos.config import settings
 
 #######################
@@ -13,10 +13,9 @@ from cosmos.config import settings
 from cosmos import django_settings
 from django.conf import settings as django_conf_settings, global_settings
 django_conf_settings.configure(
-    TEMPLATE_CONTEXT_PROCESSORS=global_settings.TEMPLATE_CONTEXT_PROCESSORS + ('Workflow.context_processor.contproc',),
+    TEMPLATE_CONTEXT_PROCESSORS=global_settings.TEMPLATE_CONTEXT_PROCESSORS + ('cosmos.utils.context_processor.contproc',),
     **django_settings.__dict__)
-
-
+#custom template context processor for web interface
 
 #######################
 # DRMAA

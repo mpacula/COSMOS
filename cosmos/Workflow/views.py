@@ -3,7 +3,7 @@ from django.template import RequestContext
 from django.http import HttpResponse
 from cosmos.Workflow.models import Workflow, Stage, Task, TaskTag, WorkflowManager, TaskFile
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from cosmos.Cosmos.helpers import groupby
+from cosmos.utils.helpers import groupby
 from models import status_choices
 from django.utils.datastructures import SortedDict
 import os
