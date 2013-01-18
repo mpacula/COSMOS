@@ -1,4 +1,4 @@
-from cosmos.Cosmos.helpers import groupby
+from cosmos.utils.helpers import groupby
 import itertools as it
 import networkx as nx
 import pygraphviz as pgv
