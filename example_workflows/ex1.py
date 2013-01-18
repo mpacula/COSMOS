@@ -1,7 +1,6 @@
-from cosmos import session
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
-from tools import ECHO, CAT, PASTE, WC
+from cosmos.contrib.ezflow.dag import DAG, Split, Add
+from examples.tools import ECHO, CAT, PASTE, WC
 
 ####################
 # Workflow
