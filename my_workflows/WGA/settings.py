@@ -1,7 +1,7 @@
 import os
 from cosmos import session
 
-if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
+if session.settings.server_name == 'gpp':
     resource_bundle_path = '/nas/erik/bundle/1.5/b37'
     tools_dir = '/home/ch158749/tools'
     settings = {
@@ -10,7 +10,7 @@ if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/nas/erik/bwa_reference/human_g1k_v37.fasta',
         }
-elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
+elif session.settings.server_name  == 'orchestra':
     resource_bundle_path = '/groups/lpm/erik/WGA/bundle/2.2/b37'
     tools_dir = '/groups/lpm/erik/WGA/tools'
     settings = {
@@ -19,7 +19,7 @@ elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/groups/lpm/erik/WGA/bwa_reference/human_g1k_v37.fasta',
         }
-elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.bioseq':
+elif session.settings.server_name  == 'bioseq':
     resource_bundle_path = '/cosmos/WGA/bundle/2.2/b37/'
     tools_dir = '/cosmos/WGA/tools'
     settings = {
@@ -28,7 +28,7 @@ elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.bioseq':
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/cosmos/WGA/bwa_reference/human_g1k_v37.fasta',
         }
-elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.default':
+elif session.settings.server_name  == 'default':
     resource_bundle_path = '/cosmos/WGA/bundle/2.2/b37/'
     tools_dir = '/cosmos/WGA/tools'
     settings = {

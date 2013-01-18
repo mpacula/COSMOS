@@ -1,7 +1,8 @@
 import argparse
 import cosmos.session
 from cosmos.Workflow.models import Workflow
-import os
+import os,sys
+from cosmos import manage
 
 def runweb(port):
     """
@@ -31,7 +32,10 @@ def resetdb():
     os.system('manage reset_db -R default')
     os.system('manage syncdb')
 
-
+def django(django_args=[]):
+    "Django manage.py script"
+    from django.core.management import execute_from_command_line
+    execute_from_command_line([sys.argv[0]]+django_args)
 
 def main():
     parser = argparse.ArgumentParser(description='Cosmos CLI')
@@ -43,7 +47,11 @@ def main():
 
     subparsers.add_parser('syncdb',help=syncdb.__doc__).set_defaults(func=syncdb)
 
-    wf_sp = subparsers.add_parser('list',help=list.__doc__).set_defaults(func=list)
+    django_sp = subparsers.add_parser('django',help=django.__doc__)
+    django_sp.set_defaults(func=django)
+    django_sp.add_argument('django_args', nargs=argparse.REMAINDER)
+
+    subparsers.add_parser('list',help=list.__doc__).set_defaults(func=list)
 
     runweb_sp = subparsers.add_parser('runweb',help=runweb.__doc__)
     runweb_sp.set_defaults(func=runweb)
