@@ -6,7 +6,7 @@ Configuration
 1. Setup Your Shell Environment
 _______________________________
 
-
+Type `cosmos` at the command line, and generate a default configuration file in :filepath:`~/.cosmos/config.ini`.
 Edit :file:`~/.cosmos/config.ini`, and configure it to your liking.  There are only a few variables to set.
 
 SGE specific environment variables
@@ -23,11 +23,14 @@ You may also need to set (if they're not already) normal :term:`SGE` job submiss
 3. Create SQL Tables and Load Static Files
 __________________________________________
 
-Once you've configured Cosmos, setting up the SQL database tables is easy.  :term:`Django` also requires you to run the collectstatic
-command, which moves all the necessary image, css, and javascript files to the static/ directory.  Just run these two commands for any directory after you've properly
-configured the environment variables described in step #1.
+Once you've configured Cosmos, setting up the SQL database tables is easy.  :term:`Django` also requires you to run the
+collectstatic command, which moves all the necessary image, css, and javascript files to the static/ directory.  Run
+these two commands after you've configured the database to your liking
 
 .. code-block:: bash
 
-   $ cosmos adm syncdb
-   $ manage collectstatic
+   $ cosmos syncdb
+   $ cosmos collectstatic
+
+If you ever switch to a different database in your :filepath:`~/.cosmos/config.ini`, be sure to run `cosmos syncdb`
+to recreate your tables.

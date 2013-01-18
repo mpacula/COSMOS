@@ -13,7 +13,9 @@ The following will:
 
 .. code-block:: bash
 
-   pip install github@git:path/to/Cosmos
+   git clone git@github.com:ComputationalBiomedicine/Cosmos.git
+   cd Cosmos
+   python setup.py install
   
 .. note:: Many python libraries won't be able to install unless their dependent software is already installed on the system.  For example, pygraphviz requires graphviz-dev and python-mysql require python-dev libmysqlclient-dev.
    

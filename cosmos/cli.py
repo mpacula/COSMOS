@@ -30,6 +30,10 @@ def list():
 def syncdb():
     "Sets up the SQL database"
     os.system('cosmos django syncdb')
+
+def collectstatic():
+    "Collects static files for the web interface"
+    os.system('cosmos django collectstatic')
     
 def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"
@@ -54,6 +58,7 @@ def main():
 #    subparsers.add_parser('init',help=init.__doc__).set_defaults(func=init)
 
     subparsers.add_parser('syncdb',help=syncdb.__doc__).set_defaults(func=syncdb)
+    subparsers.add_parser('collectstatic',help=collectstatic.__doc__).set_defaults(func=collectstatic)
 
     django_sp = subparsers.add_parser('django',help=django.__doc__)
     django_sp.set_defaults(func=django)

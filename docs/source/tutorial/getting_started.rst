@@ -14,7 +14,7 @@ features of Cosmos.  The number beside each object inside brackets, `[#]`, is th
 
 .. code-block:: bash
 
-   $ python $COSMOS_HOME_PATH/my_workflows/examples/ex1.py
+   $ python ~/.cosmos/example_workflows/ex1.py
    
    wrote to /tmp/ex1.svg
    INFO: 2012-12-06 16:45:51: Created Workflow Workflow[2] Example 1.
@@ -58,12 +58,15 @@ You can use the web interface to explore the history and debug all workflows.  T
 
 .. code-block:: bash
 
-   cosmos adm runweb -p 8080
+   cosmos runweb -p 8080
   
-.. note:: Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the system you're running the workflow on.
+.. note::
+
+    Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the
+    system you're running the workflow on.
    
-Visit http://your-ip:8080 to access it.  If you can't access the website, its likely firewalled off; fortunately, the Cosmos website
-works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080` 
+Visit http://your-ip:8080 to access it.  If you can't access the website, its likely firewalled off.  Fortunately, the
+Cosmos website works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080`
 
 .. figure:: /imgs/web_interface.png
    :width: 90%
@@ -72,6 +75,7 @@ works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080`
 Terminating a Workflow
 ______________________
 
-To terminate a workflow, simply press ctrl+c (or send the process a SIGINT signal) in the terminal.  Cosmos will terminate running jobs and mark them as failed.
+To terminate a workflow, simply press ctrl+c (or send the process a SIGINT signal) in the terminal.
+Cosmos will terminate running jobs and mark them as failed.
 You can resume from the point in the workflow you left off later.
 
