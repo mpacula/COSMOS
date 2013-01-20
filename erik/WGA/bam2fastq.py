@@ -12,6 +12,7 @@ from tools import picard
 import os
 from settings import settings
 
+
 class SplitFastq(Tool):
     outputs = ['dir']
     time_req = 0

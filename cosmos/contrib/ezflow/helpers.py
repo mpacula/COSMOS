@@ -1,8 +1,6 @@
 import types
 from inspect import getargspec
 import sys, pprint
-from cosmos.Cosmos.helpers import groupby
-
 
 def cosmos_format(s,d):
     """

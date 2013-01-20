@@ -104,6 +104,9 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
             raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
 
+        check_and_create_output_dir(self.output_dir)
+        self.log, self.log_path = get_workflow_logger(self)
+
     @property
     def tasks(self):
         """Tasks in this Workflow"""
@@ -276,10 +279,8 @@ class Workflow(models.Model):
         output_dir = os.path.join(root_output_dir,name)
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
-        wf.log.info('Created Workflow {0}.'.format(wf))
-        check_and_create_output_dir(wf.output_dir)
 
-        wf.log, wf.log_path = get_workflow_logger(wf)
+        wf.log.info('Created Workflow {0}.'.format(wf))
 
         return wf
 
@@ -542,7 +543,7 @@ class Workflow(models.Model):
                                                                              cpu_req=task.cpu_requirement,
                                                                              time_req=task.time_requirement,
                                                                              queue=self.default_queue if self.default_queue else settings['default_queue'],
-                                                                             parallel_environment_name=settings['parallel_environment_name']
+                                                                             parallel_environment_name=settings['SGE']['parallel_environment_name']
                                      ))
 
         task._jobAttempts.add(jobAttempt)
@@ -824,6 +825,7 @@ class Stage(models.Model):
         validate_not_null(self.workflow)
         
         validate_name(self.name,self.name)
+        check_and_create_output_dir(self.output_dir)
         #validate unique name
 #        if Stage.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
 #            raise ValidationError("Stage names must be unique within a given Workflow. The name {0} already exists.".format(self.name))

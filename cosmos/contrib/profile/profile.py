@@ -1,5 +1,5 @@
 import time
-from cosmos.contrib.profile import read_man_proc
+import read_man_proc
 
 start_time = time.time()
 

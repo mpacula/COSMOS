@@ -34,8 +34,8 @@ class REVERTSAM(Picard):
     outputs = ['bam']
     one_parent = True
     time_req = 0
-    mem_req = 20*1024
-    succeed_on_failure = True
+    mem_req = 40*1024
+    succeed_on_failure = False
 
     jar = 'RevertSam.jar'
 
@@ -46,7 +46,7 @@ class REVERTSAM(Picard):
             INPUT={i[bam]}
             OUTPUT=$OUT.bam
             VALIDATION_STRINGENCY=SILENT
-            MAX_RECORDS_IN_RAM=2000000
+            MAX_RECORDS_IN_RAM=4000000
         """
 
 class BAM2FASTQ(Picard):

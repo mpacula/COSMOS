@@ -1,7 +1,7 @@
 from helpers import getcallargs,cosmos_format
 import re
 from cosmos.Workflow.models import TaskFile
-from cosmos.Cosmos.helpers import parse_cmd
+from cosmos.utils.helpers import parse_cmd
 import itertools
 
 i = 0

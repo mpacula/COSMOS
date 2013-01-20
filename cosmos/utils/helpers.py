@@ -131,7 +131,7 @@ def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_req=None,parallel_envir
             s += ' -q {0}'.format(queue)
         return s
     elif DRM == 'GE':
-        return '-l h_vmem={0}M -pe {2} {3}'.format(int(mem_req/cpu_req),int(mem_req*.7),cpu_req)
+        return '-l h_vmem={0}M -pe {1} {2}'.format(int(mem_req/cpu_req),parallel_environment_name,cpu_req)
         #return '-l h_vmem={0}M,slots={1}'.format(mem_req,cpu_req)
     else:
         raise Exception('DRM native specification not supported')
