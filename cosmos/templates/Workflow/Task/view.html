@@ -9,10 +9,18 @@
   <li class="active">{{task}}</li>
 </ul>
 
-<div class="alert {%if task.successful%}alert-success{%endif%}">
+<div>
     <h1>
-        {%if task.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
-        {%if task.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
+        {%if task.status == "successful"%}
+            <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>
+        {%endif%}
+        {%if task.status == "failed"%}
+        <i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>
+            Failed
+        {%endif%}
+        {%if task.status == "in_progress"%}
+            <i class="icon-refresh" rel="tooltip" title="Warning"></i>
+        {%endif%}
         {{task}}
     </h1>
 <strong>Tags</strong>: 
@@ -21,7 +29,7 @@
 {% endfor %}
 </div>
 <dl class="dl-horizontal">
-<dt>Status</dt><dd>{{task.status}}</dd>
+<dt>Status</dt><dd><em>{{task.status}}</em></dd>
 <dt>Parents</dt><dd>
 	{%for parent in task.parents%}
 	<a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>

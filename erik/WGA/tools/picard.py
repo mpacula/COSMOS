@@ -49,7 +49,7 @@ class REVERTSAM(Picard):
             MAX_RECORDS_IN_RAM=4000000
         """
 
-class BAM2FASTQ(Picard):
+class SAM2FASTQ_byrg(Picard):
     inputs = ['bam']
     outputs = ['dir']
     one_parent = True
@@ -69,6 +69,25 @@ class BAM2FASTQ(Picard):
             VALIDATION_STRINGENCY=LENIENT
         """
 
+
+class SAM2FASTQ(Picard):
+    inputs = ['bam']
+    outputs = ['fastq']
+    one_parent = True
+    time_req = 0
+    mem_req = 12*1024
+    succeed_on_failure = True
+
+    jar = 'SamToFastq.jar'
+
+    def cmd(self,i,s,p):
+        import re
+        return r"""
+            {self.bin}
+            INPUT={i[bam]}
+            FASTQ=$OUT.fastq
+            VALIDATION_STRINGENCY=LENIENT
+        """
 
 
 class MERGE_SAMS(Picard):

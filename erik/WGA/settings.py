@@ -10,6 +10,7 @@ if cosmos_settings['server_name'] == 'gpp':
         'Picard_dir' : os.path.join(tools_dir,'picard-tools-1.77'),
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/nas/erik/bwa_reference/human_g1k_v37.fasta',
+        'samtools_path':os.path.join(tools_dir,'samtools-0.1.18/samtools')
         }
 elif cosmos_settings['server_name']  == 'orchestra':
     resource_bundle_path = '/groups/lpm/erik/WGA/bundle/2.2/b37'
@@ -19,6 +20,7 @@ elif cosmos_settings['server_name']  == 'orchestra':
         'Picard_dir' : os.path.join(tools_dir,'picard-tools-1.78'),
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/groups/lpm/erik/WGA/bwa_reference/human_g1k_v37.fasta',
+        'samtools_path':os.path.join(tools_dir,'samtools-0.1.18/samtools')
         }
 elif cosmos_settings['server_name']  == 'bioseq':
     resource_bundle_path = '/cosmos/WGA/bundle/2.2/b37/'
@@ -28,16 +30,28 @@ elif cosmos_settings['server_name']  == 'bioseq':
         'Picard_dir' : os.path.join(tools_dir,'picard-tools-1.81'),
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
         'bwa_reference_fasta_path' : '/cosmos/WGA/bwa_reference/human_g1k_v37.fasta',
+        'samtools_path':os.path.join(tools_dir,'samtools-0.1.18/samtools')
         }
-else:
-    resource_bundle_path = '/WGA/bundle/2.2/b37/'
-    tools_dir = '/WGA/tools'
+elif cosmos_settings['server_name']  == 'wga':
+    resource_bundle_path = '/gluster/gv0/WGA/bundle/2.2/b37/'
+    tools_dir = '/gluster/gv0/WGA/tools'
     settings = {
         'GATK_path' :os.path.join(tools_dir,'GenomeAnalysisTKLite-2.2-16-g2cc9ef8/GenomeAnalysisTKLite.jar'),
         'Picard_dir' : os.path.join(tools_dir,'picard-tools-1.81'),
         'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
-        'bwa_reference_fasta_path' : '/WGA/bwa_reference/human_g1k_v37.fasta',
-        }
+        'bwa_reference_fasta_path' : '/gluster/gv0/bwa_reference/human_g1k_v37.fasta',
+        'samtools_path':os.path.join(tools_dir,'samtools-0.1.18/samtools')
+    }
+else:
+    resource_bundle_path = '/gluster/gv0/WGA/bundle/2.2/b37/'
+    tools_dir = '/gluster/gv0/WGA/tools'
+    settings = {
+        'GATK_path' :os.path.join(tools_dir,'GenomeAnalysisTKLite-2.2-16-g2cc9ef8/GenomeAnalysisTKLite.jar'),
+        'Picard_dir' : os.path.join(tools_dir,'picard-tools-1.81'),
+        'bwa_path' : os.path.join(tools_dir,'bwa-0.6.2/bwa'),
+        'bwa_reference_fasta_path' : '/gluster/gv0/WGA/bwa_reference/human_g1k_v37.fasta',
+        'samtools_path':os.path.join(tools_dir,'samtools-0.1.18/samtools')
+    }
 settings.update({
     'resource_bundle_path' : resource_bundle_path,
     'tmp_dir' : cosmos_settings['tmp_dir'],

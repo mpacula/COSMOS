@@ -22,8 +22,7 @@ django_conf_settings.configure(
 #######################
 
 if settings['DRM'] == 'LSF':
-    os.environ['DRMAA_LIBRARY_PATH'] = settings['drmaa_library_path']
-    os.environ['DRMAA_LIBRARY_PATH'] = os.path.join(settings['cosmos_library_path'],'lsf_drmaa.conf')
+    os.environ['LSF_DRMAA_CONF'] = os.path.join(settings['cosmos_library_path'],'lsf_drmaa.conf')
 
 import drmaa
 drmaa_enabled = False

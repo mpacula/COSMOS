@@ -20,7 +20,7 @@ def cosmos_format(s,d):
         raise Exception('Wrapped function must return a str')
     try:
         return s.format(**d)
-    except (KeyError,IndexError) as e:
+    except (KeyError,IndexError,TypeError) as e:
         print >> sys.stderr, "Format Error: {0}".format(e)
         print >> sys.stderr, "\tTried to format: {0}".format(pprint.pformat(s))
         print >> sys.stderr, "\tWith: {0}".format(pprint.pformat(d))

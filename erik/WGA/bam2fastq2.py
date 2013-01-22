@@ -22,6 +22,16 @@ class SplitFastq(Tool):
     def cmd(self,i,s,p):
         return "python scripts/splitfastq.py {t[input]} $OUT.dir"
 
+class SplitBam(Tool):
+    inputs=['bam']
+    outputs = ['dir']
+    time_req = 0
+    mem_req = 5000
+    one_parent=True
+
+    def cmd(self,i,s,p):
+        return "/home/erik/.virtualenvs/cosmos/bin/python /home/erik/Cosmos/erik/WGA/scripts/splitBam.py -i {i[bam]} -o $OUT.dir"
+
 
 cli = CLI()
 cli.parser.add_argument('-i','--input_file',required=True)
@@ -34,8 +44,7 @@ WF = cli.parse_args()
 
 dag = (DAG()
         |Add| [ INPUT(output_path=cli.parsed_kwargs['input_file']) ]
-        |Apply| picard.REVERTSAM
-        |Apply| picard.SAM2FASTQ_byrg
+        |Apply| SplitBam
     ).configure(settings=settings)
 
 #################

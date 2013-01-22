@@ -154,15 +154,15 @@ class Tool(object):
     def process_cmd(self):
         """
         Stuff that happens in between map_inputs() and cmd()
-        :param *args: input file parameters
-        :param **kwargs: Named input file parameters
         """
-        callargs = getcallargs(self.cmd,i=self.input_files,s=self.settings,p=self.parameters.update(self.tags))
+        p = self.parameters.copy()
+        p.update(self.tags)
+        callargs = getcallargs(self.cmd,i=self.input_files,s=self.settings,p=p)
         del callargs['self']
         r = self.cmd(**callargs)
         
         #if tuple is returned, second element is a dict to format with
-        extra_format_dict = r[1] if len(r) == 2 else {}
+        extra_format_dict = r[1] if len(r) == 2 and r else {}
         pcmd = r[0] if len(r) == 2 else r 
         
         #replace $OUT with taskfile    
