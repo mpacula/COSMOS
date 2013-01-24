@@ -1,5 +1,5 @@
+.project
 .idea/
-.gitignore
 .git/
 build/
 dist/
@@ -8,5 +8,3 @@ migrations/
 *.pyc
 *.swp
 *.*~
-quickCommit.bash
-lsync.conf*

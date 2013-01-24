@@ -9,11 +9,10 @@ def list_rgids(input_filename,samtools_path,**kwargs):
     """
     Lists read group ids in input_filename
     """
+    cmd = '{0} view -H {1}'.format(samtools_path,input_filename)
+    logging.info('Getting readgroups via cmd: {0}'.format(cmd))
     p = Popen('{0} view -H {1}'.format(samtools_path,input_filename).split(' '),stdout=PIPE,stderr=PIPE)
     header = p.stdout.readlines()
-    cmd = '{0} view -h {1}'.format(samtools_path,input_filename)
-    logging.info('Getting readgroups via cmd: {0}'.format(cmd))
-    view_proc = Popen(cmd.split(' '),stdout=PIPE,stderr=PIPE)
     rgids = map(rg2rgid,filter(lambda l:re.match('@RG',l),header))
     for rgid in rgids: yield rgid
 

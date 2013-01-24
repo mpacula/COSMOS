@@ -16,20 +16,20 @@ from settings import settings
 
 
 class SplitFastq(Tool):
-    inputs = ['_1.fastq','_2.fastq']
+    inputs = ['1.fastq','2.fastq']
     outputs = ['dir']
     time_req = 0
     mem_req = 1000
 
     def cmd(self,i,s,p):
-        input = i['_1.fastq'][0] if p['pair'] == 1 else i['_2.fastq'][0]
+        input = i['1.fastq'][0] if p['pair'] == 1 else i['2.fastq'][0]
         return "python scripts/splitfastq.py {input} $OUT.dir", { 'input': input}
 
 class FilterBamByRG(Tool):
     inputs = ['bam']
     outputs = ['bam']
     time_req = 0
-    mem_req = 5000
+    mem_req = 3000
     one_parent=True
 
     def cmd(self,i,s,p):

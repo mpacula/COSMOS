@@ -25,18 +25,20 @@ setup(name='cosmos',
     scripts=['bin/cosmos'],
     package_data={'cosmos':['default_config.ini']+all_files('cosmos/static')+all_files('cosmos/templates')},
     data_files=[(examples_installation_dir,example_workflows)],
-    install_requires=['decorator',
-                      'Django',
-                      'configobj',
-                      'MySQL-python',
-                      'networkx',
-                      'django-extensions',
-                      'django-picklefield',
-                      'drmaa',
+    install_requires=[
+        'distribute>=0.6.28',
+        'decorator',
+        'Django',
+        'configobj',
+        'MySQL-python',
+        'networkx',
+        'django-extensions',
+        'django-picklefield',
+        'drmaa',
 
-                      #optional
-                      'pygraphviz',
-                      'south',
-                      'ipython',
+        #optional
+        'pygraphviz',
+        'south',
+        'ipython',
     ]
 )
