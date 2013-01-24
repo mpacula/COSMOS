@@ -97,7 +97,7 @@ class Tool(object):
 
         if len(outputs) == 0:
             #x = [ x.name for x in self.get_output('*') ]
-            raise GetOutputError('No output file in {0} with name {1}.')
+            raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
 
         return outputs[0]
     
@@ -166,7 +166,7 @@ class Tool(object):
         pcmd = r[0] if len(r) == 2 else r 
         
         #replace $OUT with taskfile    
-        for out_name in re.findall('\$OUT\.([\w]+)',pcmd):
+        for out_name in re.findall('\$OUT\.([\.\w]+)',pcmd):
             try:
                 pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
             except KeyError as e:

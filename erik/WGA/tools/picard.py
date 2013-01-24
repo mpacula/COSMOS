@@ -4,10 +4,17 @@ import os
 class Picard(Tool):
     time_req = 120
     mem_req = 2*1024
+    cpu_req=2
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -Dsnappy.loader.verbosity=true -jar {jar}'.format(self=self,mem_req=int(self.mem_req*.8),s=self.settings,jar=os.path.join(self.settings['Picard_dir'],self.jar))
+        return 'java  -XX:ParallelGCThreads={gc_threads} -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -Dsnappy.loader.verbosity=true -jar {jar}'.format(
+            self=self,
+            mem_req=int(self.mem_req*.8),
+            gc_threads = self.cpu_req,
+            s=self.settings,
+            jar=os.path.join(self.settings['Picard_dir'],self.jar),
+            )
 
 
 class FIXMATE(Picard):
@@ -34,7 +41,7 @@ class REVERTSAM(Picard):
     outputs = ['bam']
     one_parent = True
     time_req = 0
-    mem_req = 40*1024
+    mem_req = 10*1024
     succeed_on_failure = False
 
     jar = 'RevertSam.jar'
@@ -72,11 +79,11 @@ class SAM2FASTQ_byrg(Picard):
 
 class SAM2FASTQ(Picard):
     inputs = ['bam']
-    outputs = ['fastq']
+    outputs = ['1.fastq','2.fastq']
     one_parent = True
     time_req = 0
     mem_req = 12*1024
-    succeed_on_failure = True
+    succeed_on_failure = False
 
     jar = 'SamToFastq.jar'
 
@@ -85,7 +92,8 @@ class SAM2FASTQ(Picard):
         return r"""
             {self.bin}
             INPUT={i[bam]}
-            FASTQ=$OUT.fastq
+            FASTQ=$OUT.1.fastq
+            SECOND_END_FASTQ=$OUT.2.fastq
             VALIDATION_STRINGENCY=LENIENT
         """
 

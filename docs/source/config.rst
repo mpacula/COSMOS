@@ -16,7 +16,7 @@ You may also need to set (if they're not already) normal :term:`SGE` job submiss
 
 .. code-block:: bash
 
-	SGE_ROOT=/opt/sge6/lib/linux-x64/libdrmaa.so
+	SGE_ROOT=/opt/sge6/
 	SGE_EXECD_PORT=63232
 	SGE_QMASTER_PORT=63231
 
