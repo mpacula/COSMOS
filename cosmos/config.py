@@ -17,6 +17,7 @@ if not os.path.exists(config_path):
         if not os.path.exists(os.path.dirname(config_path)):
             os.mkdir(os.path.dirname(config_path))
         shutil.copyfile(default_config_path,config_path)
+        print >> sys.stderr, "Done.  Before proceeding, please edit {0}".format(default_config_path)
     else:
         sys.exit(1)
 # Creating settings dictionary

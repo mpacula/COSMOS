@@ -41,13 +41,12 @@ class REVERTSAM(Picard):
     outputs = ['bam']
     one_parent = True
     time_req = 0
-    mem_req = 10*1024
+    mem_req = 30*1024
     succeed_on_failure = False
 
     jar = 'RevertSam.jar'
 
     def cmd(self,i,s,p):
-        import re
         return r"""
             {self.bin}
             INPUT={i[bam]}
@@ -67,7 +66,6 @@ class SAM2FASTQ_byrg(Picard):
     jar = 'SamToFastq.jar'
 
     def cmd(self,i,s,p):
-        import re
         return r"""
             {self.bin}
             INPUT={i[bam]}
@@ -78,12 +76,15 @@ class SAM2FASTQ_byrg(Picard):
 
 
 class SAM2FASTQ(Picard):
+    """
+    Assumes sorted
+    """
     inputs = ['bam']
     outputs = ['1.fastq','2.fastq']
     one_parent = True
     time_req = 0
-    mem_req = 12*1024
-    succeed_on_failure = False
+    mem_req = 3*1024
+    succeed_on_failure = True
 
     jar = 'SamToFastq.jar'
 
@@ -94,7 +95,7 @@ class SAM2FASTQ(Picard):
             INPUT={i[bam]}
             FASTQ=$OUT.1.fastq
             SECOND_END_FASTQ=$OUT.2.fastq
-            VALIDATION_STRINGENCY=LENIENT
+            VALIDATION_STRINGENCY=SILENT
         """
 
 

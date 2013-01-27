@@ -8,3 +8,5 @@ migrations/
 *.pyc
 *.swp
 *.*~
+erik/lsync.*
+erik/config.*
