@@ -7,7 +7,7 @@ from cosmos.utils.helpers import check_and_create_output_dir,spinning_cursor,ena
 from cosmos import session
 from cosmos.config import settings
 from django.utils import timezone
-import drmaa
+from cosmos.session import drmaa
 
 decode_drmaa_state = SortedDict([
         (drmaa.JobState.UNDETERMINED, 'process status cannot be determined'),

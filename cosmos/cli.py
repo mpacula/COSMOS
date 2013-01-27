@@ -2,7 +2,6 @@
 Cosmos command line interface
 """
 import argparse
-from cosmos.Workflow.models import Workflow
 import os,sys
 def runweb(port):
     """
@@ -20,6 +19,7 @@ def list():
     """
     List all workflows
     """
+    from cosmos.Workflow.models import Workflow
     for w in Workflow.objects.all():
         print w
 #
