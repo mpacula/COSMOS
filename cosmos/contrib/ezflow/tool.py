@@ -14,6 +14,7 @@ files = []
 
 class ExpectedError(Exception): pass
 class ToolError(Exception): pass
+class ToolValidationError(Exception):pass
 class GetOutputError(Exception): pass
 
 class Tool(object):
@@ -65,7 +66,13 @@ class Tool(object):
         for output_ext in self.outputs:
             tf = TaskFile(fmt=output_ext)
             self.add_output(tf)
-    
+
+        if len(self.inputs) != len(set(self.inputs)):
+            raise ToolValidationError('Duplicate input names detected.  Perhaps try using [1.ext,2.ext,...]')
+
+        if len(self.outputs) != len(set(self.outputs)):
+            raise ToolValidationError('Duplicate output names detected.  Perhaps try using [1.ext,2.ext,...]')
+
     @property
     def parents(self):
         return self.dag.G.predecessors(self)
