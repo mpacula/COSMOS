@@ -3,7 +3,7 @@ from django.template import RequestContext
 from django.http import HttpResponse
 from cosmos.Workflow.models import Workflow, Stage, Task, TaskTag, WorkflowManager, TaskFile
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from cosmos.Cosmos.helpers import groupby
+from cosmos.utils.helpers import groupby
 from models import status_choices
 from django.utils.datastructures import SortedDict
 import os
@@ -127,7 +127,7 @@ def taskfile_view(request,tfid):
         if output.strip() == '': output = 'Empty Directory'
 
     else:
-        output = file(tf.path,'rb').read(int(math.pow(2,30))) #read at most 100kb
+        output = file(tf.path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
     return render_to_response('Workflow/TaskFile/view.html', { 'request':request,'taskfile': tf, 'output':output, 'jobAttempt':None }, context_instance=RequestContext(request))
 
 
@@ -150,7 +150,7 @@ def visualize_as_img(request,pid):
 def analysis(request,pid):
     #from rpy2.robjects import r as R
     from django.conf import settings as django_settings
-    from cosmos.session import settings as cosmos_settings
+    from cosmos import config as cosmos_settings
     
     wf = Workflow.objects.get(pk=pid)
     

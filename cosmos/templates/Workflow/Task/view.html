@@ -9,10 +9,18 @@
   <li class="active">{{task}}</li>
 </ul>
 
-<div class="alert {%if task.successful%}alert-success{%endif%}">
+<div>
     <h1>
-        {%if task.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%endif%}
-        {%if task.status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
+        {%if task.status == "successful"%}
+            <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>
+        {%endif%}
+        {%if task.status == "failed"%}
+        <i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>
+            Failed
+        {%endif%}
+        {%if task.status == "in_progress"%}
+            <i class="icon-refresh" rel="tooltip" title="Warning"></i>
+        {%endif%}
         {{task}}
     </h1>
 <strong>Tags</strong>: 
@@ -21,7 +29,7 @@
 {% endfor %}
 </div>
 <dl class="dl-horizontal">
-<dt>Status</dt><dd>{{task.status}}</dd>
+<dt>Status</dt><dd><em>{{task.status}}</em></dd>
 <dt>Parents</dt><dd>
 	{%for parent in task.parents%}
 	<a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
@@ -35,10 +43,12 @@
 <dt>CPU Requirement</dt><dd>{{task.cpu_requirement}}</dd>
 <dt>Memory Requirement</dt><dd>{{task.memory_requirement}}MB</dd>
 <dt>Time Requirement</dt><dd>{{task.time_requirement}} min</dd>
-<dt>File_size</dt><dd>{%if settings.show_task_file_sizes%}{{task.file_size}}{%else%}off{%endif%}</dd>
+<dt>File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{task.output_file_size}}{%else%}off{%endif%}</dd>
 <dt>Wall time</dt><dd>{{task.wall_time|format_time}}</dd>
 <dt>Successful</dt><dd>{{task.successful}}</dd>
 <dt>NOOP</dt><dd>{{task.NOOP}}</dd>
+<dt>Cleared Outputs</dt><dd>{{task.cleared_output_files}}</dd>
+<dt>Don't Delete Outputs</dt><dd>{{task.dont_delete_output_files}}</dd>
 <dt>Succeed On Failure</dt><dd>{{task.succeed_on_failure}}</dd>
 <dt>Created On</dt><dd>{{task.created_on}}</dd>
 <dt>Finished On</dt><dd>{{task.finished_on}}</dd>

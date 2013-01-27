@@ -11,10 +11,6 @@
   <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task}}</a><span class="divider">/</span></li>
   <li class="active">{{jobAttempt}}</li>
 </ul>
-<div class="alert {% with qs=jobAttempt.queue_status %}
-            {%if jobAttempt.successful%}alert-success{%else%}
-            {%if qs == "completed"%}alert-error{%endif%}{%endif%}
-        {% endwith%}">
     <h1>
         {% with qs=jobAttempt.queue_status %}
             {%if jobAttempt.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
@@ -34,7 +30,7 @@
 <dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
 <dt><em>Profile</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
 <dt>Output Directory</dt><dd><code>{{jobAttempt.task.job_output_dir}}</code></dd>
-<dt>Task File Size</dt><dd>{%if settings.show_jobAttempt_file_sizes%}{{jobAttempt.file_size}}{%else%}OFF{%endif%}</dd>
+<dt>Task Output File Size</dt><dd>{%if cosmos_settings.show_jobAttempt_file_sizes%}{{jobAttempt.task.output_file_size}}{%else%}off{%endif%}</dd>
 <dt>Output Files</dt><dd>
 	{%for of in jobAttempt.task.output_files%}
 	<a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>

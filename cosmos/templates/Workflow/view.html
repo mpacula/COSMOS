@@ -38,6 +38,8 @@
 {% if workflow.default_queue %}
 <dt>Default Queue</dt><dd>{{workflow.default_queue}}</dd>
 {% endif %}
+<dt>Max Reattempts</dt><dd>{{workflow.max_reattempts}}</dd>
+<dt>Delete Intermedies</dt><dd>{{workflow.delete_intermediaries}}</dd>
 <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
 <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
 <dt>Wall Time</dt><dd>{{workflow.wall_time.seconds|format_time}}</dd>

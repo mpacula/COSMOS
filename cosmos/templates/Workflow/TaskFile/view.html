@@ -10,8 +10,11 @@
 </ul>
 {% endwith %}
 <h1>Viewing File <small>(first .1MB of it)</small></h1>
-<p>
-{{taskfile.name}} : <code>{{taskfile.path}}</code>
-</p>
+<dl class="dl-horizontal">
+    <dt>Total Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{taskfile.file_size}}{%else%}off{%endif%}</dd>
+    <dt>Name</dt><dd>{{taskfile.name}}</dd>
+    <dt>Format</dt><dd>{{taskfile.fmt}}</dd>
+    <dt>Path</dt><dd>{{taskfile.path}}</dd>
+</dl>
 <pre class="pre-scrollable">{{output|safe}}</pre>
 {%endblock%}
