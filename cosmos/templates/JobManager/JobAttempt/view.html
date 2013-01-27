@@ -11,10 +11,6 @@
   <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task}}</a><span class="divider">/</span></li>
   <li class="active">{{jobAttempt}}</li>
 </ul>
-<div class="alert {% with qs=jobAttempt.queue_status %}
-            {%if jobAttempt.successful%}alert-success{%else%}
-            {%if qs == "completed" %}alert-error{%endif%}{%endif%}
-        {% endwith%}">
     <h1>
         {% with qs=jobAttempt.queue_status %}
             {%if jobAttempt.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}

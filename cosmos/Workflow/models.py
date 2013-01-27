@@ -2,13 +2,14 @@
 Workflow models
 """
 from cosmos import session
+from cosmos.config import settings
 from django.db import models, transaction
 from django.db.models import Q,Count
 from django.db.utils import IntegrityError
 from cosmos.JobManager.models import JobAttempt,JobManager
 import os,sys,re,signal
-from cosmos.Cosmos.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
-from cosmos.Cosmos import helpers
+from cosmos.utils.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
+from cosmos.utils import helpers
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField, dbsafe_decode
 from django.utils import timezone
@@ -103,6 +104,9 @@ class Workflow(models.Model):
         if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
             raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
 
+        check_and_create_output_dir(self.output_dir)
+        self.log, self.log_path = get_workflow_logger(self)
+
     @property
     def tasks(self):
         """Tasks in this Workflow"""
@@ -170,7 +174,7 @@ class Workflow(models.Model):
         name = re.sub("\s","_",name)
 
         if root_output_dir is None:
-            root_output_dir = session.settings.default_root_output_dir
+            root_output_dir = settings['default_root_output_dir']
 
         if restart:
             wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
@@ -275,10 +279,8 @@ class Workflow(models.Model):
         output_dir = os.path.join(root_output_dir,name)
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
-        wf.log.info('Created Workflow {0}.'.format(wf))
-        check_and_create_output_dir(wf.output_dir)
 
-        wf.log, wf.log_path = get_workflow_logger(wf)
+        wf.log.info('Created Workflow {0}.'.format(wf))
 
         return wf
 
@@ -536,11 +538,13 @@ class Workflow(models.Model):
         jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
                                      drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
                                      jobName="",
-                                     drmaa_native_specification=get_drmaa_ns(DRM=session.settings.DRM,
+                                     drmaa_native_specification=get_drmaa_ns(DRM=settings['DRM'],
                                                                              mem_req=task.memory_requirement,
                                                                              cpu_req=task.cpu_requirement,
                                                                              time_req=task.time_requirement,
-                                                                             queue=self.default_queue if self.default_queue else session.settings.default_queue))
+                                                                             queue=self.default_queue if self.default_queue else settings['default_queue'],
+                                                                             parallel_environment_name=settings['SGE']['parallel_environment_name']
+                                     ))
 
         task._jobAttempts.add(jobAttempt)
         if self.dry_run:
@@ -821,6 +825,7 @@ class Stage(models.Model):
         validate_not_null(self.workflow)
         
         validate_name(self.name,self.name)
+        check_and_create_output_dir(self.output_dir)
         #validate unique name
 #        if Stage.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
 #            raise ValidationError("Stage names must be unique within a given Workflow. The name {0} already exists.".format(self.name))

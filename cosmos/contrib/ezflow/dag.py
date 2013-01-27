@@ -1,4 +1,4 @@
-from cosmos.Cosmos.helpers import groupby
+from cosmos.utils.helpers import groupby
 import itertools as it
 import networkx as nx
 import pygraphviz as pgv
@@ -50,8 +50,7 @@ class DAG(object):
                 self.parameters[tool.stage_name] = tool.default_params.copy()
                 self.parameters[tool.stage_name].update(parameters.get(tool.__class__.__name__,{}))
                 self.parameters[tool.stage_name].update(parameters.get(tool.stage_name,{}))
-                
-            tool.parameters = self.parameters[tool.stage_name]
+            tool.parameters = self.parameters.get(tool.stage_name,{})
         return self
             
     def add_to_workflow(self,WF):
@@ -210,6 +209,7 @@ def _reduce(dag,keywords,tool_class,stage_name=None):
         yield new_tool
 Reduce = Infix(_reduce)
 
+#TODO raise exceptions if user submits bad kwargs for any infix commands
 @infix
 def _split(dag,split_by,tool_class,stage_name=None):
     input_tools = dag.last_tools

@@ -1,7 +1,7 @@
 from helpers import getcallargs,cosmos_format
 import re
 from cosmos.Workflow.models import TaskFile
-from cosmos.Cosmos.helpers import parse_cmd
+from cosmos.utils.helpers import parse_cmd
 import itertools
 
 i = 0
@@ -14,6 +14,7 @@ files = []
 
 class ExpectedError(Exception): pass
 class ToolError(Exception): pass
+class ToolValidationError(Exception):pass
 class GetOutputError(Exception): pass
 
 class Tool(object):
@@ -65,7 +66,13 @@ class Tool(object):
         for output_ext in self.outputs:
             tf = TaskFile(fmt=output_ext)
             self.add_output(tf)
-    
+
+        if len(self.inputs) != len(set(self.inputs)):
+            raise ToolValidationError('Duplicate input names detected.  Perhaps try using [1.ext,2.ext,...]')
+
+        if len(self.outputs) != len(set(self.outputs)):
+            raise ToolValidationError('Duplicate output names detected.  Perhaps try using [1.ext,2.ext,...]')
+
     @property
     def parents(self):
         return self.dag.G.predecessors(self)
@@ -97,7 +104,7 @@ class Tool(object):
 
         if len(outputs) == 0:
             #x = [ x.name for x in self.get_output('*') ]
-            raise GetOutputError('No output file in {0} with name {1}.')
+            raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
 
         return outputs[0]
     
@@ -154,19 +161,19 @@ class Tool(object):
     def process_cmd(self):
         """
         Stuff that happens in between map_inputs() and cmd()
-        :param *args: input file parameters
-        :param **kwargs: Named input file parameters
         """
-        callargs = getcallargs(self.cmd,i=self.input_files,s=self.settings,p=self.parameters.update(self.tags))
+        p = self.parameters.copy()
+        p.update(self.tags)
+        callargs = getcallargs(self.cmd,i=self.input_files,s=self.settings,p=p)
         del callargs['self']
         r = self.cmd(**callargs)
         
         #if tuple is returned, second element is a dict to format with
-        extra_format_dict = r[1] if len(r) == 2 else {}
+        extra_format_dict = r[1] if len(r) == 2 and r else {}
         pcmd = r[0] if len(r) == 2 else r 
         
         #replace $OUT with taskfile    
-        for out_name in re.findall('\$OUT\.([\w]+)',pcmd):
+        for out_name in re.findall('\$OUT\.([\.\w]+)',pcmd):
             try:
                 pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
             except KeyError as e:

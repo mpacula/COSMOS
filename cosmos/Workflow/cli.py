@@ -11,7 +11,7 @@ class CLI(object):
         self.parser.add_argument('-o','--root_output_dir',type=str,help="The root output directory.  Output will be stored in root_output_dir/{workflow.name}.  Defaults to the value in cosmos.session.settings.")
         self.parser.add_argument('-r','--restart',action='store_true',help="Complete restart the workflow by deleting it and creating a new one.")
         self.parser.add_argument('-d','--delete_intermediaries',action='store_true',help="Deletes intermediate files to save scratch space.")
-        self.parser.add_argument('-y','--prompt_confirm',action='store_true',help="Do not use confirmation prompts before restarting or deleting, and assume answer is always yes.")
+        self.parser.add_argument('-y','--prompt_confirm',action='store_false',help="Do not use confirmation prompts before restarting or deleting, and assume answer is always yes.")
         self.parser.add_argument('-dry','--dry_run',action='store_true',help="Don't actually run any jobs.")
 
     def parse_args(self):

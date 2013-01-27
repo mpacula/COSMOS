@@ -1,46 +1,35 @@
 """
-A Cosmos session.  Sets up environment variables, Django, SQL and DRMAA
+A Cosmos session.  Must be the first import of any cosmos script.
 """
 import os,sys
-from django.utils import importlib
+from cosmos.utils.helpers import confirm
+from cosmos.config import settings
 
-#import Cosmos Settings
-if 'COSMOS_SETTINGS_MODULE' not in os.environ:
-    os.environ['COSMOS_SETTINGS_MODULE'] = 'config.default' #default location for settings
-if 'DJANGO_SETTINGS_MODULE' not in os.environ:
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.Cosmos.django_settings' #default location for settings
+#######################
+# DJANGO
+#######################
 
-try:
-    settings = importlib.import_module(os.environ['COSMOS_SETTINGS_MODULE'])
-except ImportError:
-    print >> sys.stderr, "ERROR!! The file {} in the COSMOS_SETTINGS_MODULE environment variable could not be imported.".format(os.environ['COSMOS_SETTINGS_MODULE'])
-    sys.exit(1)
-    
-if 'COSMOS_HOME_PATH' not in os.environ:
-    print >>sys.stderr, 'please set the environment variable COSMOS_HOME_PATH'
-    sys.exit(1)
+#configure django settings
+from cosmos import django_settings
+from django.conf import settings as django_conf_settings, global_settings
+django_conf_settings.configure(
+    TEMPLATE_CONTEXT_PROCESSORS=global_settings.TEMPLATE_CONTEXT_PROCESSORS + ('cosmos.utils.context_processor.contproc',),
+    **django_settings.__dict__)
+#custom template context processor for web interface
 
-#parts = os.environ['COSMOS_SETTINGS_MODULE'].split('.')
-#package=parts[0]
-#name=parts[1]
-#settings = getattr(__import__(package, fromlist=[name]), name)
+#######################
+# DRMAA
+#######################
+os.environ['DRMAA_LIBRARY_PATH'] = settings['drmaa_library_path']
+if settings['DRM'] == 'LSF':
+    os.environ['LSF_DRMAA_CONF'] = os.path.join(settings['cosmos_library_path'],'lsf_drmaa.conf')
 
-###Setup DJANGO
-path = os.path.join(settings.home_path,'cosmos')
-if path not in sys.path:
-    sys.path.append(path)
-
-#DRMAA
 import drmaa
 drmaa_enabled = False
 try:
-    drmaa_enabled = True
     drmaa_session = drmaa.Session()
     drmaa_session.initialize()
-    
+    drmaa_enabled = True
 except Exception as e:
     print e
     print "ERROR! Could not enable drmaa.  Proceeding without drmaa enabled."
-    
-    pass
-    
