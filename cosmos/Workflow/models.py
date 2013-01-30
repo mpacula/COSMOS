@@ -238,9 +238,21 @@ class Workflow(models.Model):
                 print "Exiting."
                 sys.exit(1)
             wf.bulk_delete_tasks(utasks)
-            #delete empty stages
-            Stage.objects.filter(pk__in=map(lambda d:d['id'],filter(lambda d:d['task__count'] == 0,Stage.objects.annotate(Count('task')).values('id','task__count')))).delete()
-            #.update(started_on=None,successful=False,status='no_attempt',finished_on=None)
+
+            #Update stages that are empty
+            #Stage.objects.filter(pk__in=map(lambda d:d['id'],filter(lambda d:d['task__count'] == 0,Stage.objects.annotate(Count('task')).values('id','task__count')))).delete()
+            Stage.objects.filter(pk__in=map(lambda d:d['id'],
+                filter(lambda d:d['task__count'] == 0,
+                    Stage.objects.annotate(Count('task')).values('id','task__count')
+                ))
+            ).update(started_on=None,successful=False,status='no_attempt',finished_on=None)
+
+            # Update stages that are resuming
+            Stage.objects.filter(pk__in=map(lambda d:d['id'],
+                filter(lambda d:d['task__count'] > 1 and d['status'] != 'successful',
+                    Stage.objects.annotate(Count('task')).values('id','status','task__count')
+                ))
+            ).update(successful=False,status='in_progress',finished_on=None)
 
         return wf
 
@@ -1111,6 +1123,8 @@ class Stage(models.Model):
         
     def __str__(self):
         return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
+    def toString(self):
+        return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
             
 
 class TaskTag(models.Model):
@@ -1343,4 +1357,8 @@ class Task(models.Model):
     
     def __str__(self):
         return 'Task[{0}] {1} {2}'.format(self.id,self.stage.name,self.tags)
+
+
+    def toString(self):
+        return 'Task[{0}] {1}'.format(self.id,self.stage.name,pprint.pformat(self.tags,indent=4))
 

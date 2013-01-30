@@ -272,6 +272,8 @@ class JobAttempt(models.Model):
         
     def get_command_shell_script_text(self):
         "Read the command.sh file"
+        if not os.path.exists(self.command_script_path):
+            return "Error: {0} does not exist".format(self.command_script_path)
         with open(self.command_script_path,'rb') as f:
             return f.read()
     

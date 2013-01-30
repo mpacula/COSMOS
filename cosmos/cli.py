@@ -3,6 +3,9 @@ Cosmos command line interface
 """
 import argparse
 import os,sys
+import cosmos.session
+from cosmos.Workflow.models import Workflow
+
 def runweb(port):
     """
     Start the webserver
@@ -19,7 +22,6 @@ def list():
     """
     List all workflows
     """
-    from cosmos.Workflow.models import Workflow
     for w in Workflow.objects.all():
         print w
 #
@@ -44,9 +46,7 @@ def resetdb():
     os.system('cosmos django syncdb')
 
 
-
-
-def django(django_args=[]):
+def django(django_args):
     "Django manage.py script"
     from django.core.management import execute_from_command_line
     execute_from_command_line([sys.argv[0]]+django_args)

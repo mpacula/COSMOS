@@ -16,7 +16,7 @@
 {%endblock%}
 
 {% block head %}
-    <script type="text/javascript">
+    <!--<script type="text/javascript">
     $(document).ready(function() {
         update_html = function(selector,urlfunc){
             //updates selector with the html from url every second
@@ -41,7 +41,7 @@
             return false;
         });
     });
-    </script>
+    </script>-->
 {% endblock %}
 
 {%block content%}
@@ -50,7 +50,21 @@
       <li><a href="{{stage.workflow.url }}">{{stage.workflow}}</a> <span class="divider">/</span></li>
       <li class="active">{{stage}}</li>
     </ul>
-    
+
+    <h1>
+        {%if stage.status == "successful"%}
+        <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>
+        {%endif%}
+        {%if stage.status == "failed"%}
+        <i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>
+        Failed
+        {%endif%}
+        {%if stage.status == "in_progress"%}
+        <i class="icon-refresh" rel="tooltip" title="Warning"></i>
+        {%endif%}
+        {{stage.toString}}
+    </h1>
+
     <div id="stage_table">
         {% with details=1 stages=stage|aslist%}
         {%include "Workflow/Stage/table.html"%}
@@ -74,7 +88,7 @@
                 <li>
                 <label class="control-label" for="id_{{key}}">{%if key == "f_status"%}status{%else%}{{key}}{%endif%}</label>
                 <select id="id_{{key}}" name="{{key}}">
-                        <option value="{{v}}"{%if current_filters.key == "" %}selected="selected"{%endif%}></option>
+                        <option value="{{v}}"{% if current_filters.key == "" %}selected="selected"{%endif%}></option>
                     {%for v in values%}
                         <option value="{{v}}"{%if current_filters|key2val:key == v %}selected="selected"{%endif%}>{{v}}</option>
                     {%endfor%}

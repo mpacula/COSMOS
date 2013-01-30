@@ -1,5 +1,21 @@
 """
 WGA Workflow
+
+Input Dicts
+
+[
+    {
+        'lane': 001,
+        'chunk': 001,
+        'library': 'LIB-1216301779A',
+        'sample': '1216301779A',
+        'platform': 'ILLUMINA',
+        'flowcell': 'C0MR3ACXX'
+        'pair': 0, #0 or 1
+        'path': '/path/to/fastq'
+    },
+    {..}
+]
 """
 
 _author_ = 'Erik Gafni'
@@ -22,33 +38,22 @@ import os
 ####################
 
 cli = CLI()
-cli.parser.add_argument('-i','--input_dir',type=str,help='Input directory')
-WF = cli.parse_args()
-#
-#if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.gpp':
-#    indir = '/nas/erik/ngs_data/test_data3'
-#elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.bioseq':
-#    indir = '/cosmos/WGA/ngs_data/test_data'
-#    indir = '/cosmos/WGA/ngs_data/NA12878_chr20'
-#    wf_name = 'WGA NA12878_chr20'
-#    inputs = get_inputs(indir)
-#elif os.environ['COSMOS_SETTINGS_MODULE'] == 'config.orchestra':
-#    indir = '/groups/lpm/erik/WGA/ngs_data/test_data'
-#
-#if 'inputs' not in locals():
-#    if os.environ['COSMOS_SETTINGS_MODULE'] == 'config.default':
-#        data_dict = [{u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R1_001.fastq.gz'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L001_R2_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R1_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301779A', u'sample': u'1216301779A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301779A/1216301779A_GCCAAT_L002_R2_001.fastq.gz'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R1_001.fastq.gz'}, {u'lane': u'001', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L001_R2_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 0, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R1_001.fastq.gz'}, {u'lane': u'002', u'chunk': u'001', u'library': u'LIB-1216301781A', u'sample': u'1216301781A', u'platform': u'ILLUMINA', u'flowcell': u'C0MR3ACXX', u'pair': 1, u'path': u'/nas/erik/ngs_data/test_data3/Sample_1216301781A/1216301781A_CTTGTA_L002_R2_001.fastq.gz'}]
-#        wf_name = 'Test'
-#    else:
-#        from my_workflows.WGA.inputs import batch1
-#        data_dict = json.loads(batch1.main(input_dir=indir,depth=1))
-#        wf_name = 'Test'
-#
-inputs = []
-for i in get_inputs(cli.parsed_kwargs['input_dir']):
-    path = i.pop('path')
-    inputs.append(INPUT(tags = i,taskfile=TaskFile(path=path,fmt='fastq.gz')))
+cli.parser.add_argument('-i','--inputs',type=str,help='Inputs, see script comments for format.',required=True)
+cli.parser.add_argument('-p','--input_path',type=str,help='Prepends a directory to all input paths.')
 
+WF = cli.parse_args()
+
+
+#setup inputs
+input_path = cli.parsed_kwargs['input_path']
+with open(cli.parsed_kwargs['inputs'],'r') as input_dict:
+    input_list = json.loads(input_dict.read())
+    if input_path:
+        for i in input_list:
+            i['path'] = os.path.join(input_path,i['path'])
+
+inputs = [ INPUT(taskfile=TaskFile(name='fastq.gz',path=i['path'],fmt='fastq.gz'),tags=i) for i in input_list ]
+inputs = filter(lambda i: i.tags['chunk'] == '001',inputs)
 
 ####################
 # Configuration
@@ -68,13 +73,12 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 # Create DAG
 ####################
 
-
 dag = (DAG(mem_req_factor=1)
     |Add| inputs
     |Apply| bwa.ALN
     |Reduce| (['sample','flowcell','lane','chunk'],bwa.SAMPE)
-    |Reduce| (['sample'],picard.MERGE_SAMS)
     |Apply| picard.CLEAN_SAM
+    |Reduce| (['sample'],picard.MERGE_SAMS)
     |Apply| picard.INDEX_BAM
     |Split| ([intervals],gatk.RTC)
     |Apply| gatk.IR

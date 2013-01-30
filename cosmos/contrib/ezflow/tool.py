@@ -205,8 +205,8 @@ class INPUT(Tool):
     def __init__(self,*args,**kwargs):
         """
         """
-        output_path=kwargs.pop('output_path',None)
-        output_paths=kwargs.pop('output_paths',[])
+        output_path=kwargs.pop('filepath',None)
+        output_paths=kwargs.pop('fiepaths',[])
         taskfile=kwargs.pop('taskfile',None)
         taskfiles=kwargs.pop('taskfiles',[])
         super(INPUT,self).__init__(*args,**kwargs)

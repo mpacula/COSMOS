@@ -12,7 +12,7 @@ class ALN(Tool):
     outputs = ['sai']
     default_params = { 'q': 5 }
     
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         """
         Expects tags: lane, chunk, library, sample, platform, flowcell, pair
         """
@@ -26,7 +26,7 @@ class SAMPE(Tool):
     inputs = ['fastq.gz','sai']
     outputs = ['sam']
 
-    def cmd(self,i,t,s,p):
+    def cmd(self,i,s,p):
         """
         Expects tags: lane, chunk, library, sample, platform, flowcell, pair
         """

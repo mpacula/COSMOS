@@ -10,11 +10,14 @@ class GATK(Tool):
 
     @property
     def bin(self):
-        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(self=self,s=self.settings,mem_req=int(self.mem_req*.8))
+        return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(
+            self=self,s=self.settings,
+            mem_req=int(self.mem_req*.8)
+        )
 
 class RTC(GATK):
     __verbose__ = "Indel Realigner Target Creator"
-    mem_req = 4.5*1024
+    mem_req = 8*1024
     cpu_req = 4
     inputs = ['bam']
     outputs = ['intervals']
@@ -36,7 +39,7 @@ class RTC(GATK):
     
 class IR(GATK):
     __verbose__ = "Indel Realigner"
-    mem_req = 4.5*1024
+    mem_req = 8*1024
     inputs = ['bam','intervals']
     outputs = ['bam']
     one_parent = True
@@ -135,7 +138,7 @@ class UG(GATK):
     
 class CV(GATK):
     __verbose__ = "Combine Variants"
-    mem_req = 4*1024
+    mem_req = 3*1024
     
     inputs = ['vcf']
     outputs = ['vcf']
