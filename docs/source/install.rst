@@ -23,7 +23,7 @@ ________________________________________
 The following will:
 
 1. Download Cosmos
-3. Install Cosmos and required python libraries
+2. Install Cosmos and required python libraries
 
 .. code-block:: bash
 
@@ -39,7 +39,7 @@ Install Cosmos in a virtual environment using
 This will make sure all python libraries and files related to Cosmos are installed to
 $home/.virtualenvs/cosmos.
 
-.. code-block::bash
+.. code-block:: bash
 
     pip install virtualenvwrapper --user
     source $HOME/.local/bin/virtualenvwrapper.sh

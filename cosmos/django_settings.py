@@ -96,7 +96,7 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     #'debug_toolbar.middleware.DebugToolbarMiddleware',
     # Uncomment the next line for simple clickjacking protection:
-    # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
+     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
 ROOT_URLCONF = 'cosmos.urls'
@@ -113,11 +113,11 @@ TEMPLATE_DIRS = (
 
 INSTALLED_APPS = (
     'django_extensions',
-    #'django_pdb',
-    'south',
     'cosmos.Workflow',
-    #'gunicorn',
     'cosmos.JobManager',
+    #'django_pdb',
+    #'gunicorn',
+    'south',
     #'debug_toolbar',
     'django.contrib.auth',
     'django.contrib.contenttypes',

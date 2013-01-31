@@ -6,7 +6,7 @@
   <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
   <li><a href="{{task.stage.workflow.url }}">{{task.stage.workflow}}</a> <span class="divider">/</span></li>
   <li><a href="{{task.stage.url }}">{{task.stage}}</a><span class="divider">/</span></li>
-  <li class="active">{{task}}</li>
+  <li class="active">{{task.name}}</li>
 </ul>
 
 <div>
@@ -21,11 +21,11 @@
         {%if task.status == "in_progress"%}
             <i class="icon-refresh" rel="tooltip" title="Warning"></i>
         {%endif%}
-        {{task}}
+        {{task.toString}}
     </h1>
-<strong>Tags</strong>: 
+<strong>Tags</strong>:
 {% for k,v in task.tags.items %}
-<span class="label label-important">{{k}}:{{v}}</span>
+<span class="label label-info">{{k}}:{{v}}</span>
 {% endfor %}
 </div>
 <dl class="dl-horizontal">
@@ -72,7 +72,7 @@
         {%if j.queue_status == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>{%endif%}
         {%if j.get_drmaa_status == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
         {%if j.get_drmaa_status == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
-        
+
         <a href="{{j.url}}">{{ j }}</a>
     </li>
 </ul>

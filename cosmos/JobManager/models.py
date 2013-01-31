@@ -7,7 +7,7 @@ from cosmos.utils.helpers import check_and_create_output_dir,spinning_cursor,ena
 from cosmos import session
 from cosmos.config import settings
 from django.utils import timezone
-import drmaa
+from cosmos.session import drmaa
 
 decode_drmaa_state = SortedDict([
         (drmaa.JobState.UNDETERMINED, 'process status cannot be determined'),
@@ -272,6 +272,8 @@ class JobAttempt(models.Model):
         
     def get_command_shell_script_text(self):
         "Read the command.sh file"
+        if not os.path.exists(self.command_script_path):
+            return "Error: {0} does not exist".format(self.command_script_path)
         with open(self.command_script_path,'rb') as f:
             return f.read()
     

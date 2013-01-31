@@ -3,15 +3,15 @@ import os
 
 class Picard(Tool):
     time_req = 120
-    mem_req = 2*1024
-    cpu_req=2
+    mem_req = 3*1024
+    cpu_req=1
+    extra_java_args=''
 
     @property
     def bin(self):
-        return 'java  -XX:ParallelGCThreads={gc_threads} -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -Dsnappy.loader.verbosity=true -jar {jar}'.format(
+        return 'java{self.extra_java_args} -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -Dsnappy.loader.verbosity=true -jar {jar}'.format(
             self=self,
             mem_req=int(self.mem_req*.8),
-            gc_threads = self.cpu_req,
             s=self.settings,
             jar=os.path.join(self.settings['Picard_dir'],self.jar),
             )
@@ -23,7 +23,7 @@ class FIXMATE(Picard):
     outputs = ['bam']
     one_parent = True
     time_req = 4*60
-    mem_req = 5*1024
+    mem_req = 3*1024
 
     jar = 'FixMateInformation.jar'
 
@@ -41,8 +41,11 @@ class REVERTSAM(Picard):
     outputs = ['bam']
     one_parent = True
     time_req = 0
-    mem_req = 30*1024
+    mem_req = 20*1024
+    cpu_req=2
     succeed_on_failure = False
+
+    extra_java_args =' -XX:ParallelGCThreads={0}'.format(cpu_req+1)
 
     jar = 'RevertSam.jar'
 
@@ -102,7 +105,7 @@ class SAM2FASTQ(Picard):
 class MERGE_SAMS(Picard):
     __verbose__ = "Merge Sam Files"
     mem_req = 3*1024
-    inputs = ['sam']
+    inputs = ['bam']
     outputs = ['bam']
     default_params = { 'assume_sorted': False}
     
@@ -118,13 +121,13 @@ class MERGE_SAMS(Picard):
             MERGE_SEQUENCE_DICTIONARIES=True
             ASSUME_SORTED={p[assume_sorted]}
         """, {
-        'inputs' : "\n".join(["INPUT={0}".format(n) for n in i['sam']]) 
+        'inputs' : "\n".join(["INPUT={0}".format(n) for n in i['bam']])
         }
                 
 class CLEAN_SAM(Picard):
     __verbose__ = "Clean Sams"
-    mem_req = 3*1024
-    inputs = ['bam']
+    mem_req = 4*1024
+    inputs = ['sam']
     outputs = ['bam']
     one_parent = True
     
@@ -133,13 +136,14 @@ class CLEAN_SAM(Picard):
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            I={i[bam]}
+            I={i[sam]}
             O=$OUT.bam
+            VALIDATION_STRINGENCY=SILENT
         """
 
 class DEDUPE(Picard):
     __verbose__ = "Mark Duplicates"
-    mem_req = 5*1024
+    mem_req = 4*1024
     inputs = ['bam']
     outputs = ['bam','metrics']
     one_parent = True
@@ -157,7 +161,7 @@ class DEDUPE(Picard):
 
 class INDEX_BAM(Picard):
     __verbose__ = "Index Bam Files"
-    mem_req = 3*1024
+    mem_req = 4*1024
     forward_input = True
     inputs = ['bam']
     one_parent = True

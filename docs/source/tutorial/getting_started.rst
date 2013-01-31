@@ -66,7 +66,8 @@ You can use the web interface to explore the history and debug all workflows.  T
     system you're running the workflow on.
    
 Visit http://your-ip:8080 to access it.  If you can't access the website, its likely firewalled off.  Fortunately, the
-Cosmos website works well with lynx.  Use the command: :command:`$ lynx 0.0.0.0:8080`
+Cosmos website works well with lynx.  Use the command on the same server
+running the web interface: :command:`$ lynx localhost:8080`
 
 .. figure:: /imgs/web_interface.png
    :width: 90%
