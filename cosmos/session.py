@@ -2,7 +2,6 @@
 A Cosmos session.  Must be the first import of any cosmos script.
 """
 import os,sys
-from cosmos.utils.helpers import confirm
 from cosmos.config import settings
 
 #######################

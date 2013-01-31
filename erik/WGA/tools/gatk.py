@@ -60,7 +60,7 @@ class IR(GATK):
     
 class BQSR(GATK):
     __verbose__ = "Base Quality Score Recalibration"
-    cpu_req = 1
+    cpu_req = 8
     mem_req = 9*1024
     inputs = ['bam']
     outputs = ['recal']
@@ -81,6 +81,7 @@ class BQSR(GATK):
             -cov QualityScoreCovariate
             -cov CycleCovariate
             -cov ContextCovariate
+            -nct {nct}
         """, {
             'inputs' : list2input(i['bam']),
             'nct': self.cpu_req +1
