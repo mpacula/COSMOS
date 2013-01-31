@@ -16,7 +16,7 @@ print >> sys.stderr, "Installing userfiles to ~/.cosmos"
 example_workflows = map(lambda x:os.path.join('example_workflows/',x),filter(lambda x:x[-3:]=='.py',os.listdir('example_workflows')))
 
 setup(name='cosmos',
-    version='0.2',
+    version='0.3',
     description = "Workflow Manager",
     author='Erik Gafni',
     license='Non-commercial',
