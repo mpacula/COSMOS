@@ -46,7 +46,10 @@
                 {%endwith%} 
             <strong><a href="{{task.url}}" style="color:#C09853">{{task}}</a></strong>
             </td>
-            <td>{{task.parents}}</td>
+            <td>{% for p in task.parents%}
+                <a href="{{p.url}}">{{p}}</a>
+                {% endfor %}
+            </td>
             <td>{{task.status}}
             </td>
             <td>

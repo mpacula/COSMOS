@@ -11,7 +11,7 @@ class Picard(Tool):
     def bin(self):
         return 'java{self.extra_java_args} -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -Dsnappy.loader.verbosity=true -jar {jar}'.format(
             self=self,
-            mem_req=int(self.mem_req*.8),
+            mem_req=int(self.mem_req*.5),
             s=self.settings,
             jar=os.path.join(self.settings['Picard_dir'],self.jar),
             )
@@ -126,7 +126,7 @@ class MERGE_SAMS(Picard):
                 
 class CLEAN_SAM(Picard):
     __verbose__ = "Clean Sams"
-    mem_req = 4*1024
+    mem_req = 3*1024
     inputs = ['sam']
     outputs = ['bam']
     one_parent = True
@@ -140,10 +140,26 @@ class CLEAN_SAM(Picard):
             O=$OUT.bam
             VALIDATION_STRINGENCY=SILENT
         """
+class SORTSAM(Picard):
+    __verbose__ = "Sort Sam"
+    mem_req = 3*1024
+    inputs = ['bam']
+    outputs = ['bam']
+    one_parent = True
 
-class DEDUPE(Picard):
+    jar = 'SortSam.jar'
+
+    def cmd(self,i,s,p):
+        return r"""
+            {self.bin}
+            I={i[bam]}
+            O=$OUT.bam
+            SORT_ORDER=coordinate
+        """
+
+class MARKDUPES(Picard):
     __verbose__ = "Mark Duplicates"
-    mem_req = 4*1024
+    mem_req = 2*1024
     inputs = ['bam']
     outputs = ['bam','metrics']
     one_parent = True
@@ -161,7 +177,7 @@ class DEDUPE(Picard):
 
 class INDEX_BAM(Picard):
     __verbose__ = "Index Bam Files"
-    mem_req = 4*1024
+    mem_req = 3*1024
     forward_input = True
     inputs = ['bam']
     one_parent = True

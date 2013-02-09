@@ -31,6 +31,8 @@ class JobAttempt(models.Model):
     """
     An attempt at running a task.
     """
+    drmaa_session_contact = models.CharField(max_length=256,null=False,help_text="keep track of session")
+
     queue_status_choices = (
         ('not_queued','JobAttempt has not been submitted to the JobAttempt Queue yet'),
         ('queued','JobAttempt is in the JobAttempt Queue and is waiting to run, is running, or has finished'),
@@ -48,7 +50,7 @@ class JobAttempt(models.Model):
     successful = models.BooleanField(default=False)
     command = models.TextField(max_length=1000,default='')
     command_script_path = models.TextField(max_length=1000)
-    jobName = models.CharField(max_length=150,validators = [RegexValidator(regex='^[A-Z0-9_]*$')])
+    #jobName = models.CharField(max_length=150,validators = [RegexValidator(regex='^[A-Z0-9_]*$')])
     drmaa_output_dir = models.CharField(max_length=1000)
    
     #drmaa related input fields
@@ -188,7 +190,7 @@ class JobAttempt(models.Model):
         #self.jobTemplate.args = self.command_script_text.split(' ')[1:]
         self.jobTemplate.remoteCommand = cmd.split(' ')[0]
         self.jobTemplate.args = cmd.split(' ')[1:]
-        self.jobTemplate.jobName = 'ja-'+self.jobName
+        self.jobTemplate.jobName = 'cja_{0}'.format(self.id)
         self.jobTemplate.outputPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stdout'.format(self.id))
         self.jobTemplate.errorPath = ':'+os.path.join(self.drmaa_output_dir,'cosmos_id_{0}.stderr'.format(self.id))
         self.jobTemplate.nativeSpecification = self.drmaa_native_specification
@@ -252,7 +254,7 @@ class JobAttempt(models.Model):
         "Read the STDOUT file"
         path = self.STDOUT_filepath
         if path is None:
-            return 'File does not exist.'
+            return 'STDOUT does not exist.'
         else:
             with open(path,'rb') as f:
                 return f.read()
@@ -261,7 +263,7 @@ class JobAttempt(models.Model):
         "Read the STDERR file"
         path = self.STDERR_filepath
         if path is None:
-            return 'File does not exist.'
+            return 'STDERR does not exist.'
         else:
             with open(path,'rb') as f:
                 return f.read()
@@ -341,15 +343,18 @@ class JobManager(models.Model):
             f.write(jobAttempt.command)
         os.system('chmod 700 {0}'.format(jobAttempt.command_script_path))
         
-    def add_jobAttempt(self, command, drmaa_output_dir, jobName = "Generic_Job_Name", drmaa_native_specification=''):
+    def add_jobAttempt(self, command, drmaa_output_dir, drmaa_native_specification=''):
         """
         Adds a new JobAttempt
         :param command: The system command to run
-        :param jobName: an optional name for the jobAttempt
         :param drmaa_output_dir: the directory to story the stdout and stderr files
         :param drmaa_native_specification: the drmaa_native_specifications tring
         """
-        jobAttempt = JobAttempt(jobManager=self, command = command, jobName = jobName, drmaa_output_dir = drmaa_output_dir, drmaa_native_specification=drmaa_native_specification)
+        jobAttempt = JobAttempt(jobManager=self,
+            command = command,
+            drmaa_output_dir = drmaa_output_dir,
+            drmaa_native_specification=drmaa_native_specification,
+            drmaa_session_contact = session.drmaa_session.contact)
         cmd_script_file_path = os.path.join(jobAttempt.drmaa_output_dir,'command.sh')
         jobAttempt.command_script_path = cmd_script_file_path
         jobAttempt.save()
@@ -416,7 +421,7 @@ class JobManager(models.Model):
         finally:
             enable_stderr()
             
-        job = JobAttempt.objects.get(drmaa_jobID = drmaa_info.jobId)
+        job = JobAttempt.objects.get(drmaa_jobID = drmaa_info.jobId,drmaa_session_contact=session.drmaa_session.contact)
         job.hasFinished(drmaa_info)
         return job
     

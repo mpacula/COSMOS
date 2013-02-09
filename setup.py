@@ -24,7 +24,7 @@ setup(name='cosmos',
     packages=find_packages(),
     scripts=['bin/cosmos'],
     package_data={'cosmos':['default_config.ini']+all_files('cosmos/static')+all_files('cosmos/templates')},
-    data_files=[(examples_installation_dir,example_workflows)],
+    data_files=['README.rst','LICENSE']+[(examples_installation_dir,example_workflows)],
     install_requires=[
         'distribute>=0.6.28',
         'decorator',

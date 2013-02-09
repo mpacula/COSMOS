@@ -131,8 +131,8 @@ def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_req=None,parallel_envir
             s += ' -q {0}'.format(queue)
         return s
     elif DRM == 'GE':
-        return '-l h_vmem={mem_req}M,num_proc={cpu_req}'.format(
-            mem_req=mem_req*1.5,
+        return '-l spock_mem={mem_req}M,num_proc={cpu_req}'.format(
+            mem_req=mem_req,
             pe= parallel_environment_name,
             cpu_req=cpu_req)
         #return '-l h_vmem={0}M,slots={1}'.format(mem_req,cpu_req)
@@ -158,7 +158,7 @@ def check_and_create_output_dir(path):
         if not os.path.isdir(path):
             raise ValidationException('Path is not a directory')
     else:
-        os.mkdir(path)
+        os.system('mkdir -p {0}'.format(path))
 
 def execute(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

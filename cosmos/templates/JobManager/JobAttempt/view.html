@@ -8,7 +8,7 @@
   <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
   <li><a href="{{jobAttempt.task.stage.workflow.url }}">{{jobAttempt.task.stage.workflow}}</a> <span class="divider">/</span></li>
   <li><a href="{{jobAttempt.task.stage.url }}">{{jobAttempt.task.stage}}</a><span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task}}</a><span class="divider">/</span></li>
+  <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task.toString}}</a><span class="divider">/</span></li>
   <li class="active">{{jobAttempt}}</li>
 </ul>
     <h1>
@@ -24,7 +24,6 @@
         {% endwith%}
         {{jobAttempt}}
     </h1>
-</div>
 
 <dl class="dl-horizontal">
 <dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.get_command_shell_script_text}}</pre></dd>

@@ -1,7 +1,7 @@
 from helpers import getcallargs,cosmos_format
 import re
 from cosmos.Workflow.models import TaskFile
-from cosmos.utils.helpers import parse_cmd
+from cosmos.utils.helpers import parse_cmd,groupby
 import itertools
 
 i = 0
@@ -98,7 +98,8 @@ class Tool(object):
 
         if len(outputs) == 0 and self.forward_input:
             try:
-                outputs +=  [ self.parent.get_output(name) ]
+                for p in self.parents:
+                    outputs +=  [ p.get_output(name) ]
             except GetOutputError as e:
                 pass
 
@@ -130,22 +131,36 @@ class Tool(object):
         tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(k,v) for k,v in self.tags.items() ]))
         return "[{3}] {0}{1}\\n{2}".format(self.__verbose__,tags,self.pcmd,self.id)
 
+    def _all_inputs(self,_root=True):
+        """
+        :param _root: is the root call of the recursion
+        :return: (dict) name->[inputfiles] including ones forwarded by parents
+        """
+        inputs = []
+        for p in self.parents:
+            inputs += p.output_files
+            if p.forward_input:
+                inputs += p._all_inputs(_root=False)
+        if _root:
+            return dict([ (name,list(inputfiles)) for name,inputfiles in groupby(inputs,lambda i: i.name) ])
+        else:
+            return inputs
+
     def map_inputs(self):
         """
-        Default method to map inputs.  Can be overriden of a different behavior is desired
+        Default method to map inputs, or the "i" param that gets passed to :method:`cmd`
+        Can be overriden if a different behavior is desired
+        :return: (dict) name->[inputfiles].
         """
         if not self.inputs:
             return {}
 
-        all_inputs = []
-        for name in self.inputs:
-            for p in self.parents:
-                all_inputs += [ p.get_output(name) ]
+        all_inputs = self._all_inputs()
+        input_dict = all_inputs.copy()
+        for key in self.inputs:
+            input_dict[key] = all_inputs[key]
 
-        input_dict = {}
-        for input_file in all_inputs:
-            input_dict.setdefault(input_file.name,[]).append(input_file)
-
+        #TODO remove this? Its a bit confusing
         if self.one_parent:
             for key in input_dict:
                 if len(input_dict[key]) == 1:
@@ -161,6 +176,10 @@ class Tool(object):
     def process_cmd(self):
         """
         Stuff that happens in between map_inputs() and cmd()
+
+        Generates the i,s,p kwargs
+        Replace $OUTs
+        Format() cmd
         """
         p = self.parameters.copy()
         p.update(self.tags)

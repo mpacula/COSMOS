@@ -8,64 +8,69 @@ class GATK(Tool):
     time_req = 5*60
     mem_req = 5*1024
 
+    def __init__(self,*args,**kwargs):
+        super(GATK,self).__init__(*args,**kwargs)
+
+
     @property
     def bin(self):
         return 'java -Xmx{mem_req}m -Djava.io.tmpdir={s[tmp_dir]} -jar {s[GATK_path]}'.format(
             self=self,s=self.settings,
-            mem_req=int(self.mem_req*.8)
+            mem_req=int(self.mem_req*.9)
         )
 
-class RTC(GATK):
+class IRTC(GATK):
     __verbose__ = "Indel Realigner Target Creator"
     mem_req = 8*1024
     cpu_req = 4
     inputs = ['bam']
     outputs = ['intervals']
     forward_input = True
-    one_parent = True
     
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T RealignerTargetCreator
             -R {s[reference_fasta_path]}
-            -I {i[bam]}
+            {inputs}
             -o $OUT.intervals
             --known {s[indels_1000g_phase1_path]}
             --known {s[mills_path]}
             -nt {self.cpu_req}
             -L {p[interval]}
-        """
+        """, {
+            'inputs' : list2input(i['bam'])
+        }
     
 class IR(GATK):
     __verbose__ = "Indel Realigner"
-    mem_req = 8*1024
+    mem_req = 3.5*1024
     inputs = ['bam','intervals']
     outputs = ['bam']
-    one_parent = True
+
     
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T IndelRealigner
             -R {s[reference_fasta_path]}
-            -I {i[bam]}
+            {inputs}
             -o $OUT.bam
-            -targetIntervals {i[intervals]}
+            -targetIntervals {i[intervals][0]}
             -known {s[indels_1000g_phase1_path]}
             -known {s[mills_path]}
             -model USE_READS
             -L {p[interval]}
-        """
+        """,{
+            'inputs' : list2input(i['bam'])
+        }
     
 class BQSR(GATK):
     __verbose__ = "Base Quality Score Recalibration"
     cpu_req = 8
-    mem_req = 9*1024
+    mem_req = 24*1024
     inputs = ['bam']
     outputs = ['recal']
-
-    # -nct {nct}
 
     def cmd(self,i,s,p):
         return r"""
@@ -84,21 +89,23 @@ class BQSR(GATK):
             -nct {nct}
         """, {
             'inputs' : list2input(i['bam']),
-            'nct': self.cpu_req +1
+            'nct': self.cpu_req+1
           }
     
 class PR(GATK):
     __verbose__ = "Apply BQSR"
-    mem_req = 8*1024
+    mem_req = 27*1024
     inputs = ['bam','recal']
     outputs = ['bam']
-    
+    cpu_req = 8
+
     def map_inputs(self):
         input_bams = [p.get_output('bam') for p in self.parent.parents ]
         return {'bam' : input_bams,
                'recal' : self.parent.get_output('recal')
               }
-    
+
+
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
@@ -107,14 +114,17 @@ class PR(GATK):
             {inputs}
             -o $OUT.bam
             -BQSR {i[recal]}
+            -nct {nct}
         """, {
-            'inputs' : list2input(i['bam'])  
+            'inputs' : list2input(i['bam']),
+            'nct': self.cpu_req+1
         }
 
     
 class UG(GATK):
     __verbose__ = "Unified Genotyper"
-    mem_req = 5.5*1024
+    mem_req = 10*1024
+    cpu_req = 4
     inputs = ['bam']
     outputs = ['vcf']
     
@@ -139,7 +149,7 @@ class UG(GATK):
     
 class CV(GATK):
     __verbose__ = "Combine Variants"
-    mem_req = 3*1024
+    mem_req = 5*1024
     
     inputs = ['vcf']
     outputs = ['vcf']
@@ -169,7 +179,7 @@ class CV(GATK):
     
 class VQSR(GATK):
     __verbose__ = "Variant Quality Score Recalibration"
-    mem_req = 4*1024
+    mem_req = 5*1024
     inputs = ['vcf']
     outputs = ['recal','tranches','R']
     

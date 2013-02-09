@@ -127,6 +127,11 @@ class Workflow(models.Model):
         "TaskFiles in this Stage"
         return TaskFile.objects.filter(task_output_set__in=self.tasks)
 
+    def total_cpu_hours(self):
+        #TODO only use this workflows jobattempts
+        l = [ ja['wall_time'] * ja['task_set__cpu_requirement'] for ja in JobAttempt.objects.all().values('wall_time','task_set__cpu_requirement') ]
+        return reduce(lambda x,y:x+y,l)
+
     @property
     def wall_time(self):
         """Time between this workflow's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
@@ -400,6 +405,9 @@ class Workflow(models.Model):
         >>> stage.bulk_save_tasks(tasks)
         """
         self.log.info("Bulk adding {0} Tasks...".format(len(tasks)))
+        if len(tasks) > 10000:
+            self.log.error("Tried to bulk save 10000 tags, probably a bad idea")
+            sys.exit(1)
 
         #need to manually set IDs because there's no way to get them in the right order for tagging after a bulk create
         m = Task.objects.all().aggregate(models.Max('id'))['id__max']
@@ -466,9 +474,10 @@ class Workflow(models.Model):
         return
 
     @transaction.commit_on_success
-    def bulk_delete_tasks(self,tasks):
+    def bulk_delete_tasks(self,tasks,delete_files=True):
         """Bulk deletes tasks and their related objects"""
         task_output_dirs = map(lambda t: t.output_dir,tasks)
+        #TODO if deleting an entire stage, delete by stage.  Big difference to file system.
 
         self.log.info("Bulk deleting {0} tasks".format(len(tasks)))
         self.log.info('Bulk deleting JobAttempts...')
@@ -481,10 +490,10 @@ class Workflow(models.Model):
         TaskFile.objects.filter(task_output_set__in=tasks).delete()
         self.log.info('Bulk deleting Tasks...')
         tasks.delete()
-
-        self.log.info('Deleting Task output directories')
-        for d in task_output_dirs:
-            os.system('rm -rf {0}'.format(d))
+        if delete_files:
+            self.log.info('Deleting Task output directories')
+            for d in task_output_dirs:
+                os.system('rm -rf {0}'.format(d))
 
     @transaction.commit_on_success
     def delete(self, *args, **kwargs):
@@ -549,7 +558,6 @@ class Workflow(models.Model):
 
         jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
                                      drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
-                                     jobName="",
                                      drmaa_native_specification=get_drmaa_ns(DRM=settings['DRM'],
                                                                              mem_req=task.memory_requirement,
                                                                              cpu_req=task.cpu_requirement,
@@ -580,7 +588,7 @@ class Workflow(models.Model):
         numAttempts = task.jobAttempts.count()
         if not task.successful: #ReRun jobAttempt
             if numAttempts < self.max_reattempts:
-                self.log.warning("{0} of {1} failed, on attempt # {2}, so deleting failed output files and retrying.\nSTDERR: {3}".format(failed_jobAttempt, task,numAttempts,failed_jobAttempt.STDERR_txt))
+                self.log.warning("{0} of {1} failed, on attempt # {2}, so deleting failed output files and retrying.\nSTDOUT:\n{3}\nSTDERR:\n{3}\n".format(failed_jobAttempt, task,numAttempts,failed_jobAttempt.STDOUT_txt,failed_jobAttempt.STDERR_txt))
                 os.system('rm -rf {0}/*'.format(task.job_output_dir))
                 self._run_task(task)
                 return True
@@ -1110,9 +1118,10 @@ class Stage(models.Model):
         """
         self.log.info('Deleting Stage {0}.'.format(self.name))
         if os.path.exists(self.output_dir):
-            self.log.info('Deleting directory {0}...'.format(self.output_dir))
-            os.system('rm -rf {0}'.format(self.output_dir))
-        self.workflow.bulk_delete_tasks(self.tasks)
+            cmd = 'rm -rf {0}'.format(self.output_dir)
+            self.log.info(cmd)
+            os.system(cmd)
+        self.workflow.bulk_delete_tasks(self.tasks,delete_files=False)
         super(Stage, self).delete(*args, **kwargs)
         self.log.info('{0} Deleted.'.format(self))
     

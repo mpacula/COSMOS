@@ -21,7 +21,6 @@ Input Dicts
 _author_ = 'Erik Gafni'
 
 from cosmos import session
-from cosmos.Workflow.models import Workflow
 from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.tool import INPUT
 from tools import gatk,picard,bwa
@@ -53,7 +52,7 @@ with open(cli.parsed_kwargs['inputs'],'r') as input_dict:
             i['path'] = os.path.join(input_path,i['path'])
 
 inputs = [ INPUT(taskfile=TaskFile(name='fastq.gz',path=i['path'],fmt='fastq.gz'),tags=i) for i in input_list ]
-inputs = filter(lambda i: i.tags['chunk'] == '001',inputs)
+#inputs = filter(lambda i: i.tags['chunk'] == '001',inputs)
 
 ####################
 # Configuration
@@ -78,17 +77,18 @@ dag = (DAG(mem_req_factor=1)
     |Apply| bwa.ALN
     |Reduce| (['sample','flowcell','lane','chunk'],bwa.SAMPE)
     |Apply| picard.CLEAN_SAM
-    |Reduce| (['sample'],picard.MERGE_SAMS)
+    |Apply| picard.SORTSAM
     |Apply| picard.INDEX_BAM
-    |Split| ([intervals],gatk.RTC)
-    |Apply| gatk.IR
-    |Reduce| (['sample'],gatk.BQSR)
+    |Reduce| (['sample','lane'],gatk.BQSR)
     |Apply| gatk.PR
-    |ReduceSplit| ([],[glm,intervals], gatk.UG)
-    |Reduce| (['glm'],gatk.CV)
+    |Reduce| (['sample'],picard.MARKDUPES)
+    |Split| ([intervals],gatk.IRTC)
+    |Apply| gatk.IR
+    |ReduceSplit| (['sample'],[glm,intervals], gatk.UG)
+    |Reduce| (['sample','glm'],gatk.CV)
     |Apply| gatk.VQSR
     |Apply| gatk.Apply_VQSR
-    |Reduce| ([],gatk.CV,"CV 2")
+    |Reduce| (['sample'],gatk.CV,"CV 2")
 #    |Split| ([dbs],annotate.ANNOVAR)
 #    |Apply| annotate.PROCESS_ANNOVAR
 #    |Reduce| ([],annotate.MERGE_ANNOTATIONS)
@@ -96,7 +96,7 @@ dag = (DAG(mem_req_factor=1)
 #    |Apply| annotate.ANALYSIS
 )
 dag.configure(settings,parameters)
-dag.create_dag_img('/tmp/graph.svg')
+#dag.create_dag_img('/tmp/graph.svg')
 
 #################
 # Run Workflow
