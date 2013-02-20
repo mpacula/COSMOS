@@ -221,13 +221,9 @@ class INPUT(Tool):
     mem_req = 0
     cpu_req = 0
     
-    def __init__(self,*args,**kwargs):
+    def __init__(self,output_path=None,output_paths=[],taskfile=None,taskfiles=[],*args,**kwargs):
         """
         """
-        output_path=kwargs.pop('filepath',None)
-        output_paths=kwargs.pop('fiepaths',[])
-        taskfile=kwargs.pop('taskfile',None)
-        taskfiles=kwargs.pop('taskfiles',[])
         super(INPUT,self).__init__(*args,**kwargs)
 
         if output_path: output_paths.append(output_path)

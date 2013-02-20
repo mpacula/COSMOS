@@ -37,7 +37,7 @@ import os
 ####################
 
 cli = CLI()
-cli.parser.add_argument('-i','--inputs',type=str,help='Inputs, see script comments for format.',required=True)
+cli.parser.add_argument('-i','--input_json',type=str,help='Inputs, see script comments for format.',required=True)
 cli.parser.add_argument('-p','--input_path',type=str,help='Prepends a directory to all input paths.')
 
 WF = cli.parse_args()

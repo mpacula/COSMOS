@@ -30,19 +30,17 @@ class SAMPE(Tool):
         """
         Expects tags: lane, chunk, library, sample, platform, flowcell, pair
         """
-        t2 = self.parents[0].tags
         return r"""
             {s[bwa_path]} sampe
             -f $OUT.sam
-            -r "@RG\tID:{RG_ID}\tLB:{t2[library]}\tSM:{t2[sample]}\tPL:{t2[platform]}"
+            -r "@RG\tID:{RG_ID}\tLB:{p[library]}\tSM:{p[sample]}\tPL:{p[platform]}"
             {s[bwa_reference_fasta_path]}
             {i[sai][0]}
             {i[sai][1]}
             {i[fastq.gz][0]}
             {i[fastq.gz][1]}
             """, {
-            't2' : t2,
-            'RG_ID':'{0}.L{1}'.format(t2['flowcell'],t2['lane'])
+            'RG_ID':'{0}.L{1}'.format(p['flowcell'],p['lane'])
         }
 
     
