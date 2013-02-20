@@ -131,6 +131,7 @@ def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_req=None,parallel_envir
             s += ' -q {0}'.format(queue)
         return s
     elif DRM == 'GE':
+        return ''
         return '-l h_vmem={mem_req}M,num_proc={cpu_req}'.format(
             mem_req=mem_req*1.5,
             pe= parallel_environment_name,

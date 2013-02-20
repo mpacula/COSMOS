@@ -29,7 +29,7 @@ The following will:
 
    cd /dir/to/install/Cosmos/to
    git clone git@github.com:ComputationalBiomedicine/Cosmos.git
-   pip install Cosmos
+   pip install -I Cosmos
 
 Better Install
 ________________________

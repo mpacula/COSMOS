@@ -21,11 +21,8 @@ Input Dicts
 _author_ = 'Erik Gafni'
 
 from cosmos import session
-from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.tool import INPUT
 from tools import gatk,picard,bwa
-from inputs.read import get_inputs
 from cosmos.Workflow.models import TaskFile
 from cosmos.Workflow.cli import CLI
 
@@ -42,7 +39,6 @@ cli.parser.add_argument('-i','--inputs',type=str,help='Inputs, see script commen
 cli.parser.add_argument('-p','--input_path',type=str,help='Prepends a directory to all input paths.')
 
 WF = cli.parse_args()
-
 
 #setup inputs
 input_path = cli.parsed_kwargs['input_path']
@@ -72,6 +68,8 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 ####################
 # Create DAG
 ####################
+
+from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add, A
 
 dag = (DAG(mem_req_factor=1)
     |Add| inputs

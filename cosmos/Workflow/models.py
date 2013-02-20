@@ -17,6 +17,7 @@ import networkx as nx
 import pygraphviz as pgv
 import hashlib
 import pprint
+import signals
 
 status_choices=(
                 ('successful','Successful'),
@@ -42,7 +43,7 @@ class TaskFile(models.Model):
     path = models.CharField(max_length=250,null=True)
     name = models.CharField(max_length=50,null=True)
     fmt = models.CharField(max_length=10,null=True) #file format
-    
+
 
     def __init__(self,*args,**kwargs):
         r = super(TaskFile,self).__init__(*args,**kwargs)
@@ -70,11 +71,11 @@ class TaskFile(models.Model):
     @property
     def sha1sum(self):
         return hashlib.sha1(file(self.path).read())
-    
+
     def __str__(self):
         return "#F[{0}:{1}:{2}]".format(self.id if self.id else 't{0}'.format(self.tmp_id),self.name,self.path)
-    
-    @models.permalink    
+
+    @models.permalink
     def url(self):
         return ('taskfile_view',[str(self.id)])
 
@@ -463,8 +464,6 @@ class Workflow(models.Model):
         self.log.info("Bulk adding {0} task edges...".format(len(task_edges)))
         TaskEdge.objects.bulk_create(task_edges)
 
-        return
-
     @transaction.commit_on_success
     def bulk_delete_tasks(self,tasks):
         """Bulk deletes tasks and their related objects"""
@@ -509,7 +508,6 @@ class Workflow(models.Model):
 
         super(Workflow, self).delete(*args, **kwargs)
 
-
     def _run_task(self,task):
         """
         Creates and submits and JobAttempt.
@@ -521,10 +519,10 @@ class Workflow(models.Model):
 
         #TODO fix this it's slow (do it in bulk when running a workflow?)
         if task.stage.status == 'no_attempt':
-            task.stage.status = 'in_progress'
+            task.stage.set_status('in_progress')
             task.stage.started_on = timezone.now()
             task.stage.save()
-        task.status = 'in_progress'
+        task.set_status('in_progress')
         self.log.info('Running {0}'.format(task))
 
         task.exec_command = task.pre_command
@@ -709,6 +707,7 @@ class Workflow(models.Model):
     def url(self):
         return ('workflow_view',[str(self.id)])
 
+
 class WorkflowManager():
     def __init__(self,workflow):
         self.workflow = workflow
@@ -728,7 +727,7 @@ class WorkflowManager():
         if self.workflow.delete_intermediates:
             self.clear_intermediate_tasks()  #TODO could just check the parent node of successful job for clearing instead of the whole graph
         return ready_tasks
-    
+
     def complete_task(self,task):
         self.dag_queue.remove_node(task.id)
         self.dag.node[task.id]['status'] = task.status
@@ -769,7 +768,7 @@ class WorkflowManager():
         degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
         return Task.objects.filter(id__in=filter(lambda x: x not in self.queued_tasks,degree_0_tasks))
         #return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks)) 
-    
+
     def createDiGraph(self):
         dag = nx.DiGraph()
         dag.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.task_edges.values('parent','child')])
@@ -778,7 +777,7 @@ class WorkflowManager():
             for n in stage.tasks.values('id','tags','status','cleared_output_files'):
                 dag.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name,cleared_output_files=n['cleared_output_files'])
         return dag
-    
+
     def createAGraph(self):
         dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
         dag.node_attr['fontname']="Courier"
@@ -794,18 +793,18 @@ class WorkflowManager():
                 label = " \\n".join(map(truncate_val,attrs['tags'].items()))
                 status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
                 sg.add_node(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
-            
+
         return dag
-    
-    
-    def as_img(self,format="svg"):      
+
+
+    def as_img(self,format="svg"):
         g = self.createAGraph()
         #g = self.createAGraph(self.get_simple_dag())
         #g=nx.to_agraph(self.get_simple_dag())
         g.layout(prog="dot")
         return g.draw(format=format)
-        
-    def __str__(self): 
+
+    def __str__(self):
         g = self.createAGraph()
         #g = self.createAGraph(self.get_simple_dag())
         #g=nx.to_agraph(self.get_simple_dag())
@@ -821,44 +820,52 @@ class Stage(models.Model):
     name = models.CharField(max_length=200)
     workflow = models.ForeignKey(Workflow)
     order_in_workflow = models.IntegerField(null=True)
-    status = models.CharField(max_length=200,choices=status_choices,default='no_attempt') 
+    status = models.CharField(max_length=200,choices=status_choices,default='no_attempt')
     successful = models.BooleanField(default=False)
     started_on = models.DateTimeField(null=True,default=None)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
-    
+
     class Meta:
         unique_together = (('name','workflow'))
-    
+
     def __init__(self,*args,**kwargs):
         kwargs['created_on'] = timezone.now()
         super(Stage,self).__init__(*args,**kwargs)
-        
+
         validate_not_null(self.workflow)
-        
+
         validate_name(self.name,self.name)
         check_and_create_output_dir(self.output_dir)
         #validate unique name
 #        if Stage.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
 #            raise ValidationError("Stage names must be unique within a given Workflow. The name {0} already exists.".format(self.name))
 
+    def set_status(self,new_status,save=True):
+        "Set Stage status"
+        self.log.info('{0} {1}'.format(self,new_status))
+        self.status = new_status
+
+        if new_status == 'successful':
+            self.successful = True
+
+        if save: self.save()
+
     @property
     def log(self):
         return self.workflow.log
-    
+
     @property
     def percent_done(self):
         """
         Percent of tasks that have completed
         """
         done = Task.objects.filter(stage=self,successful=True).count()
-        total = self.num_tasks
-        status = self.status
-        if total == 0 or done == 0:
-            if status == 'in_progress' or status == 'failed':
+        if self.num_tasks == 0 or done == 0:
+            if self.status == 'in_progress' or self.status == 'failed':
                 return 1
             return 0
-        r = int(100 * float(done) / float(total))
+        r = int(100 * float(done) / float(self.num_tasks))
         return r if r > 1 else 1
 
     def get_sjob_stat(self,field,statistic):
@@ -875,7 +882,7 @@ class Stage(models.Model):
         aggr_fxn = getattr(models, statistic)
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
         return JobAttempt.objects.filter(successful=True,task_set__in = Task.objects.filter(stage=self)).aggregate(aggr_fxn(field))[aggr_field]
-    
+
     def get_task_stat(self,field,statistic):
         """
         Aggregates a task's field using a statistic
@@ -891,53 +898,53 @@ class Stage(models.Model):
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
         r = Task.objects.filter(stage=self).aggregate(aggr_fxn(field))[aggr_field]
         return int(r) if r else r
-        
+
 
     @property
     def file_size(self,human_readable=True):
         "Size of the stage's output_dir"
         return folder_size(self.output_dir,human_readable=human_readable)
-    
+
     @property
     def wall_time(self):
         """Time between this stage's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.started_on if self.finished_on else timezone.now().replace(microsecond=0) - self.started_on
-    
+
     @property
     def output_dir(self):
         "Absolute path to this stage's output_dir"
         return os.path.join(self.workflow.output_dir,self.name)
-    
+
     @property
     def tasks(self):
         "Queryset of this stage's tasks"
         return Task.objects.filter(stage=self)
-    
+
     @property
     def task_edges(self):
         "Edges in this Stage"
         return TaskEdge.objects.filter(parent__in=self.tasks)
-    
+
     @property
     def task_tags(self):
         "TaskTags in this Stage"
         return TaskTag.objects.filter(task__in=self.tasks)
-    
+
     @property
     def task_files(self):
         "TaskFiles in this Stage"
         return TaskFile.objects.filter(task_output_set__in=self.tasks)
-    
+
     @property
     def num_tasks(self):
         "The number of tasks in this stage"
         return Task.objects.filter(stage=self).count()
-    
+
     @property
     def num_tasks_successful(self):
         "Number of successful tasks in this stage"
         return Task.objects.filter(stage=self,successful=True).count()
-    
+
     def get_all_tag_keys_used(self):
         """Returns a set of all the keyword tags used on any task in this stage"""
         try:
@@ -946,17 +953,17 @@ class Stage(models.Model):
             return {}
         except AttributeError:
             return set(map(lambda x: x['key'],TaskTag.objects.filter(task__in=self.tasks).values('key').distinct()))
-        
+
     def yield_task_resource_usage(self):
         """
         :yields: (list of tuples) tuples contain resource usage and tags of all tasks.  The first element is the name, the second is the value.
         """
         #TODO rework with time fields
-        for task in self.tasks: 
+        for task in self.tasks:
             sja = task.get_successful_jobAttempt()
-            if sja: 
+            if sja:
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
-    
+
     def add_task(self, *args, **kwargs):
         """
         Creates a new task, and saves it
@@ -967,7 +974,7 @@ class Stage(models.Model):
         newtask = self.new_task(*args,**kwargs)
         newtask.save()
         return newtask
-        
+
 
     def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, on_success = None, mem_req=0, cpu_req=1, time_req=None,
                  NOOP=False,
@@ -979,7 +986,7 @@ class Stage(models.Model):
         If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
         
         :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
-        :param pcmd: (str) The preformatted command to execute. Usually includes the special keywords {output_dir} and {outputs[key]} which will be automatically parsed. Required.
+        :param pcmd: (str) The preformatted command to execute. Usually includes strings that represent TaskFiles which will be automatically parsed. Required.
         :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
         :param on_success: (method) A method to run when this task succeeds.  Method is called with one parameter named 'task', the successful task.
         :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
@@ -991,12 +998,12 @@ class Stage(models.Model):
         :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
         :returns: A new task instance.  The instance has not been saved to the database.
         """
-        
+
         if (pcmd == '' or pcmd) is None and not NOOP:
             raise TaskError('pre_command cannot be blank if NOOP==False')
-        
+
         #TODO validate that this task has the same tag keys as all other tasks?
-        
+
         task_kwargs = {
                        'stage':self,
                        'name':name,
@@ -1010,7 +1017,7 @@ class Stage(models.Model):
                        'cpu_requirement':cpu_req,
                        'time_requirement':time_req
                        }
-        
+
         #delete if hard_reset
         if hard_reset:
             task_exists = Task.objects.filter(stage=self,tags=tags).count() > 0
@@ -1019,13 +1026,13 @@ class Stage(models.Model):
             if not task_exists:
                 raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
             task.delete()
-    
+
         #Instantiate a task
         t= Task(**task_kwargs)
         t.input_files_list = input_files
         t.output_files_list = output_files
         return t
-    
+
     def is_done(self):
         """
         :returns: True if this stage is finished successfully or failed, else False
@@ -1037,7 +1044,7 @@ class Stage(models.Model):
         :returns: True if all tasks have succeeded or failed in this stage, else False
         """
         return self.tasks.filter(Q(status = 'successful') | Q(status='failed')).count() == self.tasks.count()
-        
+
     def _has_finished(self):
         """
         Executed when this stage has completed running.
@@ -1046,20 +1053,18 @@ class Stage(models.Model):
         num_tasks = Task.objects.filter(stage=self).count()
         num_tasks_successful = self.num_tasks_successful
         num_tasks_failed = Task.objects.filter(stage=self,status='failed').count()
+
         if num_tasks_successful == num_tasks:
-            self.successful = True
-            self.status = 'successful'
-            self.log.info('{0} successful!'.format(self))
+            self.set_status('successful')
         elif num_tasks_failed + num_tasks_successful == num_tasks:
-            self.status='failed'
-            self.log.warning('{0} failed!'.format(self))
+            self.set_status('failed')
         else:
-            #jobs are not done so this shouldn't happen
             raise Exception('Stage._has_finished() called, but not all tasks are completed.')
-        
+
         self.finished_on = timezone.now()
         self.save()
-    
+        signals.stage_status_change.send(sender=self, status=self.status)
+
     def get_tasks_by(self,tags={},op='and'):
         """
         An alias for :func:`Workflow.get_tasks_by` with stage=self
@@ -1067,7 +1072,7 @@ class Stage(models.Model):
         :returns: a queryset of filtered tasks
         """
         return self.workflow.get_tasks_by(stage=self, tags=tags, op=op)
-    
+
     def get_task_by(self,tags={},op='and'):
         """
         An alias for :func:`Workflow.get_task_by` with stage=self
@@ -1075,7 +1080,7 @@ class Stage(models.Model):
         :returns: a queryset of filtered tasks
         """
         return self.workflow.get_task_by(stage=self, op=op, tags=tags)
-                
+
     def group_tasks_by(self,keys=[]):
         """
         Yields tasks, grouped by tags in keys.  Groups will be every unique set of possible values of tags.
@@ -1093,16 +1098,16 @@ class Stage(models.Model):
         else:
             task_tag_values = TaskTag.objects.filter(task__in=self.tasks, key__in=keys).values() #get this stage's tags
             #filter out any tasks without all keys
-            
+
             task_id2tags = {}
             for task_id, ntv in helpers.groupby(task_tag_values,lambda x: x['task_id']):
                 task_tags = dict([ (n['key'],n['value']) for n in ntv ])
                 task_id2tags[task_id] = task_tags
-            
+
             for tags,task_id_and_tags_tuple in helpers.groupby(task_id2tags.items(),lambda x: x[1]):
                 task_ids = [ x[0] for x in task_id_and_tags_tuple ]
-                yield tags, Task.objects.filter(pk__in=task_ids)    
-    
+                yield tags, Task.objects.filter(pk__in=task_ids)
+
     @transaction.commit_on_success
     def delete(self, *args, **kwargs):
         """
@@ -1115,17 +1120,17 @@ class Stage(models.Model):
         self.workflow.bulk_delete_tasks(self.tasks)
         super(Stage, self).delete(*args, **kwargs)
         self.log.info('{0} Deleted.'.format(self))
-    
-    @models.permalink    
+
+    @models.permalink
     def url(self):
         "The URL of this stage"
         return ('stage_view',[str(self.id)])
-        
+
     def __str__(self):
         return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
     def toString(self):
         return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
-            
+
 
 class TaskTag(models.Model):
     """
@@ -1134,7 +1139,7 @@ class TaskTag(models.Model):
     task = models.ForeignKey('Task')
     key = models.CharField(max_length=63)
     value = models.CharField(max_length=255)
-    
+
     def __str__(self):
         return "TaskTag[self.id] {self.key}: {self.value} for Task[{task.id}]".format(self=self,task=self.task)
 
@@ -1142,8 +1147,8 @@ class TaskEdge(models.Model):
     parent = models.ForeignKey('Task',related_name='parent_edge_set')
     child = models.ForeignKey('Task',related_name='child_edge_set')
 #    tags = PickledObjectField(null=True,default={})
-    "The keys associated with the relationship.  ex, the group_by parameter of a many2one" 
-    
+    "The keys associated with the relationship.  ex, the group_by parameter of a many2one"
+
     def __str__(self):
         return "{0.parent}->{0.child}".format(self)
 
@@ -1172,43 +1177,43 @@ class Task(models.Model):
     #on_success = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
-    
+
     _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True) #dictionary of outputs
     @property
     def output_files(self): return self._output_files.all()
-    
+
     _input_files = models.ManyToManyField(TaskFile,related_name='task_input_set',null=True)
     @property
     def input_files(self): return self._input_files.all()
-    
-#   Django has a bug that prevents indexing of BLOBs which is what tags is stored as    
+
+#   Django has a bug that prevents indexing of BLOBs which is what tags is stored as
 #    class Meta:
 #        unique_together = (('tags','stage'))
-    
+
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
         return super(Task,self).__init__(*args, **kwargs)
-    
+
     @staticmethod
     def create(*args,**kwargs):
         """
         Creates a task.
         """
         task = Task.objects.create(*args,**kwargs)
-        
+
         if Task.objects.filter(stage=task.stage,tags=task.tags).count() > 1:
             task.delete()
             raise ValidationError("Tasks belonging to a stage with the same tags detected! tags: {0}".format(task.tags))
-        
+
         check_and_create_output_dir(task.output_dir)
         check_and_create_output_dir(task.job_output_dir) #this is not in JobManager because JobManager should be not care about these details
-            
+
         #Create task tags    
         for key,value in task.tags.items():
             TaskTag.objects.create(task=task,key=key,value=value)
-                
+
         return task
-    
+
     @property
     def workflow(self):
         "This task's workflow"
@@ -1222,7 +1227,7 @@ class Task(models.Model):
     @property
     def task_edges(self):
         return TaskEdge.objects.filter(Q(parent=self)|Q(child=self))
-    
+
     @property
     def task_tags(self):
         return TaskTag.objects.filter(task=self)
@@ -1241,17 +1246,17 @@ class Task(models.Model):
     def output_file_size(self,human_readable=True):
         "Task filesize"
         return folder_size(self.job_output_dir,human_readable=human_readable)
-    
+
     @property
     def output_dir(self):
         "Task output dir"
         return os.path.join(self.stage.output_dir,str(self.id))
-    
+
     @property
     def job_output_dir(self):
         """Where the job output goes"""
         return os.path.join(self.output_dir,'out')
-    
+
     @property
     def output_paths(self):
         "Dict of this task's outputs appended to this task's output_dir."
@@ -1259,21 +1264,21 @@ class Task(models.Model):
         for key,val in self.outputs.items():
             r[key] = os.path.join(self.job_output_dir,val)
         return r
-    
+
     @property
     def jobAttempts(self):
         "Queryset of this task's jobAttempts."
         return self._jobAttempts.all().order_by('id')
-    
+
     @property
     def wall_time(self):
         "Task's wall_time"
         return self.get_successful_jobAttempt().wall_time if self.successful else None
-    
+
     def numAttempts(self):
         "This task's number of job attempts."
         return self._jobAttempts.count()
-    
+
     def get_successful_jobAttempt(self):
         """
         Get this task's successful job attempt.
@@ -1288,6 +1293,15 @@ class Task(models.Model):
         else:
             return None # no successful jobs
 
+    def set_status(self,new_status,save=True):
+        "Set Task's status"
+        self.log.info('{0} {1}'.format(self,new_status))
+        self.status = new_status
+
+        if new_status == 'successful':
+            self.successful = True
+
+        if save: self.save()
 
     def _has_finished(self,jobAttempt):
         """
@@ -1297,18 +1311,14 @@ class Task(models.Model):
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
         if jobAttempt == 'NOOP' or jobAttempt.task.succeed_on_failure or self._jobAttempts.filter(successful=True).count():
-            self.status = 'successful'
-            self.successful = True
-            if not jobAttempt == 'NOOP': self.log.info("{0} Successful!".format(self,jobAttempt))        
+            self.set_status('successful')
         else:
-            self.status = 'failed'
-            self.log.info("{0} Failed!".format(self,jobAttempt))
-            
+            self.set_status('failed')
+
         self.finished_on = timezone.now()
-        self.save()
-        
+        signals.task_status_change.send(sender=self, status=self.status)
         if self.stage._are_all_tasks_done(): self.stage._has_finished()
-        
+
     def tag(self,**kwargs):
         """
         Tag this task with key value pairs.  If the key already exists, its value will be overwritten.
@@ -1335,7 +1345,7 @@ class Task(models.Model):
         self.save()
         return self
 
-    @models.permalink    
+    @models.permalink
     def url(self):
         "This task's url."
         return ('task_view',[str(self.id)])
@@ -1354,7 +1364,7 @@ class Task(models.Model):
         if os.path.exists(self.output_dir):
             os.system('rm -rf {0}'.format(self.output_dir))
         super(Task, self).delete(*args, **kwargs)
-    
+
     def __str__(self):
         return 'Task[{0}] {1} {2}'.format(self.id,self.stage.name,self.tags)
 

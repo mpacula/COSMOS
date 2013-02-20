@@ -34,3 +34,9 @@ class WC(Tool):
         return 'wc {input} > $OUT.txt', {
                 'input':' '.join(map(lambda x: str(x),i['txt']))
                 }
+
+class FAIL(Tool):
+
+    def cmd(self,i,s,p):
+
+        return '__fail__'
