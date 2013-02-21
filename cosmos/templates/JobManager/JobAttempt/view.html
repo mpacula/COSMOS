@@ -16,7 +16,7 @@
             {%if jobAttempt.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
             {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
             {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
-                {%with ds=jobAttempt.get_drmaa_status %}
+                {%with ds=jobAttempt.get_status %}
                     {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
                     {%if ds == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
                 {% endwith%}
@@ -42,9 +42,9 @@
 <dt>Created On</dt>  <dd>{{jobAttempt.created_on}}</dd>
 <dt>Finished On</dt>  <dd>{{jobAttempt.finished_on}}</dd>
 <dt>Drmaa JobID</dt>  <dd>{{jobAttempt.drmaa_jobID}}</dd>
-<dt>Drmaa status</dt>  <dd>{{jobAttempt.get_drmaa_status}}</dd>
+<dt>Drmaa status</dt>  <dd>{{jobAttempt.get_status}}</dd>
 <dt>Drmaa native_specification</dt>  <dd>{{jobAttempt.drmaa_native_specification}}</dd>
-<dt>Drmaa info</dt>  <dd>{{jobAttempt.drmaa_info}}</dd>
+<dt>Drmaa info</dt>  <dd>{{jobAttempt.extra_jobinfo}}</dd>
 </dl>
 <p>
 <button class="btn btn-medium btn-inverse" data-toggle="collapse" data-target="#demo" >Resource Usage <i class="icon icon-resize-full icon-white"></i></button>

@@ -6,7 +6,7 @@ from cosmos.config import settings
 from django.db import models, transaction
 from django.db.models import Q,Count
 from django.db.utils import IntegrityError
-from cosmos.JobManager.models import JobAttempt,JobManager
+from cosmos.Job.models import JobAttempt,JobManager
 import os,sys,re,signal
 from cosmos.utils.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from cosmos.utils import helpers
@@ -86,7 +86,7 @@ class Workflow(models.Model):
     """
     name = models.CharField(max_length=250,unique=True)
     output_dir = models.CharField(max_length=250)
-    jobManager = models.OneToOneField(JobManager,null=True, related_name='workflow')
+    jobManager = models.OneToOneField('Job.JobManager',null=True)
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
@@ -94,7 +94,6 @@ class Workflow(models.Model):
 
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
-
 
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
@@ -331,7 +330,7 @@ class Workflow(models.Model):
         Deletes objects that are stale from the database.  This should only happens when the program exists ungracefully.
         """
         #TODO implement a catch all exception so that this never happens.  i think i can only do this if scripts are not run directly
-        JobAttempt.objects.filter(task_set=None).delete()
+        JobAttempt.objects.filter(task=None).delete()
         TaskFile.objects.filter(task_output_set=None).delete()
         TaskTag.objects.filter(task=None).delete()
 
@@ -348,7 +347,7 @@ class Workflow(models.Model):
             self.jobManager.terminate_jobAttempt(ja)
 
         #this basically a bulk task._has_finished and jobattempt.hasFinished
-        tasks = Task.objects.filter(_jobAttempts__in=jobAttempts)
+        tasks = Task.objects.filter(jobattempt_set__in=jobAttempts)
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
 
@@ -470,7 +469,7 @@ class Workflow(models.Model):
 
         self.log.info("Bulk deleting {0} tasks".format(len(tasks)))
         self.log.info('Bulk deleting JobAttempts...')
-        JobAttempt.objects.filter(task_set__in = tasks).delete()
+        JobAttempt.objects.filter(task__in = tasks).delete()
         self.log.info('Bulk deleting TaskTags...')
         TaskTag.objects.filter(task__in=tasks).delete()
         self.log.info('Bulk deleting TaskEdges...')
@@ -544,18 +543,13 @@ class Workflow(models.Model):
             except TypeError as e:
                 raise TypeError("{0}. m[0] is {0} and taskfile is {1}".format(m[0],taskfile))
 
-        jobAttempt = self.jobManager.add_jobAttempt(command=task.exec_command,
-                                     drmaa_output_dir=os.path.join(task.output_dir,'drmaa_out/'),
-                                     jobName="",
-                                     drmaa_native_specification=get_drmaa_ns(DRM=settings['DRM'],
-                                                                             mem_req=task.memory_requirement,
-                                                                             cpu_req=task.cpu_requirement,
-                                                                             time_req=task.time_requirement,
-                                                                             queue=self.default_queue if self.default_queue else settings['default_queue'],
-                                                                             parallel_environment_name=settings['SGE']['parallel_environment_name']
-                                     ))
+        jobAttempt = self.jobManager.add_jobAttempt(
+            task=task,
+            command=task.exec_command,
+            jobName=""
+        )
 
-        task._jobAttempts.add(jobAttempt)
+        task.jobattempt_set.add(jobAttempt)
         if self.dry_run:
             self.log.info('Dry Run: skipping submission of job {0}.'.format(jobAttempt))
         else:
@@ -880,7 +874,7 @@ class Stage(models.Model):
             raise ValidationError('Statistic {0} not supported'.format(statistic))
         aggr_fxn = getattr(models, statistic)
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
-        return JobAttempt.objects.filter(successful=True,task_set__in = Task.objects.filter(stage=self)).aggregate(aggr_fxn(field))[aggr_field]
+        return JobAttempt.objects.filter(successful=True,task__in = Task.objects.filter(stage=self)).aggregate(aggr_fxn(field))[aggr_field]
 
     def get_task_stat(self,field,statistic):
         """
@@ -1157,7 +1151,6 @@ class Task(models.Model):
     
     tags must be unique for all tasks in the same stage
     """
-    _jobAttempts = models.ManyToManyField(JobAttempt,related_name='task_set')
     pre_command = models.TextField(help_text='preformatted command.  almost always will contain the special string {output} which will later be replaced by the proper output path')
     exec_command = models.TextField(help_text='the actual command that was executed',null=True)
     name = models.CharField(max_length=255,null=True)
@@ -1267,7 +1260,7 @@ class Task(models.Model):
     @property
     def jobAttempts(self):
         "Queryset of this task's jobAttempts."
-        return self._jobAttempts.all().order_by('id')
+        return self.jobattempt_set.all().order_by('id')
 
     @property
     def wall_time(self):
@@ -1276,7 +1269,7 @@ class Task(models.Model):
 
     def numAttempts(self):
         "This task's number of job attempts."
-        return self._jobAttempts.count()
+        return self.jobattempt_set.count()
 
     def get_successful_jobAttempt(self):
         """
@@ -1284,7 +1277,7 @@ class Task(models.Model):
         
         :return: this task's successful job attempt.  If there were no successful job attempts, returns None
         """
-        jobs = self._jobAttempts.filter(successful=True)
+        jobs = self.jobattempt_set.filter(successful=True)
         if len(jobs) == 1:
             return jobs[0]
         elif len(jobs) > 1:
@@ -1309,7 +1302,7 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        if jobAttempt == 'NOOP' or jobAttempt.task.succeed_on_failure or self._jobAttempts.filter(successful=True).count():
+        if jobAttempt == 'NOOP' or jobAttempt.task.succeed_on_failure or self.jobattempt_set.filter(successful=True).count():
             self.set_status('successful')
         else:
             self.set_status('failed')
@@ -1356,7 +1349,7 @@ class Task(models.Model):
         """
         self.log.info('Deleting {0} and it\'s output directory {1}'.format(self,self.output_dir))
         #todo delete stuff in output_paths that may be extra files
-        for ja in self._jobAttempts.all(): ja.delete()
+        for ja in self.jobattempt_set.all(): ja.delete()
         self.task_tags.delete()
         self.task_edges.delete()
         self.output_files.delete()

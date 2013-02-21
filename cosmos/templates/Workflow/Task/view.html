@@ -70,8 +70,8 @@
         {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
         {%if j.queue_status == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
         {%if j.queue_status == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>{%endif%}
-        {%if j.get_drmaa_status == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
-        {%if j.get_drmaa_status == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
+        {%if j.get_status == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
+        {%if j.get_status == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
 
         <a href="{{j.url}}">{{ j }}</a>
     </li>

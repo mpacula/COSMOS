@@ -114,7 +114,7 @@ TEMPLATE_DIRS = (
 INSTALLED_APPS = (
     'django_extensions',
     'cosmos.Workflow',
-    'cosmos.JobManager',
+    'cosmos.Job',
     #'django_pdb',
     #'gunicorn',
     'south',

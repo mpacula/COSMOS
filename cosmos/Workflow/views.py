@@ -113,7 +113,7 @@ def stage_view(request,pid):
 @never_cache
 def task_view(request,pid):
     task = Task.objects.get(pk=pid)
-    jobAttempts_list = task._jobAttempts.all()
+    jobAttempts_list = task.jobattempt_set.all()
     return render_to_response('Workflow/Task/view.html', { 'request':request,'task': task, 'jobAttempts_list':jobAttempts_list }, context_instance=RequestContext(request))
 
 

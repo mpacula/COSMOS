@@ -16,7 +16,7 @@ ________________________
       .. autoclass:: cosmos.Workflow.models.Task
          :noindex:
 #. **JobAttempt** (:doc:`API </API/JobManager>`)   
-      .. autoclass:: cosmos.JobManager.models.JobAttempt
+      .. autoclass:: cosmos.Job.models.JobAttempt
          :noindex:
 
 API

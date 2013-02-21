@@ -131,14 +131,13 @@ def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_req=None,parallel_envir
             s += ' -q {0}'.format(queue)
         return s
     elif DRM == 'GE':
-        return ''
         return '-l h_vmem={mem_req}M,num_proc={cpu_req}'.format(
             mem_req=mem_req*1.5,
             pe= parallel_environment_name,
             cpu_req=cpu_req)
         #return '-l h_vmem={0}M,slots={1}'.format(mem_req,cpu_req)
     else:
-        raise Exception('DRM native specification not supported')
+        raise Exception('DRM not supported')
 
 def validate_name(txt,field_name=''):
     """

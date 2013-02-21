@@ -46,7 +46,11 @@
                 {%endwith%} 
             <strong><a href="{{task.url}}" style="color:#C09853">{{task}}</a></strong>
             </td>
-            <td>{{task.parents}}</td>
+            <td>
+                {%for parent in task.parents%}
+                <a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
+                {%empty%}None{%endfor%}
+            </td>
             <td>{{task.status}}
             </td>
             <td>
@@ -61,7 +65,7 @@
                             {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
                             {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
                             {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
-                                {%with ds=j.get_drmaa_status %}
+                                {%with ds=j.get_status %}
                                     {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
                                     {%if ds == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
                                 {% endwith%}

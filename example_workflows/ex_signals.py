@@ -60,8 +60,8 @@ from cosmos.contrib.ezflow.dag import DAG, Apply, Split, Add
 import tools
 
 dag = ( DAG()
-        | Add | [tools.ECHO(tags={'word': 'hello'}), tools.ECHO(tags={'word': 'world'})]
-        | Apply | tools.FAIL # Automatically fail
+        |Add| [tools.ECHO(tags={'word': 'hello'}), tools.ECHO(tags={'word': 'world'})]
+        |Apply| tools.FAIL # Automatically fail
 )
 
 #################

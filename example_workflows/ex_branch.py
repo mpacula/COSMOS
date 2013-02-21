@@ -1,6 +1,8 @@
 """
-This workflow demonstrates non-series workflows - that is when your workflow isn't a series of step-by-step stages.
-dag.use() provides you to create separate branches from any section in the workflow dag.
+This workflow demonstrates branching your workflow when you need something more complicated than a linear step-by-step
+series of stages.
+
+cosmos.contrib.ezflow.dag.DAG.use() is the key to branching.
 """
 
 from cosmos.Workflow.models import Workflow

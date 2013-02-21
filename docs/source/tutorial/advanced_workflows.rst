@@ -3,16 +3,15 @@
 Advanced Workflows
 ==================
 
-Non-Series Workflows
-++++++++++++++++++++
+Branching Workflows
++++++++++++++++++++++
 
-.. literalinclude:: ../../../example_workflows/ex_use.py
+.. literalinclude:: ../../../example_workflows/ex_branch.py
     :linenos:
 
 Command Line Interface and Signals
-+++++++++++++++++++++
-
-Here is an example of how to use signals.
+++++++++++++++++++++++++++++++++++
 
 .. literalinclude:: ../../../example_workflows/ex_signals.py
+    :language: python
     :linenos:

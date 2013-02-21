@@ -8,4 +8,4 @@ Cosmos API
    :maxdepth: 3
    
    Workflow
-   JobManager
+   Job
