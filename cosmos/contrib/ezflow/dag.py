@@ -18,6 +18,21 @@ class DAG(object):
         self.last_tools = []
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
+        self.stage_names_used = []
+
+    def use(self,stage_name):
+        """
+        Updates last_tools to be the tools in the stage with name stage_name.  This way the infix operations
+        can be applied to multiple stages if the workflow isn't "linear".
+
+        :param stage_name: (str) the name of the stage
+        :return:the updated dag.
+        """
+        if stage_name not in self.stage_names_used:
+            print self.stage_names_used
+            raise KeyError, 'Stage name "{0}" does not exist.'.format(stage_name)
+        self.last_tools = filter(lambda n: n.stage_name == stage_name, self.G.nodes())
+        return self
         
     def create_dag_img(self,path):
         dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
@@ -32,10 +47,7 @@ class DAG(object):
         dag.layout(prog="dot")
         dag.draw(path,format='svg')
         print 'wrote to {0}'.format(path)
-    
-    def describe(self,generator):
-        return list(generator)
-        
+
     def configure(self,settings={},parameters={}):
         """
         Sets the parameters of every tool in the dag
@@ -161,80 +173,106 @@ WF = None
 
 def infix(func,*args,**kwargs):
     """
-    1) If the second argument is a tuple (ie multiple args submitted with infix notation), submit it as *args
+    1) Set RHS_item to be tuples if they're not already
     2) The decorated function should return a generator, so evaluate it
     3) Set the dag.last_tools to the decorated function's return value
     4) Return the dag
     """
     def wrapped(*args,**kwargs):
         #TODO confirm args[0] is a dag
-        LHS = args[0]
-        RHS = args[1] if type(args[1]) == tuple else (args[1],)
+        dag = args[0]
+        RHS = args[1] if type(args[1]) == tuple else (args[1],) #make sure RHS_item is a tuple
         try:
-            LHS.last_tools = list(func(LHS,*RHS))
-            return LHS
+            dag.last_tools = list(func(dag,dag.last_tools,*RHS))
         except TypeError:
             raise
-#            raise dagError('Func {0} called with arguments {1} and *{2}'.format(func,LHS,RHS))
+
+        stage_name = dag.last_tools[0].stage_name
+        assert stage_name not in dag.stage_names_used, 'Duplicate stage_names detected {0}.'.format(stage_name)
+        dag.stage_names_used.append(stage_name)
+
+        return dag
     return wrapped
 
 @infix
-def _add(dag,tool_instance_list):
-    for i in tool_instance_list:
+def _add(dag,parent_tools,tools,stage_name=None):
+    """
+    Add a list of tool instances with no dependencies
+
+    :param dag: The dag to add to.
+    :param parent_tools: Not used.
+    :param tools: (list) tool instansces.
+    :return: (list) the tools added.
+    """
+    for i in tools:
         dag.G.add_node(i)
         yield i
 Add = Infix(_add)
 
 @infix
-def _apply(dag,tool_class,stage_name=None):
-    input_tools = dag.last_tools
-    #TODO validate that tool_class.stage_name is unique
-    for input_tool in input_tools:
-        new_tool = tool_class(stage_name=stage_name,dag=dag,tags=input_tool.tags)
-        dag.G.add_edge(input_tool,new_tool)
+def _apply(dag,parent_tools,tool_class,stage_name=None):
+    """
+    Create one2one relationships for all parent_tools using tool_class
+    """
+    for parent_tool in parent_tools:
+        new_tool = tool_class(stage_name=stage_name,dag=dag,tags=parent_tool.tags)
+        dag.G.add_edge(parent_tool,new_tool)
         yield new_tool
         
 Apply = Infix(_apply) #map
 
 @infix
-def _reduce(dag,keywords,tool_class,stage_name=None):
-    input_tools = dag.last_tools
+def _reduce(dag,parent_tools,keywords,tool_class,stage_name=None):
+    """
+    Create a many2one relationship.s
+    :param keywords: Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.x
+    """
     if type(keywords) != list:
         raise dagError('Invalid Right Hand Side of reduce')
-    for tags, input_tool_group in groupby(input_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-        input_tool_group = list(input_tool_group)
+    for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
+        parent_tool_group = list(parent_tool_group)
         new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
-        for input_tool in input_tool_group:
-            dag.G.add_edge(input_tool,new_tool)
+        for parent_tool in parent_tool_group:
+            dag.G.add_edge(parent_tool,new_tool)
         yield new_tool
 Reduce = Infix(_reduce)
 
 #TODO raise exceptions if user submits bad kwargs for any infix commands
 @infix
-def _split(dag,split_by,tool_class,stage_name=None):
-    input_tools = dag.last_tools
+def _split(dag,parent_tools,split_by,tool_class,stage_name=None):
+    """
+    one2manys
+    """
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
-    for input_tool in input_tools:
+    for parent_tool in parent_tools:
         for new_tags in it.product(*splits):
-            tags = tags=merge_dicts(dict(input_tool.tags),dict(new_tags))
+            tags = tags=merge_dicts(dict(parent_tool.tags),dict(new_tags))
             new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags) 
-            dag.G.add_edge(input_tool,new_tool)
+            dag.G.add_edge(parent_tool,new_tool)
             yield new_tool
 Split = Infix(_split)
 
 @infix
-def _reduce_and_split(dag,keywords,split_by,tool_class,stage_name=None):
-    input_tools = dag.last_tools
+def _reduce_and_split(dag,parent_tools,keywords,split_by,tool_class,stage_name=None):
+    """
+    many2many
+    """
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     
-    for group_tags,input_tool_group in groupby(input_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-        input_tool_group = list(input_tool_group)
+    for group_tags,parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
+        parent_tool_group = list(parent_tool_group)
         for new_tags in it.product(*splits):
             new_tool = tool_class(stage_name=stage_name,dag=dag,tags=merge_dicts(group_tags,dict(new_tags)))
-            for input_tool in input_tool_group:
-                dag.G.add_edge(input_tool,new_tool)
+            for parent_tool in parent_tool_group:
+                dag.G.add_edge(parent_tool,new_tool)
             yield new_tool
 ReduceSplit = Infix(_reduce_and_split)
 
+# class args(object):
+#     "argument object"
+#     def __init__(self,*args,**kwargs):
+#         self.args = args
+#         self.kwargs = kwargs
+#
 
     

@@ -22,14 +22,11 @@ ________________________________________
 
 The following will:
 
-1. Download Cosmos
-2. Install Cosmos and required python libraries
-
 .. code-block:: bash
 
    cd /dir/to/install/Cosmos/to
    git clone git@github.com:ComputationalBiomedicine/Cosmos.git
-   pip install -I Cosmos
+   pip install Cosmos
 
 Better Install
 ________________________
@@ -48,7 +45,7 @@ $home/.virtualenvs/cosmos.
     pip install distribute --upgrade
     git clone git@github.com:ComputationalBiomedicine/Cosmos.git
     cd Cosmos
-    pip install ./
+    pip install -I ./
 
 
 Now cosmos is installed to its own python virtual environment, which you can activate by typing

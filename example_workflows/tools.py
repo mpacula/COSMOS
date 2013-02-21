@@ -1,18 +1,18 @@
 from cosmos.contrib.ezflow.tool import Tool
 
 class ECHO(Tool):
-    outputs = ['text']
+    outputs = ['txt']
     
     def cmd (self,i,s,p):
-        return 'echo {p[word]} > $OUT.text'
+        return 'echo {p[word]} > $OUT.txt'
     
 class CAT(Tool):
-    inputs = ['text']
+    inputs = ['txt']
     outputs = ['txt']
     
     def cmd(self,i,s,p):
         return 'cat {input} > $OUT.txt', {
-                'input':' '.join(map(lambda x: str(x),i['text']))
+                'input':' '.join(map(lambda x: str(x),i['txt']))
                 }
     
 class PASTE(Tool):

@@ -440,9 +440,8 @@ class Workflow(models.Model):
     @transaction.commit_on_success
     def bulk_save_task_files(self,taskfiles):
         """
-        :param taskfiles: [taskfile1,taskfile2,...] A list of taskfiles
+        :param taskfiles: (list) A list of taskfiles.
         """
-        ### Bulk add
         self.log.info("Bulk adding {0} TaskFiles...".format(len(taskfiles)))
         m = TaskFile.objects.all().aggregate(models.Max('id'))['id__max']
         id_start =  m + 1 if m else 1
