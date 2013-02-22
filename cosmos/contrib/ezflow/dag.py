@@ -3,11 +3,14 @@ import itertools as it
 import networkx as nx
 import pygraphviz as pgv
 from cosmos.Workflow.models import Task,TaskError
-from picklefield.fields import dbsafe_decode
+from decorator import decorator
 
 class DAGError(Exception): pass
 
 class DAG(object):
+    """
+    A Representation of a workflow as a :term:`DAG` of jobs.
+    """
     
     def __init__(self,cpu_req_override=False,mem_req_factor=1):
         """
@@ -20,13 +23,15 @@ class DAG(object):
         self.mem_req_factor = mem_req_factor
         self.stage_names_used = []
 
-    def use(self,stage_name):
+    def branch(self,stage_name):
         """
-        Updates last_tools to be the tools in the stage with name stage_name.  This way the infix operations
+        Updates last_tools to be the tools in the stage with name stage_name.
+        The next infix operation will thus be applied to `stage_name`.
+        This way the infix operations
         can be applied to multiple stages if the workflow isn't "linear".
 
-        :param stage_name: (str) the name of the stage
-        :return:the updated dag.
+        :param stage_name: (str)The name of the stage.
+        :return: The updated dag.
         """
         if stage_name not in self.stage_names_used:
             print self.stage_names_used
@@ -35,6 +40,10 @@ class DAG(object):
         return self
         
     def create_dag_img(self,path):
+        """
+        Writes the :term:`DAG` as an image.
+        :param path: the path to write to
+        """
         dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
         dag.node_attr['fontname']="Courier"
         dag.node_attr['fontsize']=8
@@ -50,9 +59,10 @@ class DAG(object):
 
     def configure(self,settings={},parameters={}):
         """
-        Sets the parameters of every tool in the dag
+        Sets the parameters an settings of every tool in the dag.
         
-        :param params: (dict) {'stage_name': { params_dict }, {'stage_name2': { param_dict2 } }
+        :param parameters: (dict) {'stage_name': { 'name':'value', ... }, {'stage_name2': { 'key':'value', ... } }
+        :param settings: (dict) { 'key':'val'} }
         """
         self.parameters = parameters
         for tool in self.G.node:
@@ -65,9 +75,14 @@ class DAG(object):
             tool.parameters = self.parameters.get(tool.stage_name,{})
         return self
             
-    def add_to_workflow(self,WF):
-        #add new tasks and related objects to WF
-        WF.log.info('Adding tasks to workflow.')
+    def add_to_workflow(self,workflow):
+        """
+        Add this dag to a workflow.  Only adds tasks to stages that are new, that is, another tag in the same
+        stage with the same tags does not already exist.
+
+        :param workflow: the workflow to add
+        """
+        workflow.log.info('Adding tasks to workflow.')
         
         #Validation
         taskfiles = list(it.chain(*[ n.output_files for n in self.G.nodes() ]))
@@ -83,11 +98,11 @@ class DAG(object):
         for tool in nx.topological_sort(self.G):
             stage_name = tool.stage_name
             if stage_name not in stages: #have not seen this stage yet
-                stages[stage_name] = WF.add_stage(stage_name)
+                stages[stage_name] = workflow.add_stage(stage_name)
             tool.stage = stages[stage_name]
         
         #update tool._task_instance and tool._output_files with existing data
-        stasks = list(WF.tasks.select_related('_output_files','stage'))
+        stasks = list(workflow.tasks.select_related('_output_files','stage'))
         for tpl, group in groupby(stasks + self.G.nodes(), lambda x: (x.tags,x.stage.name)):
             group = list(group)
             if len(group) >1:
@@ -100,19 +115,19 @@ class DAG(object):
         
         #bulk save tasks
         new_nodes = filter(lambda n: not hasattr(n,'_task_instance'), nx.topological_sort(self.G))
-        WF.log.info('Total tasks: {0}, New tasks being added: {1}'.format(len(self.G.nodes()),len(new_nodes)))
+        workflow.log.info('Total tasks: {0}, New tasks being added: {1}'.format(len(self.G.nodes()),len(new_nodes)))
         
         #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs.
         #Must come before adding tasks, since taskfile.ids must be populated to compute the proper pcmd.
         taskfiles = list(it.chain(*[ n.output_files for n in new_nodes ]))
 
-        WF.bulk_save_task_files(taskfiles)
+        workflow.bulk_save_task_files(taskfiles)
         
         #bulk save tasks
         for node in new_nodes:
-                node._task_instance = self.__new_task(WF,node.stage,node)
+                node._task_instance = self.__new_task(node.stage,node)
         tasks = [ node._task_instance for node in new_nodes ]
-        WF.bulk_save_tasks(tasks)
+        workflow.bulk_save_tasks(tasks)
         
         ### Bulk add task->output_taskfile relationships
         ThroughModel = Task._output_files.through
@@ -122,38 +137,34 @@ class DAG(object):
         #bulk save edges
         new_edges = filter(lambda e: e[0] in new_nodes or e[1] in new_nodes,self.G.edges())
         task_edges = [ (parent._task_instance,child._task_instance) for parent,child in new_edges ]
-        WF.bulk_save_task_edges(task_edges)
+        workflow.bulk_save_task_edges(task_edges)
     
-    def __new_task(self,workflow,stage,tool):
-        """adds a task"""
+    def __new_task(self,stage,tool):
+        """
+        Instantiates a task from a tool.
+
+        :param stage: The stage the task should belong to.
+        :param tool: The Tool.
+        """
         try:
-            return stage.new_task(name = '',
-                                  pcmd = tool.pcmd,
-                                  tags = tool.tags,
-                                  input_files = tool.input_files,
-                                  output_files = tool.output_files,
-                                  mem_req = tool.mem_req * self.mem_req_factor,
-                                  cpu_req = tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
-                                  time_req = tool.time_req,
-                                  NOOP = tool.NOOP,
-                                  dont_delete_output_files = tool.dont_delete_output_files,
-                                  succeed_on_failure = tool.succeed_on_failure)
+            return Task(
+                      stage = stage,
+                      pcmd = tool.pcmd,
+                      tags = tool.tags,
+                      input_files = tool.input_files,
+                      output_files = tool.output_files,
+                      memory_requirement = tool.mem_req * self.mem_req_factor,
+                      cpu_requirement = tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
+                      time_requirement = tool.time_req,
+                      NOOP = tool.NOOP,
+                      dont_delete_output_files = tool.dont_delete_output_files,
+                      succeed_on_failure = tool.succeed_on_failure)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e,tool))
             
 
 
 class dagError(Exception):pass
-
-def merge_dicts(*args):
-    """
-    Merges dictionaries in *args.  On duplicate keys, right most dict take precedence
-    """
-    def md(x,y):
-        x = x.copy()
-        for k,v in y.items(): x[k]=v
-        return x
-    return reduce(md,args)
 
 class Infix:
     def __init__(self, function):
@@ -171,61 +182,112 @@ class Infix:
     
 WF = None
 
-def infix(func,*args,**kwargs):
+@decorator
+def flowfxn(func,*args,**kwargs):
     """
     1) Set RHS_item to be tuples if they're not already
     2) The decorated function should return a generator, so evaluate it
     3) Set the dag.last_tools to the decorated function's return value
     4) Return the dag
     """
-    def wrapped(*args,**kwargs):
-        #TODO confirm args[0] is a dag
-        dag = args[0]
-        RHS = args[1] if type(args[1]) == tuple else (args[1],) #make sure RHS_item is a tuple
-        try:
-            dag.last_tools = list(func(dag,dag.last_tools,*RHS))
-        except TypeError:
-            raise
+    #TODO confirm args[0] is a dag
+    dag = args[0]
+    RHS = args[1] if type(args[1]) == tuple else (args[1],) #make sure RHS_item is a tuple
+    try:
+        dag.last_tools = list(func(dag,dag.last_tools,*RHS))
+    except TypeError:
+        raise
 
-        stage_name = dag.last_tools[0].stage_name
-        assert stage_name not in dag.stage_names_used, 'Duplicate stage_names detected {0}.'.format(stage_name)
-        dag.stage_names_used.append(stage_name)
+    stage_name = dag.last_tools[0].stage_name
+    assert stage_name not in dag.stage_names_used, 'Duplicate stage_names detected {0}.'.format(stage_name)
+    dag.stage_names_used.append(stage_name)
 
-        return dag
-    return wrapped
+    return dag
 
-@infix
-def _add(dag,parent_tools,tools,stage_name=None):
+@flowfxn
+def _add(dag,tools,stage_name=None,*args):
     """
-    Add a list of tool instances with no dependencies
+    Always the first operator of a workflow.  Simply adds a list of tool instances to the dag, without adding any
+    dependencies.
+
+    .. warning::
+        This operator is different than the others in that its input is a list of
+        instantiated instances of Tools.
 
     :param dag: The dag to add to.
-    :param parent_tools: Not used.
-    :param tools: (list) tool instansces.
-    :return: (list) the tools added.
+    :param tools: (list) Tool instances.
+    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+    :return: (list) The tools added.
+
+    >>> dag() |Add| [tool1,tool2,tool3,tool4]
     """
     for i in tools:
         dag.G.add_node(i)
         yield i
 Add = Infix(_add)
 
-@infix
+@flowfxn
 def _apply(dag,parent_tools,tool_class,stage_name=None):
     """
-    Create one2one relationships for all parent_tools using tool_class
+    Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
+    type `tool_class`.
+
+    :param dag: (dag) The dag to add to.
+    :param parent_tools: (list) A list of parent tools.
+    :param tool_class: (subclass of Tool)
+    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+    :return: (list) The tools added.
+
+    >>> dag() |Apply| Tool_Class
     """
     for parent_tool in parent_tools:
         new_tool = tool_class(stage_name=stage_name,dag=dag,tags=parent_tool.tags)
         dag.G.add_edge(parent_tool,new_tool)
         yield new_tool
         
-Apply = Infix(_apply) #map
+Apply = Infix(_apply)
 
-@infix
+
+#TODO raise exceptions if user submits bad kwargs for any infix commands
+@flowfxn
+def _split(dag,parent_tools,split_by,tool_class,stage_name=None):
+    """
+    Creates one2many relationships for each tool in the stage last added to the dag, with every possible combination
+    of keywords in split_by.  New tools will be of class `tool_class` and tagged with one of the possible keyword
+    combinations.
+
+    :param dag: (dag) The dag to add to.
+    :param parent_tools: (list) A list of parent tools.
+    :param split_by: (list of (str,list)) Tags to split by.
+    :param tool_class: (list) Tool instances.
+    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+    :return: (list) The tools added.
+
+    >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
+    """
+    splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
+    for parent_tool in parent_tools:
+        for new_tags in it.product(*splits):
+            tags = tags=dict(parent_tool.tags).update(dict(new_tags))
+            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags) 
+            dag.G.add_edge(parent_tool,new_tool)
+            yield new_tool
+Split = Infix(_split)
+
+
+@flowfxn
 def _reduce(dag,parent_tools,keywords,tool_class,stage_name=None):
     """
-    Create a many2one relationship.s
-    :param keywords: Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.x
+    Create new tools with a many2one to parent_tools.
+
+    :param dag: (dag) The dag to add to.
+    :param parent_tools: (list) A list of parent tools.
+    :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
+    :param tool_class: (list) Tool instances.
+    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+    :return: (list) The tools added.
+
+    >>> dag() |Reduce| (['shape'],Tool_Class)
     """
     if type(keywords) != list:
         raise dagError('Invalid Right Hand Side of reduce')
@@ -237,42 +299,30 @@ def _reduce(dag,parent_tools,keywords,tool_class,stage_name=None):
         yield new_tool
 Reduce = Infix(_reduce)
 
-#TODO raise exceptions if user submits bad kwargs for any infix commands
-@infix
-def _split(dag,parent_tools,split_by,tool_class,stage_name=None):
-    """
-    one2manys
-    """
-    splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
-    for parent_tool in parent_tools:
-        for new_tags in it.product(*splits):
-            tags = tags=merge_dicts(dict(parent_tool.tags),dict(new_tags))
-            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags) 
-            dag.G.add_edge(parent_tool,new_tool)
-            yield new_tool
-Split = Infix(_split)
-
-@infix
+@flowfxn
 def _reduce_and_split(dag,parent_tools,keywords,split_by,tool_class,stage_name=None):
     """
-    many2many
+    Create new tools by first reducing then splitting.
+
+    :param dag: (dag) The dag to add to.
+    :param parent_tools: (list) A list of parent tools.
+    :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
+    :param split_by: (list of (str,list)) Tags to split by.  Creates every possible product of the tags.
+    :param tool_class: (list) Tool instances.
+    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+    :return: (list) The tools added.
+
+    >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
     """
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     
     for group_tags,parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
         parent_tool_group = list(parent_tool_group)
         for new_tags in it.product(*splits):
-            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=merge_dicts(group_tags,dict(new_tags)))
+            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=group_tags.update(dict(new_tags)))
             for parent_tool in parent_tool_group:
                 dag.G.add_edge(parent_tool,new_tool)
             yield new_tool
 ReduceSplit = Infix(_reduce_and_split)
-
-# class args(object):
-#     "argument object"
-#     def __init__(self,*args,**kwargs):
-#         self.args = args
-#         self.kwargs = kwargs
-#
 
     

@@ -49,7 +49,9 @@ $home/.virtualenvs/cosmos.
 
 
 Now cosmos is installed to its own python virtual environment, which you can activate by typing
-:command:`workon cosmos`.  Deactivate the virtual environment by typing :command:`deactivate`
+:command:`workon cosmos`.  Make sure you type `workon cosmos` anytime you want to interact with cosmos, or run a script
+that uses cosmos.
+Deactivate the virtual environment by typing :command:`deactivate`
 
 
 Experimental Features

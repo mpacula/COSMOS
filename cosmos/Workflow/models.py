@@ -396,7 +396,7 @@ class Workflow(models.Model):
 
         .. note:: this does not save task->taskfile relationships
 
-        >>> tasks = [stage.new_task(name='1',pcmd='cmd1',save=False),stage.new_task(name='2',pcmd='cmd2',save=False,{},True)]
+        >>> tasks = [stage.new_task(pcmd='cmd1',save=False,{'i':1}),stage.new_task(pcmd='cmd2',save=False,{'i':2})]
         >>> stage.bulk_save_tasks(tasks)
         """
         self.log.info("Bulk adding {0} Tasks...".format(len(tasks)))
@@ -523,7 +523,7 @@ class Workflow(models.Model):
         task.set_status('in_progress')
         self.log.info('Running {0}'.format(task))
 
-        task.exec_command = task.pre_command
+        task.exec_command = task.pcmd
 
         #set output_file paths to the task's job_output_dir
         for f in task.output_files:
@@ -957,74 +957,19 @@ class Stage(models.Model):
             if sja:
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
 
-    def add_task(self, *args, **kwargs):
+    def add_task(self, pcmd, tags={}, **kwargs):
         """
-        Creates a new task, and saves it
-        Has the same signature as :meth:new_task
+        Creates a new task for this stage, and saves it
+        If a task with `tags` already exists in this stage, just return it
+        Has the same signature as :meth:`Task.__init__` minus the stage argument.
         
-        :returns: the task added
+        :returns: The task added.
         """
-        newtask = self.new_task(*args,**kwargs)
-        newtask.save()
-        return newtask
+        q = Task.objects.filter(stage=self,tags=tags)
+        if q.count() > 0:
+            return q.all()[0]
 
-
-    def new_task(self, name, pcmd, input_files=[], output_files=[], tags = {}, on_success = None, mem_req=0, cpu_req=1, time_req=None,
-                 NOOP=False,
-                 succeed_on_failure = False,
-                 hard_reset=False,
-                 dont_delete_output_files=False):
-        """
-        Adds a task to the stage. If the task with this name (in this stage) already exists and was successful, just return the existing one.
-        If the existing task was unsuccessful, delete it and all of its output files, and return a new task.
-        
-        :param name: (str) The name of the task. Must be unique within this stage. All spaces are converted to underscores. Required.
-        :param pcmd: (str) The preformatted command to execute. Usually includes strings that represent TaskFiles which will be automatically parsed. Required.
-        :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
-        :param on_success: (method) A method to run when this task succeeds.  Method is called with one parameter named 'task', the successful task.
-        :param mem_req: (int) How much memory to reserve for this task in MB. Optional.
-        :param cpu_req: (int) How many CPUs to reserve for this task. Optional.
-        :param time_req: (int) Time required in miinutes.  If a job exceeds this requirement, it will likely be killed.
-        :param NOOP: (booean) No Operation, this task does not get executed.
-        :param succeed_on_failure: (booean) Succeed even if JobAttempts fails.
-        :param dont_delete_output_files: (boolean) Prevents output files from being deleted, even when this task becomes an intermediate.
-        :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
-        :returns: A new task instance.  The instance has not been saved to the database.
-        """
-
-        if (pcmd == '' or pcmd) is None and not NOOP:
-            raise TaskError('pre_command cannot be blank if NOOP==False')
-
-        #TODO validate that this task has the same tag keys as all other tasks?
-
-        task_kwargs = {
-                       'stage':self,
-                       'name':name,
-                       'tags':tags,
-                       #'on_success':on_success,
-                       'dont_delete_output_files':dont_delete_output_files,
-                       'NOOP': NOOP,
-                       'succeed_on_failure':succeed_on_failure,
-                       'pre_command':pcmd,
-                       'memory_requirement':mem_req,
-                       'cpu_requirement':cpu_req,
-                       'time_requirement':time_req
-                       }
-
-        #delete if hard_reset
-        if hard_reset:
-            task_exists = Task.objects.filter(stage=self,tags=tags).count() > 0
-            if task_exists:
-                task = Task.objects.get(stage=self,tags=tags)
-            if not task_exists:
-                raise ValidationError("Cannot hard_reset task with name {0} as it doesn't exist.".format(name))
-            task.delete()
-
-        #Instantiate a task
-        t= Task(**task_kwargs)
-        t.input_files_list = input_files
-        t.output_files_list = output_files
-        return t
+        return Task.create(stage=self,pcmd=pcmd,**kwargs)
 
     def is_done(self):
         """
@@ -1121,8 +1066,6 @@ class Stage(models.Model):
 
     def __str__(self):
         return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
-    def toString(self):
-        return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
 
 
 class TaskTag(models.Model):
@@ -1151,26 +1094,25 @@ class Task(models.Model):
     
     tags must be unique for all tasks in the same stage
     """
-    pre_command = models.TextField(help_text='preformatted command.  almost always will contain the special string {output} which will later be replaced by the proper output path')
-    exec_command = models.TextField(help_text='the actual command that was executed',null=True)
-    name = models.CharField(max_length=255,null=True)
-    memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=0,null=True)
-    cpu_requirement = models.SmallIntegerField(help_text="Number of CPUs to reserve for this job",default=1)
+    stage = models.ForeignKey(Stage,help_text="The stage this task belongs to.")
+    pcmd = models.TextField(help_text='Preformatted command.  almost always will contain special strings for TaskFiles which will later be replaced by their proper system path at execution')
+    exec_command = models.TextField(help_text='The actual command that is executed',null=True)
+    memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=None,null=True)
+    cpu_requirement = models.SmallIntegerField(help_text="Number of CPUs to reserve for this job",default=None,null=True)
     time_requirement = models.IntegerField(help_text="Time required to run in minutes.  If a job runs longer it may be automatically killed.",default=None,null=True)
-    stage = models.ForeignKey(Stage,null=True)
-    successful = models.BooleanField(null=False)
+    successful = models.BooleanField(default=False,help_text="True if the task has been executed successfully, else False")
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
-    succeed_on_failure = models.BooleanField(default=False, help_text="Task will succeed and workflow will progress even if its JobAttempts fail.")
-    cleared_output_files = models.BooleanField(default=False,help_text="Output files have been cleared.")
-    dont_delete_output_files = models.BooleanField(default=False,help_text="Prevents output files from being deleted, even when this task becomes an intermediate.")
+    succeed_on_failure = models.BooleanField(default=False, help_text="If True, Task will succeed and workflow will progress even if its JobAttempts fail.")
+    cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
+    dont_delete_output_files = models.BooleanField(default=False,help_text="If True, prevents output files from being deleted even when this task becomes an intermediate and workflow.delete_intermediates == True.")
 
-    tags = PickledObjectField(null=False)
+    tags = PickledObjectField(null=False,default={})
     #on_success = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
 
-    _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True) #dictionary of outputs
+    _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True,default=None) #dictionary of outputs
     @property
     def output_files(self): return self._output_files.all()
 
@@ -1178,24 +1120,48 @@ class Task(models.Model):
     @property
     def input_files(self): return self._input_files.all()
 
+#TODO a fix for the below should be implemented, or at least a validation that tags and stage are in fact unique
 #   Django has a bug that prevents indexing of BLOBs which is what tags is stored as
 #    class Meta:
 #        unique_together = (('tags','stage'))
 
     def __init__(self, *args, **kwargs):
+        """
+        :param stage: (Stage) The stage this task is a part of.
+        :param pcmd: (str) The preformatted command to execute. Usually includes strings that represent TaskFiles which will be automatically parsed. Required.
+        :param tags: (dict) A dictionary keys and values to tag the task with. These tags can later be used by methods such as :py:meth:`~Workflow.models.stage.group_tasks_by` and :py:meth:`~Workflow.models.stage.get_tasks_by` Optional.
+        :param on_success: (method) A method to run when this task succeeds.  Method is called with one parameter named 'task', the successful task.
+        :param memory_requirement: (int) How much memory to reserve for this task in MB. Optional.
+        :param cpu_requirement: (int) How many CPUs to reserve for this task. Optional.
+        :param time_requirement: (int) Time required in miinutes.  If a job exceeds this requirement, it will likely be killed.
+        :param NOOP: (booean) No Operation, this task does not get executed.
+        :param succeed_on_failure: (booean) Succeed even if JobAttempts fails.
+        :param dont_delete_output_files: (boolean) Prevents output files from being deleted, even when this task becomes an intermediate.
+        :param hard_reset: (bool) Deletes this task and all associated files and start it fresh. Optional.
+        :returns: A new task instance.  The instance has not been saved to the database.
+        """
         kwargs['created_on'] = timezone.now()
         return super(Task,self).__init__(*args, **kwargs)
 
+        if not self.pcmd: raise TaskError, 'pcmd is required'
+        if not self.stage: raise TaskError, 'stage is required'
+
+        if self.pcmd == '' and not self.NOOP:
+            raise TaskError('pcmd cannot be blank if NOOP==False')
+
+
     @staticmethod
-    def create(*args,**kwargs):
+    def create(stage,pcmd,**kwargs):
         """
         Creates a task.
         """
-        task = Task.objects.create(*args,**kwargs)
+        task = Task(stage=stage, pcmd=pcmd, **kwargs)
 
-        if Task.objects.filter(stage=task.stage,tags=task.tags).count() > 1:
+        if Task.objects.filter(stage=task.stage,tags=task.tags).count() > 0:
             task.delete()
             raise ValidationError("Tasks belonging to a stage with the same tags detected! tags: {0}".format(task.tags))
+
+        task.save()
 
         check_and_create_output_dir(task.output_dir)
         check_and_create_output_dir(task.job_output_dir) #this is not in JobManager because JobManager should be not care about these details
@@ -1358,9 +1324,5 @@ class Task(models.Model):
         super(Task, self).delete(*args, **kwargs)
 
     def __str__(self):
-        return 'Task[{0}] {1} {2}'.format(self.id,self.stage.name,self.tags)
-
-
-    def toString(self):
-        return 'Task[{0}] {1}'.format(self.id,self.stage.name,pprint.pformat(self.tags,indent=4))
+        return 'Task[{0}] {1}'.format(self.id,self.tags)
 

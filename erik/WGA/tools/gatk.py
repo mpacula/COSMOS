@@ -1,5 +1,4 @@
 from cosmos.contrib.ezflow.tool import Tool
-import os
 
 def list2input(l):
     return "-I " +" -I ".join(map(lambda x: str(x),l))
@@ -16,20 +15,19 @@ class GATK(Tool):
         )
 
 class RTC(GATK):
-    __verbose__ = "Indel Realigner Target Creator"
+    name = "Indel Realigner Target Creator"
     mem_req = 8*1024
     cpu_req = 4
     inputs = ['bam']
     outputs = ['intervals']
     forward_input = True
-    one_parent = True
     
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T RealignerTargetCreator
             -R {s[reference_fasta_path]}
-            -I {i[bam]}
+            -I {i[bam][0]}
             -o $OUT.intervals
             --known {s[indels_1000g_phase1_path]}
             --known {s[mills_path]}
@@ -38,20 +36,19 @@ class RTC(GATK):
         """
     
 class IR(GATK):
-    __verbose__ = "Indel Realigner"
+    name = "Indel Realigner"
     mem_req = 8*1024
     inputs = ['bam','intervals']
     outputs = ['bam']
-    one_parent = True
     
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
             -T IndelRealigner
             -R {s[reference_fasta_path]}
-            -I {i[bam]}
+            -I {i[bam][0]}
             -o $OUT.bam
-            -targetIntervals {i[intervals]}
+            -targetIntervals {i[intervals][0]}
             -known {s[indels_1000g_phase1_path]}
             -known {s[mills_path]}
             -model USE_READS
@@ -59,7 +56,7 @@ class IR(GATK):
         """
     
 class BQSR(GATK):
-    __verbose__ = "Base Quality Score Recalibration"
+    name = "Base Quality Score Recalibration"
     cpu_req = 8
     mem_req = 9*1024
     inputs = ['bam']
@@ -88,7 +85,7 @@ class BQSR(GATK):
           }
     
 class PR(GATK):
-    __verbose__ = "Apply BQSR"
+    name = "Apply BQSR"
     mem_req = 8*1024
     inputs = ['bam','recal']
     outputs = ['bam']
@@ -113,7 +110,7 @@ class PR(GATK):
 
     
 class UG(GATK):
-    __verbose__ = "Unified Genotyper"
+    name = "Unified Genotyper"
     mem_req = 5.5*1024
     inputs = ['bam']
     outputs = ['vcf']
@@ -138,7 +135,7 @@ class UG(GATK):
         }
     
 class CV(GATK):
-    __verbose__ = "Combine Variants"
+    name = "Combine Variants"
     mem_req = 3*1024
     
     inputs = ['vcf']
@@ -168,13 +165,12 @@ class CV(GATK):
         }
     
 class VQSR(GATK):
-    __verbose__ = "Variant Quality Score Recalibration"
+    name = "Variant Quality Score Recalibration"
     mem_req = 4*1024
     inputs = ['vcf']
     outputs = ['recal','tranches','R']
     
     forward_input = True
-    one_parent = True
     
     default_params = {
       'inbreeding_coeff' : False
@@ -186,7 +182,7 @@ class VQSR(GATK):
             {self.bin}
             -T VariantRecalibrator
             -R {s[reference_fasta_path]}
-            -input {i[vcf]}
+            -input {i[vcf][0]}
             --maxGaussians 6
             -resource:hapmap,known=false,training=true,truth=true,prior=15.0 {s[hapmap_path]}
             -resource:omni,known=false,training=true,truth=false,prior=12.0 {s[omni_path]}
@@ -202,7 +198,7 @@ class VQSR(GATK):
             {self.bin}
             -T VariantRecalibrator
             -R {s[reference_fasta_path]}
-            -input {i[vcf]}
+            -input {i[vcf][0]}
             --maxGaussians 4 -std 10.0 -percentBad 0.12
             -resource:mills,known=true,training=true,truth=true,prior=12.0 {s[mills_path]}
             -an QD -an FS -an HaplotypeScore -an ReadPosRankSum {InbreedingCoeff}
@@ -214,12 +210,11 @@ class VQSR(GATK):
         return cmd, {'InbreedingCoeff' : '-an InbreedingCoeff' if p['inbreeding_coeff'] else '' }
     
 class Apply_VQSR(GATK):
-    __verbose__ = "Apply VQSR"
+    name = "Apply VQSR"
     mem_req = 4*1024
     
     inputs = ['vcf','recal','tranches']
     outputs = ['vcf']
-    one_parent = True
     
     def cmd(self,i,s,p):
         if p['glm'] == 'SNP': 
@@ -228,8 +223,8 @@ class Apply_VQSR(GATK):
             -T ApplyRecalibration
             -R {s[reference_fasta_path]}
             -input {i[vcf]}
-            -tranchesFile {i[tranches]}
-            -recalFile {i[recal]}
+            -tranchesFile {i[tranches][0]}
+            -recalFile {i[recal][0]}
             -o $OUT.vcf
             --ts_filter_level 99.0
             -mode SNP
@@ -240,8 +235,8 @@ class Apply_VQSR(GATK):
             -T ApplyRecalibration
             -R {s[reference_fasta_path]}
             -input {i[vcf]}
-            -tranchesFile {i[tranches]}
-            -recalFile {i[recal]}
+            -tranchesFile {i[tranches][0]}
+            -recalFile {i[recal][0]}
             -o $OUT.vcf
             --ts_filter_level 95.0
             -mode INDEL
@@ -250,46 +245,41 @@ class Apply_VQSR(GATK):
     
     
 class ANNOVAR(Tool):
-    __verbose__ = "Annovar"
+    name = "Annovar"
     inputs = ['vcf']
     outputs = ['tsv']
-    one_parent = True
     
     def cmd(self,i,s,p):
-        return 'annovar {i[vcf]} {p[database]}'
+        return 'annovar {i[vcf][0]} {p[database]}'
     
 class PROCESS_ANNOVAR(Tool):
-    __verbose__ = "Process Annovar"
+    name = "Process Annovar"
     inputs = ['tsv']
     outputs = ['tsv']
-    one_parent = True
 
     def cmd(self,i,s,p):
-        return 'genomekey {i[tsv]}'
+        return 'genomekey {i[tsv][0]}'
     
 class MERGE_ANNOTATIONS(Tool):
-    __verbose__ = "Merge Annotations"
+    name = "Merge Annotations"
     inputs = ['tsv']
     outputs = ['tsv']
-    one_parent = True
     
     def cmd(self,i,s,p):
         return 'genomekey merge {0}'.format(','.join(map(lambda x:str(x),i['tsv'])))
     
 class SQL_DUMP(Tool):
-    __verbose__ = "SQL Dump"
+    name = "SQL Dump"
     inputs = ['tsv']
     outputs = ['sql']
-    one_parent = True
     
     def cmd(self,i,s,p):
         return 'sql dump {i[tsv]}'
     
 class ANALYSIS(Tool):
-    __verbose__ = "Filtration And Analysis"
+    name = "Filtration And Analysis"
     inputs = ['sql']
     outputs = ['analysis']
-    one_parent = True
     
     def cmd(self,i,s,p):
         return 'analyze {i[sql]}'

@@ -2,12 +2,11 @@ from cosmos.contrib.ezflow.tool import Tool
 import os
 
 class ALN(Tool):
-    __verbose__ = "Reference Alignment"
+    _name = "Reference Alignment"
     mem_req = 4*1024
     cpu_req = 2
     time_req = 100
     forward_input = True
-    one_parent = True
     inputs = ['fastq.gz']
     outputs = ['sai']
     default_params = { 'q': 5 }
@@ -16,10 +15,10 @@ class ALN(Tool):
         """
         Expects tags: lane, chunk, library, sample, platform, flowcell, pair
         """
-        return '{s[bwa_path]} aln -q {p[q]} -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq.gz]} > $OUT.sai'
+        return '{s[bwa_path]} aln -q {p[q]} -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq.gz][0]} > $OUT.sai'
 
 class SAMPE(Tool):
-    __verbose__ = "Paired End Mapping"
+    _name = "Paired End Mapping"
     mem_req = 5*1024
     cpu_req = 1
     time_req = 120
@@ -30,6 +29,7 @@ class SAMPE(Tool):
         """
         Expects tags: lane, chunk, library, sample, platform, flowcell, pair
         """
+        #todo assert correct fastq and sai are paired
         t2 = self.parents[0].tags
         return r"""
             {s[bwa_path]} sampe

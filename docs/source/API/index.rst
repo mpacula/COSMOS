@@ -1,11 +1,12 @@
 .. _api:
 
-Cosmos API
+API
 ==========
+
 
 .. toctree::
    :numbered:
    :maxdepth: 3
-   
+
    Workflow
    Job

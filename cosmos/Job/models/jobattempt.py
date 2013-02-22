@@ -160,7 +160,7 @@ class JobAttempt(models.Model):
 
     @property
     def STDOUT_txt(self):
-        "Read the STDOUT file"
+        "The contents of the STDOUT file, or the string 'File does not exist.'"
         path = self.STDOUT_filepath
         if path is None:
             return 'File does not exist.'
@@ -169,7 +169,7 @@ class JobAttempt(models.Model):
                 return f.read()
     @property
     def STDERR_txt(self):
-        "Read the STDERR file"
+        "The contents of the STDERR file, or the string 'File does not exist.'"
         path = self.STDERR_filepath
         if path is None:
             return 'File does not exist.'

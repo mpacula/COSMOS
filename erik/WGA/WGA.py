@@ -1,7 +1,7 @@
 """
 WGA Workflow
 
-Input Dicts
+Input Dict should be in the format:
 
 [
     {
@@ -18,47 +18,42 @@ Input Dicts
 ]
 """
 
-_author_ = 'Erik Gafni'
-
-from cosmos import session
 from cosmos.contrib.ezflow.tool import INPUT
-from tools import gatk,picard,bwa
 from cosmos.Workflow.models import TaskFile
-from cosmos.Workflow.cli import CLI
 
 import json
-from settings import settings
 import os
 
 ####################
 # Input
 ####################
 
+from cosmos.Workflow.cli import CLI
 cli = CLI()
-cli.parser.add_argument('-i','--inputs',type=str,help='Inputs, see script comments for format.',required=True)
+cli.parser.add_argument('-i','--input_dict',type=str,help='Inputs, see script comments for format.',required=True)
 cli.parser.add_argument('-p','--input_path',type=str,help='Prepends a directory to all input paths.')
 
 WF = cli.parse_args()
 
 #setup inputs
 input_path = cli.parsed_kwargs['input_path']
-with open(cli.parsed_kwargs['inputs'],'r') as input_dict:
+with open(cli.parsed_kwargs['input_dict'],'r') as input_dict:
     input_list = json.loads(input_dict.read())
     if input_path:
         for i in input_list:
             i['path'] = os.path.join(input_path,i['path'])
 
 inputs = [ INPUT(taskfile=TaskFile(name='fastq.gz',path=i['path'],fmt='fastq.gz'),tags=i) for i in input_list ]
-inputs = filter(lambda i: i.tags['chunk'] == '001',inputs)
+#inputs = filter(lambda i: i.tags['chunk'] == '001',inputs)
 
 ####################
 # Configuration
 ####################
 
-#parameter keywords can be the name of the tool class, or its default __verbose__
 parameters = {
   'ALN': { 'q': 5 },
 }
+from settings import settings
 
 # Tags
 intervals = ('interval',range(1,23)+['X','Y'])
@@ -69,7 +64,8 @@ dbs = ('database',['1000G','PolyPhen2','COSMIC','ENCODE'])
 # Create DAG
 ####################
 
-from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add, A
+from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
+from tools import gatk,picard,bwa
 
 dag = (DAG(mem_req_factor=1)
     |Add| inputs

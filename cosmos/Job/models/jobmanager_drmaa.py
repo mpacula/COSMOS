@@ -142,11 +142,11 @@ class JobManager(JobManagerBase):
         finally:
             enable_stderr()
 
-        job = JobAttempt.objects.get(drmaa_jobID = extra_jobinfo.jobId)
+        jobAttempt = JobAttempt.objects.get(drmaa_jobID = extra_jobinfo.jobId)
+
+        extra_jobinfo = extra_jobinfo._asdict()
 
         successful = extra_jobinfo is not None and extra_jobinfo['exitStatus'] == 0 and extra_jobinfo['wasAborted'] == False
-        if extra_jobinfo:
-            extra_jobinfo = extra_jobinfo._asdict()
-        job._hasFinished(job, successful, extra_jobinfo)
-        return job
+        jobAttempt._hasFinished(successful, extra_jobinfo)
+        return jobAttempt
 

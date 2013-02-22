@@ -18,10 +18,9 @@ class Picard(Tool):
 
 
 class FIXMATE(Picard):
-    __verbose__ = "Fix Mate Information"
+    name = "Fix Mate Information"
     inputs = ['bam']
     outputs = ['bam']
-    one_parent = True
     time_req = 4*60
     mem_req = 3*1024
 
@@ -30,7 +29,7 @@ class FIXMATE(Picard):
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            INPUT={i[bam]}
+            INPUT={i[bam][0]}
             OUTPUT=$OUT.bam
             VALIDATION_STRINGENCY=LENIENT
         """
@@ -39,7 +38,6 @@ class FIXMATE(Picard):
 class REVERTSAM(Picard):
     inputs = ['bam']
     outputs = ['bam']
-    one_parent = True
     time_req = 0
     mem_req = 20*1024
     cpu_req=2
@@ -52,7 +50,7 @@ class REVERTSAM(Picard):
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            INPUT={i[bam]}
+            INPUT={i[bam][0]}
             OUTPUT=$OUT.bam
             VALIDATION_STRINGENCY=SILENT
             MAX_RECORDS_IN_RAM=4000000
@@ -61,7 +59,6 @@ class REVERTSAM(Picard):
 class SAM2FASTQ_byrg(Picard):
     inputs = ['bam']
     outputs = ['dir']
-    one_parent = True
     time_req = 0
     mem_req = 12*1024
     succeed_on_failure = True
@@ -71,7 +68,7 @@ class SAM2FASTQ_byrg(Picard):
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            INPUT={i[bam]}
+            INPUT={i[bam][0]}
             OUTPUT_DIR=$OUT.dir
             OUTPUT_PER_RG=true
             VALIDATION_STRINGENCY=LENIENT
@@ -84,7 +81,6 @@ class SAM2FASTQ(Picard):
     """
     inputs = ['bam']
     outputs = ['1.fastq','2.fastq']
-    one_parent = True
     time_req = 0
     mem_req = 3*1024
     succeed_on_failure = True
@@ -95,7 +91,7 @@ class SAM2FASTQ(Picard):
         import re
         return r"""
             {self.bin}
-            INPUT={i[bam]}
+            INPUT={i[bam][0]}
             FASTQ=$OUT.1.fastq
             SECOND_END_FASTQ=$OUT.2.fastq
             VALIDATION_STRINGENCY=SILENT
@@ -103,7 +99,7 @@ class SAM2FASTQ(Picard):
 
 
 class MERGE_SAMS(Picard):
-    __verbose__ = "Merge Sam Files"
+    name = "Merge Sam Files"
     mem_req = 3*1024
     inputs = ['bam']
     outputs = ['bam']
@@ -125,52 +121,49 @@ class MERGE_SAMS(Picard):
         }
                 
 class CLEAN_SAM(Picard):
-    __verbose__ = "Clean Sams"
+    name = "Clean Sams"
     mem_req = 4*1024
     inputs = ['sam']
     outputs = ['bam']
-    one_parent = True
-    
+        
     jar = 'CleanSam.jar'
     
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            I={i[sam]}
+            I={i[sam][0]}
             O=$OUT.bam
             VALIDATION_STRINGENCY=SILENT
         """
 
 class DEDUPE(Picard):
-    __verbose__ = "Mark Duplicates"
+    name = "Mark Duplicates"
     mem_req = 4*1024
     inputs = ['bam']
     outputs = ['bam','metrics']
-    one_parent = True
-    
+        
     jar = 'MarkDuplicates.jar'
     
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            I={i[bam]}
+            I={i[bam][0]}
             O=$OUT.bam
             METRICS_FILE=$OUT.metrics
             ASSUME_SORTED=True
         """
 
 class INDEX_BAM(Picard):
-    __verbose__ = "Index Bam Files"
+    name = "Index Bam Files"
     mem_req = 4*1024
     forward_input = True
     inputs = ['bam']
-    one_parent = True
-    
+        
     jar = 'BuildBamIndex.jar'
     
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            INPUT={i[bam]}
-            OUTPUT={i[bam]}.bai
+            INPUT={i[bam][0]}
+            OUTPUT={i[bam][0]}.bai
         """

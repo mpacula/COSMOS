@@ -6,12 +6,13 @@ Advanced Workflows
 Branching Workflows
 +++++++++++++++++++++
 
+:file:`example_workflows/ex_branch.py`
+
 .. literalinclude:: ../../../example_workflows/ex_branch.py
-    :linenos:
 
 Command Line Interface and Signals
 ++++++++++++++++++++++++++++++++++
 
+:file:`example_workflows/ex_branch.py`
+
 .. literalinclude:: ../../../example_workflows/ex_signals.py
-    :language: python
-    :linenos:

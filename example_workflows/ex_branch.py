@@ -1,5 +1,6 @@
 """
-This workflow demonstrates branching your workflow when you need something more complicated than a linear step-by-step
+This workflow demonstrates branching your workflow when you need
+something more complicated than a linear step-by-step
 series of stages.
 
 cosmos.contrib.ezflow.dag.DAG.use() is the key to branching.
@@ -20,7 +21,7 @@ dag = ( DAG()
 
 )
 # Add an independent Word Count Job, who's stage's name will be "Extra Word Count"
-dag.use('ECHO') |Apply| (tools.WC,'Extra Independent Word Count')
+dag.branch('ECHO') |Apply| (tools.WC,'Extra Independent Word Count')
 
 # Generate image
 dag.create_dag_img('/tmp/ex2.svg')

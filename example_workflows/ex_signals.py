@@ -1,9 +1,13 @@
 """
-This shows how to use signals to run arbitrary code when a stage fails.  One could easily
+This shows how to use signals to run arbitrary
+code when astage fails.  One could easily
 modify this to send SMS texts instead of e-mails.
 
-.. note:: that signals for status changes are not sent when they're changed due to a
-workflow starting, or a workflow terminating.
+.. note::
+
+    Signals for status changes are not sent
+    when they're changed due to a
+    workflow starting, or a workflow terminating.
 """
 ####################
 # CLI
@@ -39,7 +43,7 @@ def email_on_fail(sender, status, **kwargs):
         SUBJECT = "{0} Failed!".format(stage)
         TO = email
         FROM = "me@me.com"
-        HOST = "smpt.server"
+        HOST = "smtp.server"
         text = '{0} has failed at stage {1}'.format(stage.workflow, stage)
         BODY = "\r\n".join(
             "From: %s" % FROM,

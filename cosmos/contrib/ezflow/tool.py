@@ -2,7 +2,6 @@ from helpers import getcallargs,cosmos_format
 import re
 from cosmos.Workflow.models import TaskFile
 from cosmos.utils.helpers import parse_cmd
-import itertools
 
 i = 0
 def get_id():
@@ -19,36 +18,41 @@ class GetOutputError(Exception): pass
 
 class Tool(object):
     """
-    A Tool
-    
-    If initialized with a single argument, it becomes a factory that produces a class who's stage_name is that argument.
-    Otherwise, intialize with keyword arguments to make it behave like a regular class.
-    
+    A Tool is a class who's instances represent a command that gets executed.  It also contains properties which
+    define the resources that are required
+
+    :property inputs: (list of strs) a list of input names. Defaults to [].  Can be overridden.
+    :property outputs: (list of strs) a list of output names. Defaults to []. Can be overridden.
+    :property mem_req: (int) Number of megabytes of memory to request.  Defaults to 1024.  Can be overridden.
+    :property cpu_req: (int) Number of cores to request.  Defaults to 1.  Can be overridden.
+    :property NOOP: (bool) If True, these tasks do not contain commands that are executed.  Used for INPUT.  Default is False. Can be overridden.
+    :property forward_input: (bool) If True, the input files of this tool will also be input files of children of this tool.  Default is False.  Can be overridden.
+    :property succeed_on_failure: (bool) If True, if this tool's tasks' job attempts fail, the task will still be considered successful.  Default is False.  Can be overridden.
+    :property dont_delete_output_files: (bool) If True, this tool's output files will not be deleted when a workflow is executed with delete_intermediates=True.  Default is False.  Can be overridden.
+    :property default_params: (dict) A dictionary of default parameters.  Defaults to {}.  Can be overridden.
     :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
     :property dag: (DAG) The dag that is keeping track of this Tool
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
     :property output_files: (list) This Tool's output TaskFiles.  A tool's output taskfile names should be unique.
-    :property tags: (dict) This Tool's tags
-    :property inputs: (list of strs) a list of input names, must be specified by user
-    :property outputs: (list of strs) a list of output names, must be specified by user
-    :property default_params: (dict) a dictionary of default parameters
+    :property tags: (dict) This Tool's tags.
     """
-    NOOP = False #set to True if this Task should never actually be submitted to the Cosmos Workflow
-    
+    #TODO props that cant be overridden should be private
+
+    inputs = []
+    outputs = []
     mem_req = 1*1024 #(MB)
     cpu_req = 1 #(cores)
     time_req = None #
-    inputs = []
-    outputs = []
+    NOOP = False #set to True if this Task should never actually be submitted to the Cosmos Workflow
     forward_input = False
     succeed_on_failure = False
     dont_delete_output_files = False
-    one_parent = False
+    default_params = {}
+
     settings = {}
     parameters = {}
     tags = {}
-    default_params = {}
     
     def __init__(self,stage_name=None,tags={},dag=None):
         """
@@ -56,9 +60,9 @@ class Tool(object):
         :param dag: the dag this task belongs to.
         """
         if not hasattr(self,'output_files'): self.output_files = []
-        if not hasattr(self,'__verbose__'): self.__verbose__ = self.__class__.__name__
+        if not hasattr(self,'name'): self.name = self.__class__.__name__
         self.tags = tags
-        self.stage_name = stage_name if stage_name else self.__verbose__
+        self.stage_name = stage_name if stage_name else self.name
         self.dag = dag
         
         self.id = get_id()
@@ -128,11 +132,12 @@ class Tool(object):
     def label(self):
         "Label used for the DAG image"
         tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(k,v) for k,v in self.tags.items() ]))
-        return "[{3}] {0}{1}\\n{2}".format(self.__verbose__,tags,self.pcmd,self.id)
+        return "[{3}] {0}{1}\\n{2}".format(self.name,tags,self.pcmd,self.id)
 
     def map_inputs(self):
         """
         Default method to map inputs.  Can be overriden of a different behavior is desired
+        :returns: (dict) A dictionary of taskfiles which are inputs to this tool.  Keys are names of the taskfiles, values are a list of Taskfiles.
         """
         if not self.inputs:
             return {}
@@ -144,12 +149,12 @@ class Tool(object):
 
         input_dict = {}
         for input_file in all_inputs:
-            input_dict.setdefault(input_file.name,[]).append(input_file)
+            input_dict.get(input_file.name,[]).append(input_file)
 
-        if self.one_parent:
-            for key in input_dict:
-                if len(input_dict[key]) == 1:
-                    input_dict[key] = input_dict[key][0]
+        # if self.one_parent:
+        #     for key in input_dict:
+        #         if len(input_dict[key]) == 1:
+        #             input_dict[key] = input_dict[key][0]
 
         return input_dict
         
@@ -187,9 +192,9 @@ class Tool(object):
 
     def cmd(self, i, s, p):
         """
-        :param i: (dict) inputs
-        :param s: (dict) settings
-        :param p: (dict) parameters (includes tags)
+        :param i: (dict) Input TaskFiles.
+        :param s: (dict) Settings.  The settings dictionary, set by using :py:meth:`contrib.ezflow.dag.configure`
+        :param p: (dict) Parameters.
         """
         raise NotImplementedError("{0}.cmd is not implemented.".format(self.__class__.__name__))
 
@@ -197,18 +202,22 @@ class Tool(object):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
     
 class INPUT(Tool):
-    __verbose__ = "Load Input Files"
+    """
+    An Input File.
+
+    Does not actually execute anything, but sets its output_files to the TaskFiles or paths its initialized to
+
+    :property NOOP: Automatically set to True
+    """
+    name = "Load Input Files"
     NOOP = True
     mem_req = 0
     cpu_req = 0
     
-    def __init__(self,*args,**kwargs):
+    def __init__(self,output_path=None,output_paths=[],taskfile=None,taskfiles=[],*args,**kwargs):
         """
+        Lots of ways to init an INPUT File
         """
-        output_path=kwargs.pop('filepath',None)
-        output_paths=kwargs.pop('fiepaths',[])
-        taskfile=kwargs.pop('taskfile',None)
-        taskfiles=kwargs.pop('taskfiles',[])
         super(INPUT,self).__init__(*args,**kwargs)
 
         if output_path: output_paths.append(output_path)

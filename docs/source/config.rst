@@ -12,12 +12,17 @@ Edit :file:`~/.cosmos/config.ini`, and configure it to your liking.
 Local DRM
 **********
 
-Setting DRM = local is a convenient way to test workflows.  This will cause jobs to be submitted as background
-processes.  Currently there's no way to set a ceiling on the number
-of processes being executed simultaneously, since this is supposed to be handled by a DRM.  Be careful how many
-resource intensive jobs your workflow submits at once.
-A feature to set a ceiling on concurrent processes may be added in the
-future.
+Setting DRM = local in your config file will cause jobs to be submitted as background
+processes on the local machine using :py:mod:`subprocess`.Popen.  The `DRM = local` setting's
+primary purpose is for testing and developing workflows, not computing on large datasets.
+
+.. warning::
+
+    Be careful how many resource intensive jobs your workflow submits at once when using `DRM = local`.
+    Currently there's no way to set a ceiling on the number
+    of processes being executed simultaneously, since this is supposed to be handled by a DRM.
+    A feature to set a ceiling on concurrent processes may be added in the
+    future.
 
 If you do not have linux installed and want to use this feature,
 consider installing `Ubuntu <http://www.ubuntu.com/>`_

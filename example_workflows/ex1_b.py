@@ -19,7 +19,6 @@ dag.create_dag_img('/tmp/ex1.svg')
 # Run Workflow
 #################
 
-# restart changed to False.  If True then all successful tasks will be deleted and re-executed.
-WF = Workflow.start('Example 1',restart=True,delete_intermediaries=True)
+WF = Workflow.start('Example 1')
 dag.add_to_workflow(WF)
 WF.run()

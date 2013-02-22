@@ -4,7 +4,7 @@ Getting Started
 ===============
 
 We'll start by running a simple test workflow, exploring it via the web interface, and terminating it.  Then
-you'll be ready to start your own.
+you'll be ready to start learning how to write your own.
 
 Execute an Example Workflow
 ___________________________

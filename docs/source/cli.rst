@@ -1,7 +1,7 @@
 .. _cli:
 
-Command Line Interface
-______________________
+Command Line
+_____________________________
 
 Make sure your environment variables are properly set (see :ref:`config`).
 Use the shell command :command:`env` if you're not sure what's in your environment.
@@ -39,7 +39,7 @@ Get Usage Help:
    
 Reset the SQL database
 ++++++++++++++++++++++
-.. note:: This will *not* delete the files associated with workflow output.
+.. warning:: This will *not* delete the files associated with workflow output.
 
 .. code-block:: bash
 
@@ -50,10 +50,3 @@ List workflows
 .. code-block:: bash
 
    $ cosmos ls
-
-
-API
-___
-
-.. automodule:: cosmos.cli
-   :members:
