@@ -2,6 +2,7 @@ from cosmos.contrib.ezflow.tool import Tool
 
 class ECHO(Tool):
     outputs = ['txt']
+    time_req = 1 #min
     
     def cmd (self,i,s,p):
         return 'echo {p[word]} > $OUT.txt'
@@ -9,6 +10,7 @@ class ECHO(Tool):
 class CAT(Tool):
     inputs = ['txt']
     outputs = ['txt']
+    time_req = 1
     
     def cmd(self,i,s,p):
         return 'cat {input} > $OUT.txt', {
@@ -18,6 +20,7 @@ class CAT(Tool):
 class PASTE(Tool):
     inputs = ['txt']
     outputs = ['txt']
+    time_req = 1
     
     def cmd(self,i,s,p):
         return 'paste {input} > $OUT.txt', {
@@ -27,6 +30,7 @@ class PASTE(Tool):
 class WC(Tool):
     inputs = ['txt']
     outputs = ['txt']
+    time_req = 1
 
     default_para = { 'args': '' }
     

@@ -13,14 +13,11 @@ import re
 import os
 import logging as log
 import gzip
-from cosmos.Cosmos.helpers import confirm
-from argh import arg,dispatch_command
+from cosmos.utils.helpers import confirm
 from itertools import islice
+import argparse
 
-
-@arg('-c','--chunksize',type=int,help='Number of reads per fastq chunk, default is 1 million')
-@arg('-b','--buffersize',type=int,help='Number of reads to keep in RAM, default is 100k')
-def main(input_fastq,output_dir,chunksize=4000000,buffersize=100000):
+def main(input_fastq,output_dir,chunksize,buffersize):
     """
     Chunks a large fastq file into smaller pieces.
     """
@@ -68,6 +65,13 @@ def main(input_fastq,output_dir,chunksize=4000000,buffersize=100000):
 
 if __name__ == '__main__':
     log.basicConfig(level=log.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    dispatch_command(main)
+    parser = argparse.ArgumentParser(description='SplitFastqs')
+    parser.add_argument('input_fastq',type=str,help='')
+    parser.add_argument('output_dir',type=str,help='')
+    parser.add_argument('-c','--chunksize',type=int,help='Number of reads per fastq chunk, default is 1 million',default=4000000)
+    parser.add_argument('-b','--buffersize',type=int,help='Number of reads to keep in RAM, default is 100k',default=100000)
+    parsed_args = parser.parse_args()
+    kwargs = dict(parsed_args._get_kwargs())
+    main(**kwargs)
 
 

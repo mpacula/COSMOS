@@ -125,7 +125,7 @@ class Tool(object):
         
     @property
     def input_files(self):
-        "A dictionary of input files"
+        "An alias to :py:meth:map_inputs"
         return self.map_inputs()
     
     @property
@@ -137,7 +137,7 @@ class Tool(object):
     def map_inputs(self):
         """
         Default method to map inputs.  Can be overriden of a different behavior is desired
-        :returns: (dict) A dictionary of taskfiles which are inputs to this tool.  Keys are names of the taskfiles, values are a list of Taskfiles.
+        :returns: (dict) A dictionary of taskfiles which are inputs to this tool.  Keys are names of the taskfiles, values are a list of taskfiles.
         """
         if not self.inputs:
             return {}
@@ -149,7 +149,7 @@ class Tool(object):
 
         input_dict = {}
         for input_file in all_inputs:
-            input_dict.get(input_file.name,[]).append(input_file)
+            input_dict.setdefault(input_file.name,[]).append(input_file)
 
         # if self.one_parent:
         #     for key in input_dict:
@@ -205,7 +205,7 @@ class INPUT(Tool):
     """
     An Input File.
 
-    Does not actually execute anything, but sets its output_files to the TaskFiles or paths its initialized to
+    Does not actually execute anything, but sets self.output_files to the TaskFiles or paths its initialized to
 
     :property NOOP: Automatically set to True
     """
@@ -214,12 +214,13 @@ class INPUT(Tool):
     mem_req = 0
     cpu_req = 0
     
-    def __init__(self,output_path=None,output_paths=[],taskfile=None,taskfiles=[],*args,**kwargs):
+    def __init__(self,output_path=None,output_paths=None,taskfile=None,taskfiles=None,*args,**kwargs):
         """
         Lots of ways to init an INPUT File
         """
         super(INPUT,self).__init__(*args,**kwargs)
-
+        if output_paths == None: output_paths = []
+        if taskfiles == None: taskfiles = []
         if output_path: output_paths.append(output_path)
         for fp in output_paths:
             tf = TaskFile(path=fp)

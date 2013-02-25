@@ -34,7 +34,6 @@ class DAG(object):
         :return: The updated dag.
         """
         if stage_name not in self.stage_names_used:
-            print self.stage_names_used
             raise KeyError, 'Stage name "{0}" does not exist.'.format(stage_name)
         self.last_tools = filter(lambda n: n.stage_name == stage_name, self.G.nodes())
         return self
@@ -166,15 +165,18 @@ class DAG(object):
 
 class dagError(Exception):pass
 
+def f(LHS,params):
+    pass
+
 class Infix:
     def __init__(self, function):
         self.function = function
     def __ror__(self, other):
-        return Infix(lambda x, self=self, other=other: self.function(other, x))
+        return Infix(lambda x, self=self, other=other: self.function(other, *x if type(x) == tuple else (x,)))
     def __or__(self, other):
         return self.function(other)
     def __rlshift__(self, other):
-        return Infix(lambda x, self=self, other=other: self.function(other, x))
+        return Infix(lambda x, self=self, other=other: self.function(other, *x if type(x) == tuple else (x,)))
     def __rshift__(self, other):
         return self.function(other)
     def __call__(self, value1, value2):
@@ -183,29 +185,24 @@ class Infix:
 WF = None
 
 @decorator
-def flowfxn(func,*args,**kwargs):
+def flowfxn(func,dag,*args,**kwargs):
     """
-    1) Set RHS_item to be tuples if they're not already
-    2) The decorated function should return a generator, so evaluate it
-    3) Set the dag.last_tools to the decorated function's return value
-    4) Return the dag
+    1) The decorated function should return a generator, so evaluate it
+    2) Set the dag.last_tools to the decorated function's return value
+    3) Return the dag
     """
-    #TODO confirm args[0] is a dag
-    dag = args[0]
-    RHS = args[1] if type(args[1]) == tuple else (args[1],) #make sure RHS_item is a tuple
-    try:
-        dag.last_tools = list(func(dag,dag.last_tools,*RHS))
-    except TypeError:
-        raise
+    if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
 
+    dag.last_tools = list(func(dag,*args,**kwargs))
     stage_name = dag.last_tools[0].stage_name
-    assert stage_name not in dag.stage_names_used, 'Duplicate stage_names detected {0}.'.format(stage_name)
+
+    if stage_name in dag.stage_names_used: raise DAGError, 'Duplicate stage_names detected {0}.'.format(stage_name)
     dag.stage_names_used.append(stage_name)
 
     return dag
 
 @flowfxn
-def _add(dag,tools,stage_name=None,*args):
+def _add(dag,tools,stage_name=None):
     """
     Always the first operator of a workflow.  Simply adds a list of tool instances to the dag, without adding any
     dependencies.
@@ -227,7 +224,7 @@ def _add(dag,tools,stage_name=None,*args):
 Add = Infix(_add)
 
 @flowfxn
-def _apply(dag,parent_tools,tool_class,stage_name=None):
+def _apply(dag,tool_class,stage_name=None):
     """
     Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
     type `tool_class`.
@@ -240,6 +237,7 @@ def _apply(dag,parent_tools,tool_class,stage_name=None):
 
     >>> dag() |Apply| Tool_Class
     """
+    parent_tools = dag.last_tools
     for parent_tool in parent_tools:
         new_tool = tool_class(stage_name=stage_name,dag=dag,tags=parent_tool.tags)
         dag.G.add_edge(parent_tool,new_tool)
@@ -250,7 +248,7 @@ Apply = Infix(_apply)
 
 #TODO raise exceptions if user submits bad kwargs for any infix commands
 @flowfxn
-def _split(dag,parent_tools,split_by,tool_class,stage_name=None):
+def _split(dag,split_by,tool_class,stage_name=None):
     """
     Creates one2many relationships for each tool in the stage last added to the dag, with every possible combination
     of keywords in split_by.  New tools will be of class `tool_class` and tagged with one of the possible keyword
@@ -265,10 +263,12 @@ def _split(dag,parent_tools,split_by,tool_class,stage_name=None):
 
     >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
     """
+    parent_tools = dag.last_tools
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     for parent_tool in parent_tools:
         for new_tags in it.product(*splits):
-            tags = tags=dict(parent_tool.tags).update(dict(new_tags))
+            tags = dict(parent_tool.tags).copy()
+            tags.update(dict(new_tags))
             new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags) 
             dag.G.add_edge(parent_tool,new_tool)
             yield new_tool
@@ -276,7 +276,7 @@ Split = Infix(_split)
 
 
 @flowfxn
-def _reduce(dag,parent_tools,keywords,tool_class,stage_name=None):
+def _reduce(dag,keywords,tool_class,stage_name=None):
     """
     Create new tools with a many2one to parent_tools.
 
@@ -289,6 +289,7 @@ def _reduce(dag,parent_tools,keywords,tool_class,stage_name=None):
 
     >>> dag() |Reduce| (['shape'],Tool_Class)
     """
+    parent_tools = dag.last_tools
     if type(keywords) != list:
         raise dagError('Invalid Right Hand Side of reduce')
     for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
@@ -300,7 +301,7 @@ def _reduce(dag,parent_tools,keywords,tool_class,stage_name=None):
 Reduce = Infix(_reduce)
 
 @flowfxn
-def _reduce_and_split(dag,parent_tools,keywords,split_by,tool_class,stage_name=None):
+def _reduce_and_split(dag,keywords,split_by,tool_class,stage_name=None):
     """
     Create new tools by first reducing then splitting.
 
@@ -314,12 +315,15 @@ def _reduce_and_split(dag,parent_tools,keywords,split_by,tool_class,stage_name=N
 
     >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
     """
+    parent_tools = dag.last_tools
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     
     for group_tags,parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
         parent_tool_group = list(parent_tool_group)
         for new_tags in it.product(*splits):
-            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=group_tags.update(dict(new_tags)))
+            tags = group_tags.copy()
+            tags.update(dict(new_tags))
+            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
             for parent_tool in parent_tool_group:
                 dag.G.add_edge(parent_tool,new_tool)
             yield new_tool

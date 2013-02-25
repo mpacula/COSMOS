@@ -8,7 +8,7 @@ from django.db.models import Q,Count
 from django.db.utils import IntegrityError
 from cosmos.Job.models import JobAttempt,JobManager
 import os,sys,re,signal
-from cosmos.utils.helpers import get_drmaa_ns,validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
+from cosmos.utils.helpers import validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from cosmos.utils import helpers
 from django.core.exceptions import ValidationError
 from picklefield.fields import PickledObjectField, dbsafe_decode
@@ -156,7 +156,8 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
 
     @staticmethod
-    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None, default_queue=None, delete_intermediates = False,prompt_confirm=True,*args,**kwargs):
+    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None,
+              default_queue=None, delete_intermediates = False,prompt_confirm=True,*args,**kwargs):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
 
@@ -175,6 +176,9 @@ class Workflow(models.Model):
 
         if root_output_dir is None:
             root_output_dir = settings['default_root_output_dir']
+
+        if default_queue is None:
+            default_queue = session.settings['default_queue']
 
         if restart:
             wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
@@ -203,9 +207,9 @@ class Workflow(models.Model):
     @staticmethod
     def __resume(name,dry_run, default_queue, delete_intermediates):
         """
-        Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be used by the average user.
+        Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be called by anything except __reload
 
-        see :py:method:`start` for parameter definitions
+        see :py:meth:`start` for parameter definitions
         """
 
         if Workflow.objects.filter(name=name).count() == 0:
@@ -226,7 +230,7 @@ class Workflow(models.Model):
         """
         Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
 
-        see :py:method:`start` for parameter definitions
+        see :py:meth:`start` for parameter definitions
         """
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
 
@@ -262,7 +266,7 @@ class Workflow(models.Model):
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
 
-        see :py:method:`start` for parameter definitions
+        see :py:meth:`start` for parameter definitions
 
         """
         wf_id = None
@@ -283,7 +287,7 @@ class Workflow(models.Model):
         """
         Creates a new workflow
 
-        see :py:method:`start` for parameter definitions
+        see :py:meth:`start` for parameter definitions
         :param _wf_id: the ID to use for creating a workflow
         """
         if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
@@ -302,7 +306,7 @@ class Workflow(models.Model):
         Adds a stage to this workflow.  If a stage with this name (in this Workflow) already exists,
         and it hasn't been added in this session yet, return the existing one.
 
-        :parameter name: (str) The name of the stage, must be unique within this Workflow. Required.
+        :param name: (str) The name of the stage, must be unique within this Workflow. Required.
         """
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
@@ -347,7 +351,8 @@ class Workflow(models.Model):
             self.jobManager.terminate_jobAttempt(ja)
 
         #this basically a bulk task._has_finished and jobattempt.hasFinished
-        tasks = Task.objects.filter(jobattempt_set__in=jobAttempts)
+        task_ids = jobAttempts.values('task')
+        tasks = Task.objects.filter(pk__in=task_ids)
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
 
@@ -777,7 +782,7 @@ class WorkflowManager():
         dag.node_attr['fontsize']=8
         dag.add_edges_from(self.dag.edges())
         for stage,tasks in helpers.groupby(self.dag.nodes(data=True),lambda x:x[1]['stage']):
-            sg = dag.add_subgraph(name="cluster_{0}".format(stage),label=stage,color='lightgrey')
+            sg = dag.add_subgraph(name="cluster_{0}".format(stage),label=str(stage),color='lightgrey')
             for n,attrs in tasks:
                 def truncate_val(kv):
                     v = "{0}".format(kv[1])

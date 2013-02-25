@@ -3,7 +3,6 @@ Cosmos command line interface
 """
 import argparse
 import os,sys
-import cosmos.session
 from cosmos.Workflow.models import Workflow
 
 def runweb(port):

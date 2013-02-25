@@ -59,18 +59,8 @@ class JobManagerBase(models.Model):
         :param command: The system command to run
         :param jobName: an optional name for the jobAttempt
         :param jobinfo_output_dir: the directory to story the stdout and stderr files
-        :param drmaa_native_specification: the drmaa_native_specifications tring
         """
-        drmaa_native_specification=''
-        #     get_drmaa_ns(DRM=session.settings['DRM'],
-        #                                         mem_req=task.memory_requirement,
-        #                                         cpu_req=task.cpu_requirement,
-        #                                         time_req=task.time_requirement,
-        #                                         queue=self.default_queue if self.default_queue else session.settings['default_queue'],
-        #                                         parallel_environment_name=session.settings['SGE']['parallel_environment_name']
-        # )
-        jobAttempt = JobAttempt(jobManager=self, task=task, command = command, jobName = jobName,
-                                drmaa_native_specification=drmaa_native_specification)
+        jobAttempt = JobAttempt(jobManager=self, task=task, command = command, jobName = jobName)
         jobAttempt.command_script_path = os.path.join(jobAttempt.jobinfo_output_dir,'command.sh')
         check_and_create_output_dir(jobAttempt.jobinfo_output_dir)
         self.__create_command_sh(jobAttempt)

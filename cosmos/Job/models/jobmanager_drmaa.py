@@ -61,7 +61,7 @@ class JobManager(JobManagerBase):
     def terminate_jobAttempt(self,jobAttempt):
         "Terminates a jobAttempt"
         try:
-            session.drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
+            drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
             return True
         except drmaa.errors.InternalException:
             False
@@ -72,10 +72,10 @@ class JobManager(JobManagerBase):
         Queries the DRM for the status of the job
         """
         try:
-            s = decode_drmaa_state[drmaa_session.jobStatus(str(self.drmaa_jobID))]
+            s = decode_drmaa_state[drmaa_session.jobStatus(str(jobAttempt.drmaa_jobID))]
         except drmaa.InvalidJobException:
-            if self.queue_status == 'completed':
-                if self.successful:
+            if jobAttempt.queue_status == 'completed':
+                if jobAttempt.successful:
                     s = decode_drmaa_state[drmaa.JobState.DONE]
                 else:
                     s = decode_drmaa_state[drmaa.JobState.FAILED]
@@ -96,7 +96,6 @@ class JobManager(JobManagerBase):
         'startTime','transferFiles','workingDirectory','cpu_time']
 
         """
-
         cmd = self._create_cmd_str(jobAttempt)
 
         jt = drmaa_session.createJobTemplate()
@@ -105,10 +104,11 @@ class JobManager(JobManagerBase):
         #jt.args = self.command_script_text.split(' ')[1:]
         jt.remoteCommand = cmd.split(' ')[0]
         jt.args = cmd.split(' ')[1:]
+        jt.workingDirectory = os.getcwd()
         jt.jobName = 'ja-'+jobAttempt.jobName
         jt.outputPath = ':'+jobAttempt.STDOUT_filepath
         jt.errorPath = ':'+jobAttempt.STDERR_filepath
-        jt.nativeSpecification = jobAttempt.drmaa_native_specification
+        jt.nativeSpecification = get_drmaa_ns(jobAttempt)
 
         return jt
 
@@ -150,3 +150,34 @@ class JobManager(JobManagerBase):
         jobAttempt._hasFinished(successful, extra_jobinfo)
         return jobAttempt
 
+
+def get_drmaa_ns(jobAttempt):
+    """Returns the DRM specific resource usage flags for the drmaa_native_specification
+    :param time_limit: (int) as datetime.time object.
+    :param mem_req: (int) memory required in MB
+    :param cpu_req: (int) number of cpus required
+    :param queue: (str) name of queue to submit to
+    """
+    task = jobAttempt.task
+    DRM = session.settings['DRM']
+    cpu_req = task.cpu_requirement
+    mem_req = task.memory_requirement
+    time_req = task.time_requirement
+    queue = task.workflow.default_queue
+    parallel_environment_name='' #deprecated
+
+    if DRM == 'LSF':
+        s = '-R "rusage[mem={0}] span[hosts=1]" -n {1}'.format(mem_req,cpu_req)
+        if time_req:
+            s += ' -W 0:{0}'.format(time_req)
+        if queue:
+            s += ' -q {0}'.format(queue)
+        return s
+    elif DRM == 'GE':
+        return '-l h_vmem={mem_req}M,num_proc={cpu_req}'.format(
+            mem_req=mem_req*1.5,
+            pe= parallel_environment_name,
+            cpu_req=cpu_req)
+        #return '-l h_vmem={0}M,slots={1}'.format(mem_req,cpu_req)
+    else:
+        raise Exception('DRM not supported')

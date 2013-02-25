@@ -6,7 +6,7 @@
   <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
   <li><a href="{{task.stage.workflow.url }}">{{task.stage.workflow}}</a> <span class="divider">/</span></li>
   <li><a href="{{task.stage.url }}">{{task.stage}}</a><span class="divider">/</span></li>
-  <li class="active">{{task.name}}</li>
+  <li class="active">{{task}}</li>
 </ul>
 
 <div>
@@ -21,7 +21,7 @@
         {%if task.status == "in_progress"%}
             <i class="icon-refresh" rel="tooltip" title="Warning"></i>
         {%endif%}
-        {{task.toString}}
+        {{task}}
     </h1>
 <strong>Tags</strong>:
 {% for k,v in task.tags.items %}
@@ -52,7 +52,7 @@
 <dt>Succeed On Failure</dt><dd>{{task.succeed_on_failure}}</dd>
 <dt>Created On</dt><dd>{{task.created_on}}</dd>
 <dt>Finished On</dt><dd>{{task.finished_on}}</dd>
-<dt>Pre Command</dt><dd><pre class="pre-scrollable">{{task.pre_command}}</pre></dd>
+<dt>Preformatted<br/>Command</dt><dd><pre class="pre-scrollable">{{task.pcmd}}</pre></dd>
 <dt>Output Directory</dt><dd><code>{{task.output_dir}}</code></dd>
 <dt>Output Files</dt><dd>
     {%for of in task.output_files%}

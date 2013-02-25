@@ -116,28 +116,6 @@ def spinning_cursor(i):
     while 1:
         return cursor[i % len(cursor)]
 
-def get_drmaa_ns(DRM,mem_req=0,cpu_req=1,queue=None,time_req=None,parallel_environment_name=''):
-    """Returns the DRM specific resource usage flags for the drmaa_native_specification
-    :param time_limit: (int) as datetime.time object.
-    :param mem_req: (int) memory required in MB
-    :param cpu_req: (int) number of cpus required
-    :param queue: (str) name of queue to submit to
-    """
-    if DRM == 'LSF':
-        s = '-R "rusage[mem={0}] span[hosts=1]" -n {1}'.format(mem_req,cpu_req)
-        if time_req:
-            s += ' -W 0:{0}'.format(time_req)
-        if queue:
-            s += ' -q {0}'.format(queue)
-        return s
-    elif DRM == 'GE':
-        return '-l h_vmem={mem_req}M,num_proc={cpu_req}'.format(
-            mem_req=mem_req*1.5,
-            pe= parallel_environment_name,
-            cpu_req=cpu_req)
-        #return '-l h_vmem={0}M,slots={1}'.format(mem_req,cpu_req)
-    else:
-        raise Exception('DRM not supported')
 
 def validate_name(txt,field_name=''):
     """

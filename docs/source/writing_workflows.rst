@@ -18,9 +18,7 @@ EZFlow
 a command line tool and various functions to make creating a complex workflow of jobs represented by a
 :term:`DAG` simple.
 
-A `DAG` consists of `Stages`, `Tools` and `Tool dependencies`.  `Stages` have no function
-except for organizational purposes.
-
+A `DAG` consists of Stages, Tools and Tool dependencies.
 Defining Tools
 --------------
 A tool represents an executable (like echo, cat, or paste, or script) that is run from the command line.
@@ -81,7 +79,12 @@ All jobs and and job dependencies are represented by the :py:class:`dag.DAG` cla
 
 There are 5 infix operators you can use to generate a DAG.  They each take an
 instance of a :py:class:`~dag.DAG` on the left, and apply the :py:class:`tool.Tool` class
-on the right to the last :term:`Stage` added to the ``DAG``.
+on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the ``DAG``.
+
+.. hint::
+
+    You can always visualize the ``DAG`` that you've built using :py:meth:`dag.DAG.create_dag_img`.
+    (see :ref:`examples` for details)
 
 *The 5 infix operators are:*
 

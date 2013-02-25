@@ -38,7 +38,7 @@ class FIXMATE(Picard):
 class REVERTSAM(Picard):
     inputs = ['bam']
     outputs = ['bam']
-    time_req = 0
+    time_req = 180
     mem_req = 20*1024
     cpu_req=2
     succeed_on_failure = False
@@ -59,7 +59,7 @@ class REVERTSAM(Picard):
 class SAM2FASTQ_byrg(Picard):
     inputs = ['bam']
     outputs = ['dir']
-    time_req = 0
+    time_req = 180
     mem_req = 12*1024
     succeed_on_failure = True
 
@@ -81,7 +81,7 @@ class SAM2FASTQ(Picard):
     """
     inputs = ['bam']
     outputs = ['1.fastq','2.fastq']
-    time_req = 0
+    time_req = 180
     mem_req = 3*1024
     succeed_on_failure = True
 
