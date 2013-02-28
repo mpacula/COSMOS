@@ -46,17 +46,21 @@ class TaskFile(models.Model):
 
 
     def __init__(self,*args,**kwargs):
-        r = super(TaskFile,self).__init__(*args,**kwargs)
+        super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
             try:
-                p = self.path[:-3] if self.path[-3:] == '.gz' else self.path
-                self.fmt = re.search('.+\.(.+?)$',p).group(1)
+                # if path ends with .gz, the format includes the extensions before the gz
+                # ie fmt = fastq.gz if path=file.blah.fastq.gz
+                # otherwise take the last extension
+                # ie fmt = fastq if path=file.blah.fastq
+                groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
+                self.fmt = groups[0] if groups[0] else groups[1]
+
             except AttributeError as e:
                 raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
         if not self.name and self.fmt:
             self.name = self.fmt
         self.tmp_id = get_tmp_id()
-        return r
 
     @property
     def task(self):
@@ -1258,11 +1262,11 @@ class Task(models.Model):
 
     def set_status(self,new_status,save=True):
         "Set Task's status"
-        self.log.info('{0} {1}'.format(self,new_status))
         self.status = new_status
 
         if new_status == 'successful':
             self.successful = True
+            self.log.info('{0} successful!'.format(self))
 
         if save: self.save()
 

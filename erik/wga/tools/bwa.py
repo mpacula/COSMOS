@@ -2,7 +2,7 @@ from cosmos.contrib.ezflow.tool import Tool
 import os
 
 class ALN(Tool):
-    _name = "Reference Alignment"
+    name = "Reference Alignment"
     mem_req = 4*1024
     cpu_req = 2
     time_req = 100
@@ -18,7 +18,7 @@ class ALN(Tool):
         return '{s[bwa_path]} aln -q {p[q]} -t {self.cpu_req} {s[bwa_reference_fasta_path]} {i[fastq.gz][0]} > $OUT.sai'
 
 class SAMPE(Tool):
-    _name = "Paired End Mapping"
+    name = "Paired End Mapping"
     mem_req = 5*1024
     cpu_req = 1
     time_req = 120

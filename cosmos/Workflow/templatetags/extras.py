@@ -96,9 +96,9 @@ def format_memory_kb(kb):
     mb = kb/1024.0
     gb = mb/1024.0
     if gb > 1:
-        return "%s GB" % round(gb,1)
+        return "%sGB" % round(gb,1)
     else:
-        return "%s MB" % round(mb,1)
+        return "%sMB" % round(mb,1)
 @register.filter
 def format_memory_mb(mb):
     """converts mb to human readible"""

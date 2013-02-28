@@ -1,24 +1,22 @@
 from cosmos.contrib.ezflow.tool import Tool
 import os
 
-class ANNOVAR(Tool):
+class AnnovarExt_DownDB(Tool):
+    name = "Download Annotation Database"
+
+    def cmd(self,i,s,p):
+        return 'annovarext downdb {p[build]} {p[dbname]}'
+
+class AnnovarExt_Anno(Tool):
     name = "Annovar"
     inputs = ['vcf']
     outputs = ['tsv']
     
 
-    def cmd(self,i,t,s,p):
-        return 'annovar {i[vcf]} {t[database]}'
+    def cmd(self,i,s,p):
+        return 'annovarext anno hg19 {i[vcf]} {t[database]}'
 
-class PROCESS_ANNOVAR(Tool):
-    name = "Process Annovar"
-    inputs = ['tsv']
-    outputs = ['tsv']
-    
-    def cmd(self,i,t,s,p):
-        return 'genomekey {i[tsv]}'
-
-class MERGE_ANNOTATIONS(Tool):
+class AnnovarExt_Merge(Tool):
     name = "Merge Annotations"
     inputs = ['tsv']
     outputs = ['tsv']

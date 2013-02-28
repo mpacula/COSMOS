@@ -26,6 +26,7 @@ The following will:
 
    cd /dir/to/install/Cosmos/to
    git clone git@github.com:ComputationalBiomedicine/Cosmos.git
+   pip install distribute --upgrade
    pip install Cosmos
 
 Better Install

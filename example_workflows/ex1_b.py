@@ -1,5 +1,5 @@
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Apply, Split, Add
+from cosmos.contrib.ezflow.dag import DAG, Workflow, Split, Add
 from tools import ECHO, CAT, WC
 
 ####################
@@ -9,7 +9,7 @@ from tools import ECHO, CAT, WC
 dag = ( DAG()
     |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
     |Split| ([('i',[1,2])],CAT)
-    |Apply| WC
+    |Workflow| WC
 
 )
 dag.create_dag_img('/tmp/ex1.svg')

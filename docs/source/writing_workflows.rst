@@ -94,19 +94,22 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
     any dependencies.
 
     :param tools: (list of tools) A list of tool instances to add.
+    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
     :returns: The modified dag.
 
     >>> dag() |Add| [tool1,tool2,tool3,tool4]
+    >>> dag() |Add| ([tool1,tool2,tool3,tool4],'My Stage Name')
 
-.. py:method:: |Apply|
+.. py:method:: |Map|
 
     Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
     type ``tool_class``.
 
     :param tool_class: (subclass of Tool)
+    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
     :returns: The modified dag.
 
-    >>> dag() |Apply| Tool_Class
+    >>> dag() |Map| Tool_Class
 
 .. py:method:: |Split|
 
@@ -116,9 +119,11 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
 
     :param tool_class: (subclass of Tool)
     :param split_by: (list of (str,list)) Tags to split by.
+    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
     :returns: The modified dag.
 
     >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
+    >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class,'My Stage Name')
 
     The above will generate 4 new tools dependent on each tool in the most recent stage.  The new tools will be tagged
     with:
@@ -135,6 +140,7 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
 
     :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
     :param tool_class: (subclass of Tool)
+    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
     :returns: The modified dag.
 
     >>> dag() |Reduce| (['shape','color'],Tool_Class)
@@ -151,6 +157,7 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
     :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
     :param split_by: (list of (str,list)) Tags to split by.
     :param tool_class: (subclass of Tool)
+    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
     :returns: The modified dag.
 
     >>> dag() |ReduceSplit| (['color','shape'],[('size',['small','large'])],Tool_Class)

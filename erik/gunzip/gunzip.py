@@ -5,7 +5,7 @@ Gunzip a directory
 """
 from cosmos import session
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
+from cosmos.contrib.ezflow.dag import DAG, Map, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.tool import INPUT,Tool
 import os
 import pprint
@@ -27,7 +27,7 @@ indir = '/groups/lpm/erik/gatk/bundle2/b37'
 dag_inputs = [ INPUT(tags={'i':i+1},output_path=os.path.join(indir,p)) for i,p in enumerate(filter(lambda f: f[-3:] == '.gz', os.listdir(indir))) ]
 dag = (DAG()
        |Add| dag_inputs
-       |Apply| GUNZIP
+       |Map| GUNZIP
     )
 
 #################

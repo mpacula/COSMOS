@@ -41,6 +41,7 @@ class DAG(object):
     def create_dag_img(self,path):
         """
         Writes the :term:`DAG` as an image.
+        gat
         :param path: the path to write to
         """
         dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
@@ -185,21 +186,36 @@ class Infix:
 WF = None
 
 @decorator
-def flowfxn(func,dag,*args,**kwargs):
+def flowfxn(func,dag,*RHS):
     """
-    1) The decorated function should return a generator, so evaluate it
-    2) Set the dag.last_tools to the decorated function's return value
-    3) Return the dag
+    - The decorated function should return a generator, so evaluate it
+    - Set the dag.last_tools to the decorated function's return value
+    - Return the dag
     """
     if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
-
-    dag.last_tools = list(func(dag,*args,**kwargs))
+    dag.last_tools = list(func(dag,*RHS))
     stage_name = dag.last_tools[0].stage_name
 
     if stage_name in dag.stage_names_used: raise DAGError, 'Duplicate stage_names detected {0}.'.format(stage_name)
     dag.stage_names_used.append(stage_name)
 
     return dag
+
+#Different from other flowfxns, so do not decorate with @flowfxn
+def _subworkflow(dag,subflow_class,parser=None):
+    """
+    Applies a :py:class:`flow.SubWorkflow` to the last tools added to the dag.
+    :param dag:
+    :param subflow_class: An instance which is a subclass of py:class:`flow.SubWorkflow`
+    :return: the new dag
+
+    >>> DAG() |Workflow| SubWorkflowClass
+    """
+    if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
+    subflow_class().flow(dag)
+    return dag
+
+SWF=Infix(_subworkflow)
 
 @flowfxn
 def _add(dag,tools,stage_name=None):
@@ -218,13 +234,16 @@ def _add(dag,tools,stage_name=None):
 
     >>> dag() |Add| [tool1,tool2,tool3,tool4]
     """
-    for i in tools:
-        dag.G.add_node(i)
-        yield i
+    if stage_name is None:
+        stage_name = tools[0].stage_name
+    for tool in tools:
+        tool.stage_name = stage_name
+        dag.G.add_node(tool)
+        yield tool
 Add = Infix(_add)
 
 @flowfxn
-def _apply(dag,tool_class,stage_name=None):
+def _map(dag,tool_class,stage_name=None):
     """
     Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
     type `tool_class`.
@@ -235,7 +254,7 @@ def _apply(dag,tool_class,stage_name=None):
     :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
     :return: (list) The tools added.
 
-    >>> dag() |Apply| Tool_Class
+    >>> dag() |Map| Tool_Class
     """
     parent_tools = dag.last_tools
     for parent_tool in parent_tools:
@@ -243,7 +262,7 @@ def _apply(dag,tool_class,stage_name=None):
         dag.G.add_edge(parent_tool,new_tool)
         yield new_tool
         
-Apply = Infix(_apply)
+Map = Infix(_map)
 
 
 #TODO raise exceptions if user submits bad kwargs for any infix commands

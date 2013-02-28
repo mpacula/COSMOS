@@ -2,17 +2,17 @@
 WGA Workflow
 """
 import argparse
-
-from cosmos.contrib.ezflow.dag import DAG,Add
-from erik.WGA.gatk import GATK_Best_Practices
-from cosmos.Workflow.cli import CLI
-from settings import settings
-from cosmos.contrib.ezflow.tool import INPUT
-from cosmos.Workflow.models import TaskFile, Workflow
-import re
-
 import json
-import os
+
+from cosmos.contrib.ezflow.dag import DAG,Add,SWF
+from cosmos.contrib.ezflow.tool import INPUT
+from erik.wga.workflows.gatk import GATK_Best_Practices
+from erik.wga.workflows.annotate import DownDBs
+from erik.wga.workflows.bam2fastq import Bam2Fastq
+from cosmos.Workflow.cli import CLI
+from cosmos.Workflow.models import TaskFile, Workflow
+from scripts import rg_helpers
+from settings import settings
 
 def json_(workflow,input_dict,**kwargs):
     """
@@ -45,50 +45,34 @@ def json_(workflow,input_dict,**kwargs):
 
 def bam(workflow,input_bam,**kwargs):
     """
-    Input file is a bam with properly annotated readgroups.  Note that this means the header
-    is also properly annotated with the correct readgroups.
+    Input file is a bam with properly annotated readgroups.  Note that this also
+    means the bam header is also properly annotated with the correct readgroups.
     """
-    from scripts import rg_helpers
-    from bam2fastq import Bam2Fastq
+
     rgids = list(rg_helpers.list_rgids(input_bam,settings['samtools_path']))
     print 'RGIDS:'
     print rgids
 
     dag = DAG(mem_req_factor=1) |Add| [ INPUT(input_bam) ]
-    Bam2Fastq(dag,settings,rgids)
-    dag.create_dag_img('/tmp/graph.svg')
 
+    #Run bam2fastq
+    Bam2Fastq(workflow,dag,settings,rgids)
     dag.add_to_workflow(workflow)
     workflow.run(finish=False)
 
-    #Load Fastq Chunks
-    s = workflow.stages.get(name='SplitFastq')
-    inputs = []
-    for t in s.tasks:
-        d = {}
-        d.update(t.tags)
-        d['sample'] = 'NA12878'
-        d['library'] = 'LIB-NA12878'
-        d['platform'] = 'ILLUMINA'
-        d['flowcell'] = d['rgid'][:5]
-        for f in os.listdir(t.output_files[0].path):
-            d2 = d.copy()
-            d2['chunk'] = re.search("(\d+)\.fastq",f).group(1)
-            d2['path'] = os.path.join(t.output_files[0].path.replace('/scratch/esg21/cosmos_out/Bam2Fastq3_NA12878_WGS/',''),f)
-            d2['lane'] = d['rgid'][6:]
-            inputs.append(INPUT(d2['path'],tags=d2))
-    dag |Add| (inputs,"Load Fastq Chunks")
-
     #Run GATK
     GATK_Best_Practices(dag,settings)
+    dag.add_to_workflow(workflow)
+    workflow.run()
+
+def downdbs(workflow,**kwargs):
+    dag = DAG() |SWF| DownDBs
 
     dag.add_to_workflow(workflow)
     workflow.run()
 
 
-
 def main():
-
     parser = argparse.ArgumentParser(description='WGA')
     subparsers = parser.add_subparsers(title="Commands", metavar="<command>")
 
@@ -101,6 +85,10 @@ def main():
     CLI.add_default_args(bam_sp)
     bam_sp.add_argument('-i','--input_bam',required=True)
     bam_sp.set_defaults(func=bam)
+
+    downdbs_sp = subparsers.add_parser('downdbs',help=DownDBs.__doc__)
+    CLI.add_default_args(downdbs_sp)
+    downdbs_sp.set_defaults(func=downdbs)
 
     a = parser.parse_args()
     kwargs = dict(a._get_kwargs())

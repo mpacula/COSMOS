@@ -136,7 +136,24 @@ class CLEAN_SAM(Picard):
             VALIDATION_STRINGENCY=SILENT
         """
 
-class DEDUPE(Picard):
+class SORT_BAM(Picard):
+    name = "Sort BAM"
+    mem_req = 4*1024
+    inputs = ['bam']
+    outputs = ['bam']
+
+    jar = 'SortSam.jar'
+
+    def cmd(self,i,s,p):
+        return r"""
+            {self.bin}
+            I={i[bam][0]}
+            O=$OUT.bam
+            SORT_ORDER=coordiante
+        """
+
+
+class MARK_DUPES(Picard):
     name = "Mark Duplicates"
     mem_req = 4*1024
     inputs = ['bam']

@@ -5,7 +5,7 @@ Chunks a Bam
 """
 from cosmos import session
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Apply, Reduce, Split, ReduceSplit, Add
+from cosmos.contrib.ezflow.dag import DAG, Map, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.tool import INPUT,Tool
 from tools import picard
 import os
@@ -35,8 +35,8 @@ class BamChunk(Tool):
 
 dag = (DAG()
        |Add| dag_inputs
-       |Apply| picard.REVERTSAM
-       |Apply| BamChunk
+       |Map| picard.REVERTSAM
+       |Map| BamChunk
     )
 dag.configure(settings=settings)
 dag.add_to_workflow(WF)

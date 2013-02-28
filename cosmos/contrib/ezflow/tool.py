@@ -229,4 +229,7 @@ class INPUT(Tool):
         if taskfile: taskfiles.append(taskfile)
         for tf in taskfiles:
             self.add_output(tf)
+    def __str__(self):
+        return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
+
     

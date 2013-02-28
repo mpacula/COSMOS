@@ -22,7 +22,7 @@ Roughly in order of what you'll want to check out:
    config
    getting_started
    writing_workflows
-   examples/index
+   examples
    cli
    shell
    API/index

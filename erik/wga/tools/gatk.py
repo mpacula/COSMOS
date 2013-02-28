@@ -220,7 +220,7 @@ class Apply_VQSR(GATK):
         if p['glm'] == 'SNP': 
             cmd = r"""
             {self.bin}
-            -T ApplyRecalibration
+            -T MapRecalibration
             -R {s[reference_fasta_path]}
             -input {i[vcf]}
             -tranchesFile {i[tranches][0]}
@@ -232,7 +232,7 @@ class Apply_VQSR(GATK):
         elif p['glm'] == 'INDEL':
             cmd = r"""
             {self.bin}
-            -T ApplyRecalibration
+            -T MapRecalibration
             -R {s[reference_fasta_path]}
             -input {i[vcf]}
             -tranchesFile {i[tranches][0]}
@@ -242,46 +242,4 @@ class Apply_VQSR(GATK):
             -mode INDEL
             """
         return cmd
-    
-    
-class ANNOVAR(Tool):
-    name = "Annovar"
-    inputs = ['vcf']
-    outputs = ['tsv']
-    
-    def cmd(self,i,s,p):
-        return 'annovar {i[vcf][0]} {p[database]}'
-    
-class PROCESS_ANNOVAR(Tool):
-    name = "Process Annovar"
-    inputs = ['tsv']
-    outputs = ['tsv']
-
-    def cmd(self,i,s,p):
-        return 'genomekey {i[tsv][0]}'
-    
-class MERGE_ANNOTATIONS(Tool):
-    name = "Merge Annotations"
-    inputs = ['tsv']
-    outputs = ['tsv']
-    
-    def cmd(self,i,s,p):
-        return 'genomekey merge {0}'.format(','.join(map(lambda x:str(x),i['tsv'])))
-    
-class SQL_DUMP(Tool):
-    name = "SQL Dump"
-    inputs = ['tsv']
-    outputs = ['sql']
-    
-    def cmd(self,i,s,p):
-        return 'sql dump {i[tsv]}'
-    
-class ANALYSIS(Tool):
-    name = "Filtration And Analysis"
-    inputs = ['sql']
-    outputs = ['analysis']
-    
-    def cmd(self,i,s,p):
-        return 'analyze {i[sql]}'
-        
     
