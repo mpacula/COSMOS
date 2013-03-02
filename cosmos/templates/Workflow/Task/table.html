@@ -48,7 +48,7 @@
             </td>
             <td>
                 {%for parent in task.parents%}
-                <a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
+                <a href="{{parent.url}}">{{parent}}{%if not forloop.last%}<br/>{%endif%}</a>
                 {%empty%}None{%endfor%}
             </td>
             <td>{{task.status}}

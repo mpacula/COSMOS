@@ -4,7 +4,7 @@ def list2input(l):
     return "-I " +" -I ".join(map(lambda x: str(x),l))
 
 class GATK(Tool):
-    time_req = 5*60
+    time_req = 12*60
     mem_req = 5*1024
 
     @property
@@ -17,7 +17,8 @@ class GATK(Tool):
 class RTC(GATK):
     name = "Indel Realigner Target Creator"
     mem_req = 8*1024
-    cpu_req = 4
+    #cpu_req = 4
+    cpu_req = 2
     inputs = ['bam']
     outputs = ['intervals']
     forward_input = True
@@ -57,7 +58,8 @@ class IR(GATK):
     
 class BQSR(GATK):
     name = "Base Quality Score Recalibration"
-    cpu_req = 8
+    #cpu_req = 8
+    cpu_req = 2
     mem_req = 9*1024
     inputs = ['bam']
     outputs = ['recal']

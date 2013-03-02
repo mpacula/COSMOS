@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load extras %}
-
+{%block title%} - {{jobAttempt.task.stage.workflow.name}}{%endblock%}
 {%block content%}
 
 
@@ -27,7 +27,7 @@
 </div>
 
 <dl class="dl-horizontal">
-<dt>Shell Script</dt><dd><pre class="pre-scrollable">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
+<dt>Shell Script</dt><dd><pre class="prettyprint linenums">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
 <dt><em>Profile</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
 <dt>Output Directory</dt><dd><code>{{jobAttempt.task.job_output_dir}}</code></dd>
 <dt>Task Output File Size</dt><dd>{%if cosmos_settings.show_jobAttempt_file_sizes%}{{jobAttempt.task.output_file_size}}{%else%}off{%endif%}</dd>

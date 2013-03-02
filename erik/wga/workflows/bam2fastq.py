@@ -17,7 +17,7 @@ import re
 class SplitFastq(Tool):
     inputs = ['1.fastq','2.fastq']
     outputs = ['dir']
-    time_req = 120
+    time_req = 12*60
     mem_req = 1000
 
     def cmd(self,i,s,p):
@@ -27,7 +27,7 @@ class SplitFastq(Tool):
 class FilterBamByRG(Tool):
     inputs = ['bam']
     outputs = ['bam']
-    time_req = 120
+    time_req = 12*60
     mem_req = 3000
 
     def cmd(self,i,s,p):

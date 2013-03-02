@@ -7,7 +7,7 @@ import json
 from cosmos.contrib.ezflow.dag import DAG,Add,SWF
 from cosmos.contrib.ezflow.tool import INPUT
 from erik.wga.workflows.gatk import GATK_Best_Practices
-from erik.wga.workflows.annotate import DownDBs
+from erik.wga.workflows import annotate
 from erik.wga.workflows.bam2fastq import Bam2Fastq
 from cosmos.Workflow.cli import CLI
 from cosmos.Workflow.models import TaskFile, Workflow
@@ -40,8 +40,7 @@ def json_(workflow,input_dict,**kwargs):
     GATK_Best_Practices(dag,settings)
     dag.create_dag_img('/tmp/graph.svg')
 
-    dag.add_to_workflow(workflow)
-    workflow.run()
+    dag.add_run(workflow)
 
 def bam(workflow,input_bam,**kwargs):
     """
@@ -62,14 +61,35 @@ def bam(workflow,input_bam,**kwargs):
 
     #Run GATK
     GATK_Best_Practices(dag,settings)
-    dag.add_to_workflow(workflow)
-    workflow.run()
+
+    dag.add_run(workflow)
 
 def downdbs(workflow,**kwargs):
-    dag = DAG() |SWF| DownDBs
+    """
+    Download all annotation databases
+    """
+    dag = DAG() |SWF| annotate.DownDBs
 
-    dag.add_to_workflow(workflow)
-    workflow.run()
+    dag.add_run(workflow)
+
+
+def anno(workflow,input_file,tsv=False,**kwargs):
+    """
+    Annotate a vcf file
+    """
+
+    dag = DAG()
+
+    if tsv:
+        dag |Add| [ INPUT(input_file) ]
+    else:
+        (dag |Add| [ INPUT(input_file) ]
+         #|Map| annotate.Vcf_to_Anno
+         )
+
+    dag |SWF| annotate.Annotate
+
+    dag.add_run(workflow)
 
 
 def main():
@@ -86,9 +106,15 @@ def main():
     bam_sp.add_argument('-i','--input_bam',required=True)
     bam_sp.set_defaults(func=bam)
 
-    downdbs_sp = subparsers.add_parser('downdbs',help=DownDBs.__doc__)
+    downdbs_sp = subparsers.add_parser('downdbs',help=downdbs.__doc__)
     CLI.add_default_args(downdbs_sp)
     downdbs_sp.set_defaults(func=downdbs)
+
+    anno_sp = subparsers.add_parser('anno',help=annotate.Annotate.__doc__)
+    CLI.add_default_args(anno_sp)
+    anno_sp.add_argument('-i','--input_file',required=True,help="input vcf file")
+    anno_sp.add_argument('-tsv',action='store_true',help='Input file is already a tsv file with ID as the 5th column.')
+    anno_sp.set_defaults(func=anno)
 
     a = parser.parse_args()
     kwargs = dict(a._get_kwargs())

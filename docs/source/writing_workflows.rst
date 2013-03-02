@@ -12,13 +12,15 @@ The easiest way to write a workflow is to use the *ezflow* package.
 .. py:module:: cosmos.contrib.ezflow
 
 EZFlow
-============
+++++++++
 
-*EZFlow* is a package that makes creating workflows easy.  It allows you to define classes that represent
+*EZFlow* is a package that contains powerful modules for describing workflows.
+It allows you to define classes that represent
 a command line tool and various functions to make creating a complex workflow of jobs represented by a
 :term:`DAG` simple.
 
 A `DAG` consists of Stages, Tools and Tool dependencies.
+
 Defining Tools
 --------------
 A tool represents an executable (like echo, cat, or paste, or script) that is run from the command line.
@@ -73,7 +75,7 @@ A more fine grained approach to defining input files:
     INPUT(taskfile=TaskFile(name='favorite_txt',path='/path/to/favorite_txt.txt.gz',fmt='txt.gz'),tags={'color':'red'})
 
 Designing Workflows
-===================
++++++++++++++++++++
 
 All jobs and and job dependencies are represented by the :py:class:`dag.DAG` class.
 
@@ -169,7 +171,7 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
 
 
 EZFlow API
-===========
+++++++++++
 
 Tool
 -----

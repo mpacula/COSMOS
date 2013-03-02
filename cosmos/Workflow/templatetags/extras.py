@@ -11,6 +11,7 @@ def aslist(o):
 @register.simple_tag
 def get_sjob_stat(stage,field,statistic,pipe=None):
     r = stage.get_sjob_stat(field,statistic)
+    if r is None:  return ''
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
 @register.simple_tag

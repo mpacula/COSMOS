@@ -1,7 +1,7 @@
 from cosmos.contrib.ezflow.tool import Tool
-import os
 
 class AnnovarExt_DownDB(Tool):
+    time_req = 10
     name = "Download Annotation Database"
 
     def cmd(self,i,s,p):
@@ -9,20 +9,36 @@ class AnnovarExt_DownDB(Tool):
 
 class AnnovarExt_Anno(Tool):
     name = "Annovar"
-    inputs = ['vcf']
-    outputs = ['tsv']
-    
+    inputs = ['tsv']
+    outputs = ['dir']
+    forward_input=True
+    time_req = 120
 
     def cmd(self,i,s,p):
-        return 'annovarext anno hg19 {i[vcf]} {t[database]}'
+        return 'annovarext anno {p[build]} {p[dbname]} {i[tsv][0]} $OUT.dir'
+
+class AnnovarExt_vcf2anno(Tool):
+    name = "Annovar"
+    inputs = ['vcf']
+    outputs = ['anno']
+    forward_input=True
+    time_req = 10
+
+    def cmd(self,i,s,p):
+        return 'annovarext vcf2anno {i[vcf][0]} > $OUT.dir'
+
 
 class AnnovarExt_Merge(Tool):
     name = "Merge Annotations"
-    inputs = ['tsv']
-    outputs = ['tsv']
+    inputs = ['tsv','dir']
+    outputs = ['dir']
+    mem_req = 10*1024
+    time_req = 120
     
-    def cmd(self,i,t,s,p):
-        return 'genomekey merge {0}'.format(','.join(map(lambda x:str(x),i['tsv'])))
+    def cmd(self,i,s,p):
+        return ('annovarext merge {i[tsv][0]} $OUT.dir {annotated_dir_output}',
+                { 'annotated_dir_output' : ' '.join(map(str,i['dir'])) }
+        )
 
 class SQL_DUMP(Tool):
     name = "SQL Dump"

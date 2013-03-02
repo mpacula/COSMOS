@@ -2,7 +2,7 @@ from cosmos.contrib.ezflow.tool import Tool
 import os
 
 class Picard(Tool):
-    time_req = 120
+    time_req = 12*60
     mem_req = 3*1024
     cpu_req=1
     extra_java_args=''
@@ -21,7 +21,7 @@ class FIXMATE(Picard):
     name = "Fix Mate Information"
     inputs = ['bam']
     outputs = ['bam']
-    time_req = 4*60
+    # time_req = 4*60
     mem_req = 3*1024
 
     jar = 'FixMateInformation.jar'
@@ -38,8 +38,7 @@ class FIXMATE(Picard):
 class REVERTSAM(Picard):
     inputs = ['bam']
     outputs = ['bam']
-    time_req = 180
-    mem_req = 20*1024
+    mem_req = 12*1024
     cpu_req=2
     succeed_on_failure = False
 
@@ -59,7 +58,7 @@ class REVERTSAM(Picard):
 class SAM2FASTQ_byrg(Picard):
     inputs = ['bam']
     outputs = ['dir']
-    time_req = 180
+    # time_req = 180
     mem_req = 12*1024
     succeed_on_failure = True
 
@@ -81,7 +80,6 @@ class SAM2FASTQ(Picard):
     """
     inputs = ['bam']
     outputs = ['1.fastq','2.fastq']
-    time_req = 180
     mem_req = 3*1024
     succeed_on_failure = True
 
@@ -149,7 +147,7 @@ class SORT_BAM(Picard):
             {self.bin}
             I={i[bam][0]}
             O=$OUT.bam
-            SORT_ORDER=coordiante
+            SORT_ORDER=coordinate
         """
 
 

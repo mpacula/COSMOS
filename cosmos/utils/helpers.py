@@ -33,7 +33,7 @@ def confirm(prompt=None, default=False, timeout=0):
     'default' should be set to the default value assumed by the caller when
     user simply types ENTER.
 
-    :param timeout: (int) If set, prompt will return default. 
+    :param timeout: (int) If set, prompt will return default.
 
     >>> confirm(prompt='Create Directory?', default=True)
     Create Directory? [y]|n: 

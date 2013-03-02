@@ -78,7 +78,7 @@ def __get_context_for_stage_task_table(request,pid):
         tasks_list = Task.objects.filter(stage=stage)
 
     #pagination
-    page_size = 10
+    page_size = 20
     paginator = Paginator(tasks_list, page_size) # Show 25 contacts per page
     page = request.GET.get('page')
     if page is None: page = 1
@@ -90,7 +90,7 @@ def __get_context_for_stage_task_table(request,pid):
     except EmptyPage:
         # If page is out of range (e.g. 9999), deliver last page of results.
         tasks = paginator.page(paginator.num_pages)
-    page_slice = "{0}:{1}".format(page,int(page)+9)
+    page_slice = "{0}:{1}".format(page,int(page)+19)
     
     
     return { 'request':request,'stage': stage,'page_size':page_size,'paged_tasks':tasks, 'page_slice':page_slice, 'current_filters':all_filters, 'filter_url':filter_url }
@@ -101,18 +101,20 @@ def stage_task_table(request,pid):
     return render(request,'Workflow/Task/table.html', context)
 
 @never_cache
-def stage_view(request,pid):
-    stage = Stage.objects.get(pk=pid)
+def stage_view(request,wf_id,stage_name):
+    stage = Stage.objects.get(workflow=wf_id,name=stage_name)
     filter_choices = __get_filter_choices(stage)
-    task_table_context = __get_context_for_stage_task_table(request,pid)
+    task_table_context = __get_context_for_stage_task_table(request,stage.id)
     this_context = {'request':request, 'stage': stage, 'filter_choices':filter_choices}
     for k,v in task_table_context.items(): this_context[k] = v 
     
     return render_to_response('Workflow/Stage/view.html', this_context, context_instance=RequestContext(request))
 
 @never_cache
-def task_view(request,pid):
-    task = Task.objects.get(pk=pid)
+def task_view(request,wf_id,stage_name,tags_qs):
+    import urlparse
+    stage = Stage.objects.get(workflow=wf_id,name=stage_name)
+    task = stage.get_task_by(tags=dict(urlparse.parse_qsl(tags_qs)))
     jobAttempts_list = task.jobattempt_set.all()
     return render_to_response('Workflow/Task/view.html', { 'request':request,'task': task, 'jobAttempts_list':jobAttempts_list }, context_instance=RequestContext(request))
 

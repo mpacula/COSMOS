@@ -138,7 +138,16 @@ class DAG(object):
         new_edges = filter(lambda e: e[0] in new_nodes or e[1] in new_nodes,self.G.edges())
         task_edges = [ (parent._task_instance,child._task_instance) for parent,child in new_edges ]
         workflow.bulk_save_task_edges(task_edges)
-    
+
+    def add_run(self,workflow):
+        """
+        Shortcut to add to workflow and then run the workflow
+        :param workflow:
+        """
+        self.add_to_workflow(workflow)
+        workflow.run()
+
+
     def __new_task(self,stage,tool):
         """
         Instantiates a task from a tool.

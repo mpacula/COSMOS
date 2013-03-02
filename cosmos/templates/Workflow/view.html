@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load url from future %}
 {% load extras %}
-
+{%block title%} - {{workflow.name}}{%endblock%}
 {% block head %}
     <script type="text/javascript">
     $(document).ready(function(){
