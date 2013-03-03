@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 {% load url from future %}
-
+{% block title%} - {{stage.workflow.name}}{%endblock%}
 {%block style%}
     ul.dropdown-form {
       list-style-type: none; 
@@ -62,7 +62,7 @@
         {%if stage.status == "in_progress"%}
         <i class="icon-refresh" rel="tooltip" title="Warning"></i>
         {%endif%}
-        {{stage.toString}}
+        {{stage}}
     </h1>
 
     <div id="stage_table">

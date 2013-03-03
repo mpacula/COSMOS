@@ -26,7 +26,7 @@ primary purpose is for testing and developing workflows, not computing on large 
 
 If you do not have linux installed and want to use this feature,
 consider installing `Ubuntu <http://www.ubuntu.com/>`_
-inside `VirtualBox <https://www.virtualbox.org/>`_.
+inside `VirtualBox <https://www.virtualbox.org/>`_.  Cosmos does not support Windows.
 
 
 2. Create SQL Tables and Load Static Files

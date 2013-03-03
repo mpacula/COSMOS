@@ -46,17 +46,21 @@ class TaskFile(models.Model):
 
 
     def __init__(self,*args,**kwargs):
-        r = super(TaskFile,self).__init__(*args,**kwargs)
+        super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
             try:
-                p = self.path[:-3] if self.path[-3:] == '.gz' else self.path
-                self.fmt = re.search('.+\.(.+?)$',p).group(1)
+                # if path ends with .gz, the format includes the extensions before the gz
+                # ie fmt = fastq.gz if path=file.blah.fastq.gz
+                # otherwise take the last extension
+                # ie fmt = fastq if path=file.blah.fastq
+                groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
+                self.fmt = groups[0] if groups[0] else groups[1]
+
             except AttributeError as e:
                 raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
         if not self.name and self.fmt:
             self.name = self.fmt
         self.tmp_id = get_tmp_id()
-        return r
 
     @property
     def task(self):
@@ -234,6 +238,10 @@ class Workflow(models.Model):
         """
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
 
+        for s in Stage.objects.exclude(task__successful=True):
+            wf.log.info('{0} has no successful tasks, deleting.'.format(s))
+            s.delete()
+
         #Delete unsuccessful tasks
         utasks = wf.tasks.filter(successful=False)
         num_utasks = len(utasks)
@@ -243,20 +251,8 @@ class Workflow(models.Model):
                 sys.exit(1)
             wf.bulk_delete_tasks(utasks)
 
-            #Update stages that are empty
-            #Stage.objects.filter(pk__in=map(lambda d:d['id'],filter(lambda d:d['task__count'] == 0,Stage.objects.annotate(Count('task')).values('id','task__count')))).delete()
-            Stage.objects.filter(pk__in=map(lambda d:d['id'],
-                filter(lambda d:d['task__count'] == 0,
-                    Stage.objects.annotate(Count('task')).values('id','task__count')
-                ))
-            ).update(started_on=None,successful=False,status='no_attempt',finished_on=None)
-
             # Update stages that are resuming
-            Stage.objects.filter(pk__in=map(lambda d:d['id'],
-                filter(lambda d:d['task__count'] > 1 and d['status'] != 'successful',
-                    Stage.objects.annotate(Count('task')).values('id','status','task__count')
-                ))
-            ).update(successful=False,status='in_progress',finished_on=None)
+            Stage.objects.filter(workflow=wf,successful=False,task__successful=True).update(successful=False,status='in_progress',finished_on=None)
 
         return wf
 
@@ -521,9 +517,10 @@ class Workflow(models.Model):
             return 'NOOP'
 
         #TODO fix this it's slow (do it in bulk when running a workflow?)
-        if task.stage.status == 'no_attempt':
+        if task.stage.status in ['no_attempt','failed']:
             task.stage.set_status('in_progress')
-            task.stage.started_on = timezone.now()
+            if task.stage.status == 'no_attempt':
+                task.stage.started_on = timezone.now()
             task.stage.save()
         task.set_status('in_progress')
         self.log.info('Running {0}'.format(task))
@@ -628,8 +625,6 @@ class Workflow(models.Model):
     def finished(self):
         """
         Call at the end of every workflow.
-
-        :param delete_unused_stages: (bool) Any stages and their output_dir from previous workflows that weren't loaded since the last create, __reload, or __restart, using add_stage() are deleted.
 
         """
         self.finished_on = timezone.now()
@@ -868,13 +863,14 @@ class Stage(models.Model):
 
     def get_sjob_stat(self,field,statistic):
         """
-        Aggregates a task successful job's field using a statistic
+        Aggregates a task successful job's field using a statistic.
         :param field: (str) name of a tasks's field.  ex: wall_time or avg_rss_mem
         :param statistic: (str) choose from ['Avg','Sum','Max','Min','Count']
         
         >>> stage.get_stat('wall_time','Avg')
         120
         """
+
         if statistic not in ['Avg','Sum','Max','Min','Count']:
             raise ValidationError('Statistic {0} not supported'.format(statistic))
         aggr_fxn = getattr(models, statistic)
@@ -890,6 +886,7 @@ class Stage(models.Model):
         >>> stage.get_stat('cpu_requirement','Avg')
         120
         """
+
         if statistic not in ['Avg','Sum','Max','Min','Count']:
             raise ValidationError('Statistic {0} not supported'.format(statistic))
         aggr_fxn = getattr(models, statistic)
@@ -964,15 +961,15 @@ class Stage(models.Model):
 
     def add_task(self, pcmd, tags={}, **kwargs):
         """
-        Creates a new task for this stage, and saves it
-        If a task with `tags` already exists in this stage, just return it
+        Creates a new task for this stage, and saves it.
+        If a task with `tags` already exists in this stage, just return it.
         Has the same signature as :meth:`Task.__init__` minus the stage argument.
         
         :returns: The task added.
         """
         q = Task.objects.filter(stage=self,tags=tags)
-        if q.count() > 0:
-            return q.all()[0]
+        # if q.count() > 0:
+        #     return q.all()[0]
 
         return Task.create(stage=self,pcmd=pcmd,**kwargs)
 
@@ -1067,7 +1064,7 @@ class Stage(models.Model):
     @models.permalink
     def url(self):
         "The URL of this stage"
-        return ('stage_view',[str(self.id)])
+        return ('stage_view',[str(self.workflow.id),self.name])
 
     def __str__(self):
         return 'Stage[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
@@ -1160,6 +1157,7 @@ class Task(models.Model):
         """
         Creates a task.
         """
+        #TODO just pput this in __init__ and run if pk is None
         task = Task(stage=stage, pcmd=pcmd, **kwargs)
 
         if Task.objects.filter(stage=task.stage,tags=task.tags).count() > 0:
@@ -1169,7 +1167,7 @@ class Task(models.Model):
         task.save()
 
         check_and_create_output_dir(task.output_dir)
-        check_and_create_output_dir(task.job_output_dir) #this is not in JobManager because JobManager should be not care about these details
+        check_and_create_output_dir(task.job_output_dir)
 
         #Create task tags    
         for key,value in task.tags.items():
@@ -1258,11 +1256,11 @@ class Task(models.Model):
 
     def set_status(self,new_status,save=True):
         "Set Task's status"
-        self.log.info('{0} {1}'.format(self,new_status))
         self.status = new_status
 
         if new_status == 'successful':
             self.successful = True
+            self.log.info('{0} successful!'.format(self))
 
         if save: self.save()
 
@@ -1311,7 +1309,14 @@ class Task(models.Model):
     @models.permalink
     def url(self):
         "This task's url."
-        return ('task_view',[str(self.id)])
+        return ('task_view',[str(self.workflow.id),self.stage.name,self.tags_as_query_string()])
+
+    def tags_as_query_string(self):
+        """
+        Returns a string of tag keys and values as a url query string
+        """
+        import urllib
+        return urllib.urlencode(self.tags)
 
     @transaction.commit_on_success
     def delete(self, *args, **kwargs):

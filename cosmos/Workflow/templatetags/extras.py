@@ -11,6 +11,7 @@ def aslist(o):
 @register.simple_tag
 def get_sjob_stat(stage,field,statistic,pipe=None):
     r = stage.get_sjob_stat(field,statistic)
+    if r is None:  return ''
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
 @register.simple_tag
@@ -96,9 +97,9 @@ def format_memory_kb(kb):
     mb = kb/1024.0
     gb = mb/1024.0
     if gb > 1:
-        return "%s GB" % round(gb,1)
+        return "%sGB" % round(gb,1)
     else:
-        return "%s MB" % round(mb,1)
+        return "%sMB" % round(mb,1)
 @register.filter
 def format_memory_mb(mb):
     """converts mb to human readible"""

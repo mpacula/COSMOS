@@ -43,9 +43,9 @@ class Tool(object):
     outputs = []
     mem_req = 1*1024 #(MB)
     cpu_req = 1 #(cores)
-    time_req = None #
-    NOOP = False #set to True if this Task should never actually be submitted to the Cosmos Workflow
-    forward_input = False
+    time_req = None #(mins)
+    NOOP = False
+    forward_input = False # If True, input of this tool can be accessed by its output files
     succeed_on_failure = False
     dont_delete_output_files = False
     default_params = {}
@@ -192,9 +192,14 @@ class Tool(object):
 
     def cmd(self, i, s, p):
         """
+        Constructs the preformatted command string.  The string will be .format()ed with the i,s,p dictionaries,
+        and later, $OUT.outname  will be replaced with a TaskFile associated with the output name `outname`
+
         :param i: (dict) Input TaskFiles.
         :param s: (dict) Settings.  The settings dictionary, set by using :py:meth:`contrib.ezflow.dag.configure`
         :param p: (dict) Parameters.
+        :returns: (str|tuple(str,dict)) A preformatted command string, or a tuple of the former and a dict with extra values to use for
+            formatting
         """
         raise NotImplementedError("{0}.cmd is not implemented.".format(self.__class__.__name__))
 
@@ -205,9 +210,14 @@ class INPUT(Tool):
     """
     An Input File.
 
-    Does not actually execute anything, but sets self.output_files to the TaskFiles or paths its initialized to
+    Does not actually execute anything, but sets self.output_files to the TaskFiles or paths it's initialized with
 
     :property NOOP: Automatically set to True
+
+    >>> INPUT('/path/to/file.ext')
+    >>> INPUT(TaskFile(path='/path/to/file.ext',name='myname'))
+    >>> INPUT(output_paths=['/path1','/path2'])
+    >>> INPUT(taskfiles=[TaskFile(path='/path1'),TaskFile(path='/path2')])
     """
     name = "Load Input Files"
     NOOP = True
@@ -229,4 +239,7 @@ class INPUT(Tool):
         if taskfile: taskfiles.append(taskfile)
         for tf in taskfiles:
             self.add_output(tf)
+    def __str__(self):
+        return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
+
     

@@ -108,6 +108,8 @@ class JobManager(JobManagerBase):
         jt.jobName = 'ja-'+jobAttempt.jobName
         jt.outputPath = ':'+jobAttempt.STDOUT_filepath
         jt.errorPath = ':'+jobAttempt.STDERR_filepath
+
+        jt.jobEnvironment = os.environ
         jt.nativeSpecification = get_drmaa_ns(jobAttempt)
 
         return jt
@@ -115,6 +117,7 @@ class JobManager(JobManagerBase):
     def _submit_job(self,jobAttempt):
         jobTemplate = self.__drmaa_createJobTemplate(jobAttempt)
         jobAttempt.drmaa_jobID = drmaa_session.runJob(jobTemplate)
+        jobAttempt.drmaa_native_specification = jobTemplate.nativeSpecification
         jobTemplate.delete() #prevents memory leak
 
 

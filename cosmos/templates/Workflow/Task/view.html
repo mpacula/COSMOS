@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% load extras %}
+
+{%block title%} - {{task.workflow.name}}{%endblock%}
+
 {%block content%}
+
 
 <ul class="breadcrumb">
   <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>

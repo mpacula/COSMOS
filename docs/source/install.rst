@@ -12,21 +12,27 @@ python-mysql require python-dev libmysqlclient-dev.  If pip install is failing, 
 :command:`apt-get update -y`
 :command:`apt-get install python-dev libmysqlclient-dev mysql-server graphviz graphviz-dev`
 
-The only other requirement is that :term:`DRMAA` is installed on the system.
-If you use multiple python virtual environments, we highly recommend
-using .
-
+The only other requirement is that :term:`DRMAA` is installed on the system if you want Cosmos to submit
+jobs to a :term:`DRMS` like LSF or Grid Engine.
 
 Quick Install
 ________________________________________
 
-The following will:
+
+This is generally for advanced users who have worked with python packages before.
 
 .. code-block:: bash
 
    cd /dir/to/install/Cosmos/to
    git clone git@github.com:ComputationalBiomedicine/Cosmos.git
+   pip install distribute --upgrade
    pip install Cosmos
+
+.. hint::
+
+    You need root access to install python packages to the system directories.  You may have to run pip install with
+    'sudo pip install ...', or to install to the user level use 'pip install --user'.  99% of users should just
+    use the *Better Install* described next.
 
 Better Install
 ________________________
@@ -51,7 +57,7 @@ $home/.virtualenvs/cosmos.
 Now cosmos is installed to its own python virtual environment, which you can activate by typing
 :command:`workon cosmos`.  Make sure you type `workon cosmos` anytime you want to interact with cosmos, or run a script
 that uses cosmos.
-Deactivate the virtual environment by typing :command:`deactivate`
+Deactivate the virtual environment by typing :command:`deactivate`.
 
 
 Experimental Features

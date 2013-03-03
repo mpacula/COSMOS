@@ -1,7 +1,7 @@
 .. _cli:
 
-Command Line
-_____________________________
+Command Line Interface
+======================
 
 Make sure your environment variables are properly set (see :ref:`config`).
 Use the shell command :command:`env` if you're not sure what's in your environment.

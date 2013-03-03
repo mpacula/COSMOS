@@ -1,13 +1,14 @@
 """
 This shows how to use signals to run arbitrary
-code when astage fails.  One could easily
+code when a stage fails.  One could easily
 modify this to send SMS texts instead of e-mails.
 
 .. note::
 
-    Signals for status changes are not sent
-    when they're changed due to a
-    workflow starting, or a workflow terminating.
+    Signals for status changes are not
+    triggered when they occur due to a
+    workflow starting, or a workflow being
+    manually terminated.
 """
 ####################
 # CLI
@@ -60,12 +61,12 @@ def email_on_fail(sender, status, **kwargs):
 # Workflow
 ####################
 
-from cosmos.contrib.ezflow.dag import DAG, Apply, Split, Add
+from cosmos.contrib.ezflow.dag import DAG, Workflow, Split, Add
 import tools
 
 dag = ( DAG()
         |Add| [tools.ECHO(tags={'word': 'hello'}), tools.ECHO(tags={'word': 'world'})]
-        |Apply| tools.FAIL # Automatically fail
+        |Workflow| tools.FAIL # Automatically fail
 )
 
 #################
