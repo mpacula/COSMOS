@@ -24,9 +24,10 @@ This is generally for advanced users who have worked with python packages before
 .. code-block:: bash
 
    cd /dir/to/install/Cosmos/to
-   git clone git@github.com:ComputationalBiomedicine/Cosmos.git
+   git clone git@github.com:ComputationalBiomedicine/Cosmos.git --depth=1
    pip install distribute --upgrade
-   pip install Cosmos
+   cd Cosmos
+   pip install .
 
 .. hint::
 
@@ -39,19 +40,21 @@ ________________________
 
 Install Cosmos in a virtual environment using
 `virtualenvwrapper <http://www.doughellmann.com/projects/virtualenvwrapper/>`_.
-This will make sure all python libraries and files related to Cosmos are installed to
-$home/.virtualenvs/cosmos.
+This will make sure all python libraries and files related to Cosmos are installed to a sandboxed location in
+:file:`$HOME/.virtualenvs/cosmos`.
 
 .. code-block:: bash
 
     pip install virtualenvwrapper --user
     source $HOME/.local/bin/virtualenvwrapper.sh
     echo "source $HOME/.local/bin/virtualenvwrapper.sh" >> ~/bash.rc
+
     mkvirtualenv cosmos
+    cd /dir/to/install/Cosmos/to
     pip install distribute --upgrade
-    git clone git@github.com:ComputationalBiomedicine/Cosmos.git
+    git clone git@github.com:ComputationalBiomedicine/Cosmos.git --depth=1
     cd Cosmos
-    pip install -I ./
+    pip install .
 
 
 Now cosmos is installed to its own python virtual environment, which you can activate by typing
