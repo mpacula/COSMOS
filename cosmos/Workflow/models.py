@@ -239,7 +239,7 @@ class Workflow(models.Model):
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
 
         for s in Stage.objects.exclude(task__successful=True):
-            wf.log.info('{0} has no successful tasks, deleting.'.format(s))
+            wf.log.info('{0} has no successful tasks.'.format(s))
             s.delete()
 
         #Delete unsuccessful tasks
