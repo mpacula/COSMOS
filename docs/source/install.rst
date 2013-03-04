@@ -58,8 +58,8 @@ This will make sure all python libraries and files related to Cosmos are install
 
 
 Now cosmos is installed to its own python virtual environment, which you can activate by typing
-:command:`workon cosmos`.  Make sure you type `workon cosmos` anytime you want to interact with cosmos, or run a script
-that uses cosmos.
+:command:`workon cosmos`.  Make sure you type `workon cosmos` anytime you want to interact with Cosmos, or run a script
+that uses Cosmos.
 Deactivate the virtual environment by typing :command:`deactivate`.
 
 
