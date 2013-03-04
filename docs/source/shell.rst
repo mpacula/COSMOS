@@ -55,7 +55,7 @@ Or for multiple objects:
 
 .. code-block:: python
 
-    Workflow.objects.filter(pk__in=[200,201,300]
+    Workflow.objects.filter(pk__in=[200,201,300])
 
 You can also query on the many fields available for each object
 

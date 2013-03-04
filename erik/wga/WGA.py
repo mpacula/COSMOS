@@ -52,12 +52,10 @@ def bam(workflow,input_bam,**kwargs):
     print 'RGIDS:'
     print rgids
 
-    dag = DAG(mem_req_factor=1) |Add| [ INPUT(input_bam) ]
+    dag = DAG() |Add| [ INPUT(input_bam) ]
 
     #Run bam2fastq
     Bam2Fastq(workflow,dag,settings,rgids)
-    dag.add_to_workflow(workflow)
-    workflow.run(finish=False)
 
     #Run GATK
     GATK_Best_Practices(dag,settings)

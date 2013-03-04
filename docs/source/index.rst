@@ -12,7 +12,7 @@ Welcome
     * :ref:`API` -- Module API.
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 4
 
    introduction
    install

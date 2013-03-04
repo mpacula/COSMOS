@@ -75,7 +75,7 @@ A more fine grained approach to defining input files:
     INPUT(taskfile=TaskFile(name='favorite_txt',path='/path/to/favorite_txt.txt.gz',fmt='txt.gz'),tags={'color':'red'})
 
 Designing Workflows
-+++++++++++++++++++
+--------------------
 
 All jobs and and job dependencies are represented by the :py:class:`dag.DAG` class.
 
@@ -170,18 +170,17 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
 
 
 
-EZFlow API
-++++++++++
+API
+-----------
 
 Tool
------
-
+*****
 .. automodule:: cosmos.contrib.ezflow.tool
     :members:
 
 
 DAG
------
+****
 
 .. automodule:: cosmos.contrib.ezflow.dag
     :private-members:

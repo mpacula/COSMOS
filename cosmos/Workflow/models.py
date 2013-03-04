@@ -252,7 +252,9 @@ class Workflow(models.Model):
             wf.bulk_delete_tasks(utasks)
 
             # Update stages that are resuming
-            Stage.objects.filter(workflow=wf,successful=False,task__successful=True).update(successful=False,status='in_progress',finished_on=None)
+            Stage.objects.filter(workflow=wf,successful=False,task__successful=True).update(
+                successful=False,status='in_progress',finished_on=None
+            )
 
         return wf
 
@@ -518,9 +520,9 @@ class Workflow(models.Model):
 
         #TODO fix this it's slow (do it in bulk when running a workflow?)
         if task.stage.status in ['no_attempt','failed']:
-            task.stage.set_status('in_progress')
             if task.stage.status == 'no_attempt':
                 task.stage.started_on = timezone.now()
+            task.stage.set_status('in_progress')
             task.stage.save()
         task.set_status('in_progress')
         self.log.info('Running {0}'.format(task))
