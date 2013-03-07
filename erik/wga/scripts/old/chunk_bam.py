@@ -9,7 +9,7 @@ from cosmos.contrib.ezflow.dag import DAG, Map, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.tool import INPUT,Tool
 from tools import picard
 import os
-from settings import settings
+from wga_settings import settings
 from cosmos.Workflow.cli import CLI
 
 cli = CLI()

@@ -1,7 +1,7 @@
 from cosmos.contrib.ezflow.dag import DAG, Map, Reduce, Split, ReduceSplit, Add
 from wga.tools import gatk,picard,bwa
 
-def GATK_Best_Practices(dag,settings):
+def GATK_Best_Practices(dag,wga_settings):
     """
     Maps GATK best practices to dag's last_tools
     """
@@ -39,4 +39,4 @@ def GATK_Best_Practices(dag,settings):
            # |Workflow| annotate.SQL_DUMP
            # |Workflow| annotate.ANALYSIS
     )
-    dag.configure(settings,parameters)
+    dag.configure(wga_settings,parameters)

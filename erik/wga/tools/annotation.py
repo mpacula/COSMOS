@@ -1,42 +1,55 @@
 from cosmos.contrib.ezflow.tool import Tool
 
-class AnnovarExt_DownDB(Tool):
+class DownDB(Tool):
     time_req = 10
     name = "Download Annotation Database"
 
     def cmd(self,i,s,p):
         return 'annovarext downdb {p[build]} {p[dbname]}'
 
-class AnnovarExt_Anno(Tool):
-    name = "Annovar"
-    inputs = ['tsv']
-    outputs = ['dir']
-    forward_input=True
-    time_req = 120
 
-    def cmd(self,i,s,p):
-        return 'annovarext anno {p[build]} {p[dbname]} {i[tsv][0]} $OUT.dir'
-
-class AnnovarExt_vcf2anno(Tool):
-    name = "Annovar"
+class SetID(Tool):
+    name = "Set VCF ID"
     inputs = ['vcf']
-    outputs = ['anno']
+    outputs = ['vcf_id']
     forward_input=True
     time_req = 10
 
     def cmd(self,i,s,p):
-        return 'annovarext vcf2anno {i[vcf][0]} > $OUT.dir'
+        return "annovarext setid '{i[vcf][0]}' > $OUT.vcf_id"
 
 
-class AnnovarExt_Merge(Tool):
-    name = "Merge Annotations"
-    inputs = ['tsv','dir']
+class Vcf2Anno_in(Tool):
+    name = "Convert VCF"
+    inputs = ['vcf_id']
+    outputs = ['anno_in']
+    forward_input=True
+    time_req = 10
+
+    def cmd(self,i,s,p):
+        return "annovarext vcf2anno '{i[vcf_id][0]}' > $OUT.anno_in"
+
+class Anno(Tool):
+    name = "Annotate"
+    inputs = ['anno_in']
     outputs = ['dir']
-    mem_req = 10*1024
+    forward_input=True
     time_req = 120
+    mem_req = 8*1024
+
+    def cmd(self,i,s,p):
+        return 'annovarext anno {p[build]} {p[dbname]} {i[anno_in][0]} $OUT.dir'
+
+class MergeAnno(Tool):
+    name = "Merge Annotations"
+    inputs = ['vcf_id','dir']
+    outputs = ['dir']
+    mem_req = 20*1024
+    time_req = 120
+    forward_input=True
     
     def cmd(self,i,s,p):
-        return ('annovarext merge {i[tsv][0]} $OUT.dir {annotated_dir_output}',
+        return ('annovarext merge {i[vcf_id][0]} $OUT.dir {annotated_dir_output}',
                 { 'annotated_dir_output' : ' '.join(map(str,i['dir'])) }
         )
 

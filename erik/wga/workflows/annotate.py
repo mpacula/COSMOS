@@ -1,8 +1,7 @@
 from cosmos.contrib.ezflow.dag import DAG, Map, Reduce, Split, ReduceSplit, Add
 from cosmos.contrib.ezflow.flow import SubWorkFlow
-from wga import settings
 from subprocess import Popen,PIPE
-from wga.tools import annotate
+from wga.tools import annotation
 
 def get_db_names():
     cmd = 'annovarext listdbs'
@@ -22,8 +21,8 @@ class Annotate(SubWorkFlow):
         ( dag
           |Split| ( [('build',['hg19']),
                       ('dbname',get_db_names()) ],
-                      annotate.AnnovarExt_Anno )
-          |Reduce| ([],annotate.AnnovarExt_Merge)
+                    annotation.Anno )
+          |Reduce| ([],annotation.MergeAnno)
         )
 
 
@@ -38,5 +37,5 @@ class DownDBs(SubWorkFlow):
         """
         No inputs or outputs, just downloads databases
         """
-        dag |Add| [ annotate.AnnovarExt_DownDB(tags={'build':'hg19','dbname':db}) for db in get_db_names() ]
+        dag |Add| [ annotation.DownDB(tags={'build':'hg19','dbname':db}) for db in get_db_names() ]
 

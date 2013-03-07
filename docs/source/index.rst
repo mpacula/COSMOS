@@ -22,6 +22,7 @@ Welcome
    examples
    cli
    shell
+   advanced
    faq
    API/index
    glossary

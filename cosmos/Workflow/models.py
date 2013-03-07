@@ -50,9 +50,9 @@ class TaskFile(models.Model):
         if not self.fmt and self.path:
             try:
                 # if path ends with .gz, the format includes the extensions before the gz
-                # ie fmt = fastq.gz if path=file.blah.fastq.gz
+                #   ie fmt = fastq.gz if path=file.blah.fastq.gz
                 # otherwise take the last extension
-                # ie fmt = fastq if path=file.blah.fastq
+                #   ie fmt = fastq if path=file.blah.fastq
                 groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
                 self.fmt = groups[0] if groups[0] else groups[1]
 
@@ -238,7 +238,7 @@ class Workflow(models.Model):
         """
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
 
-        for s in Stage.objects.exclude(task__successful=True):
+        for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
             wf.log.info('{0} has no successful tasks.'.format(s))
             s.delete()
 
@@ -575,18 +575,21 @@ class Workflow(models.Model):
         numAttempts = task.jobAttempts.count()
         if not task.successful: #ReRun jobAttempt
             if numAttempts < self.max_reattempts:
-                self.log.warning("{0} of {1} failed, on attempt # {2}, so deleting failed output files and retrying.\nSTDERR: {3}".format(failed_jobAttempt, task,numAttempts,failed_jobAttempt.STDERR_txt))
+                self.log.warning("{0} of {1} failed, on attempt # {2}, so deleting failed output files and retrying.\n".format(failed_jobAttempt,task,numAttempts)
+                               + "<COMMAND>\n{0}\n</COMMAND>\n".format(failed_jobAttempt.get_command_shell_script_text())
+                               + "<STDERR>{0}\n</STDERR>".format(failed_jobAttempt.STDERR_txt)
+                )
                 os.system('rm -rf {0}/*'.format(task.job_output_dir))
                 self._run_task(task)
                 return True
             else:
-                self.log.warning("{0} has failed and reached max_reattempts of {1}.\nSTDERR: {2}".format(self, self.max_reattempts,failed_jobAttempt.STDERR_txt))
+                self.log.warning("{0} has failed and reached max_reattempts of {1}.\n<STDERR>\n{2}\n</STDERR>".format(self, self.max_reattempts,failed_jobAttempt.STDERR_txt))
                 self.status = 'failed'
                 self.save()
                 return False
 
 
-    def run(self,terminate_on_fail=False,finish=True):
+    def run(self,terminate_on_fail=True,finish=True):
         """
         Runs a workflow using the DAG of jobs
 
@@ -1336,5 +1339,5 @@ class Task(models.Model):
         super(Task, self).delete(*args, **kwargs)
 
     def __str__(self):
-        return 'Task[{0}] {1}'.format(self.id,self.tags)
+        return '{0}Task/[{1}] {2}'.format(self.stage,self.id,self.tags)
 

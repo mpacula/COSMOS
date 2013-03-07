@@ -59,7 +59,7 @@ class IR(GATK):
 class BQSR(GATK):
     name = "Base Quality Score Recalibration"
     #cpu_req = 8
-    cpu_req = 2
+    cpu_req = 4
     mem_req = 9*1024
     inputs = ['bam']
     outputs = ['recal']

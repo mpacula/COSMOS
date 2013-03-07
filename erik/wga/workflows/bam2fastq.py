@@ -36,14 +36,16 @@ class FilterBamByRG(Tool):
 
 def Bam2Fastq(workflow,dag,settings,rgids):
 
-    dag = (dag
-            |Split| ([('rgid',rgids)],FilterBamByRG)
-            |Map| picard.REVERTSAM
-            |Map| picard.SAM2FASTQ
-            |Split| ([('pair',[1,2])],SplitFastq)
-        ).configure(settings=settings)
+    (  dag
+        |Split| ([('rgid',rgids)],FilterBamByRG)
+        |Map| picard.REVERTSAM
+        |Map| picard.SAM2FASTQ
+        |Split| ([('pair',[1,2])],SplitFastq)
+    )
+    dag.configure(settings)
+    # if workflow.stages.filter(name='SplitFastq',successful=True).count() == 0:
     dag.add_to_workflow(workflow)
-    workflow.run(finish=False)
+    workflow.run(finish=False) # this updates the taskfile paths
 
     #Load Fastq Chunks for processing
     input_chunks = []
@@ -64,4 +66,3 @@ def Bam2Fastq(workflow,dag,settings,rgids):
             dag.G.add_edge(input_tool,new_tool)
             input_chunks.append(new_tool)
     dag.last_tools = input_chunks
-    return dag
