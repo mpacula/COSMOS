@@ -203,7 +203,12 @@ def flowfxn(func,dag,*RHS):
     """
     if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
     dag.last_tools = list(func(dag,*RHS))
-    stage_name = dag.last_tools[0].stage_name
+    try:
+        stage_name = dag.last_tools[0].stage_name
+    except IndexError:
+        raise DAGError, 'Tried to apply |{0}| to DAG, but dag.last_tools is not set.  Make sure to |Add| some INPUTs first.'.format(
+            func.__name__[1:].capitalize()
+        )
 
     if stage_name in dag.stage_names_used: raise DAGError, 'Duplicate stage_names detected {0}.'.format(stage_name)
     dag.stage_names_used.append(stage_name)
@@ -211,6 +216,7 @@ def flowfxn(func,dag,*RHS):
     return dag
 
 #Different from other flowfxns, so do not decorate with @flowfxn
+#Experimental
 def _subworkflow(dag,subflow_class,parser=None):
     """
     Applies a :py:class:`flow.SubWorkflow` to the last tools added to the dag.

@@ -154,6 +154,7 @@ class SORT_BAM(Picard):
 class MARK_DUPES(Picard):
     name = "Mark Duplicates"
     mem_req = 4*1024
+    time_req = 16*60
     inputs = ['bam']
     outputs = ['bam','metrics']
         

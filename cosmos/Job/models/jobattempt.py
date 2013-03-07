@@ -118,6 +118,10 @@ class JobAttempt(models.Model):
         ':returns: [profile_fields], a simple list of profile_field names, without their type information'
         return reduce(lambda x,y: x+y,[tf[1] for tf in JobAttempt.profile_fields])
 
+    @property
+    def workflow(self):
+        "This jobattempt's workflow"
+        self.task.workflow
 
     @property
     def resource_usage(self):

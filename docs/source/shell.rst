@@ -68,7 +68,7 @@ For filtering by tags, use the special method :py:meth:`cosmos.Workflow.models.W
 .. code-block:: python
 
     wf = Workflow.objects.get(name="My Workflow")
-    wf.get_task_by(tags={'color':'orange','shape':'circle'inst})
+    wf.get_task_by(tags={'color':'orange','shape':'circle'})
 
 For more advanced queries, see `Django Queries <https://docs.djangoproject.com/en/dev/topics/db/queries/>`_.
 
