@@ -1,7 +1,8 @@
 {% load extras %}
 
-<table class="table table-condensed">
-    <tbody>
+
+<table class="table table-condensed table-striped">
+    <thead>
     <tr><th>Step</th>
         <th>Stage</th>
         <th></th>
@@ -30,10 +31,12 @@
         {% endif %}
         <th>Output Dir Size</th>
     </tr>
+    </thead>
+    <tbody>
     {% for stage in stages %}
         <tr onclick="window.location.href = '{{stage.url}}';" style="cursor:pointer">
         <td>{{stage.order_in_workflow}}.</td>
-        <td>[{{stage.id}}] <a href="{{stage.url}}"><strong>{{stage.name|underscore2space}}</strong></a></td>
+        <td><strong><a href="{{stage.url}}">[{{stage.id}}] {{stage.name|underscore2space}}</a></strong></td>
 
             <td>
                 {%with status=stage.status %}
@@ -46,8 +49,8 @@
                     <div class="bar" style="opacity:.75;width:{{stage.percent_done}}%"></div>
                 </div></td>
             <td>{{stage.num_tasks_successful}}/{{stage.num_tasks}}</td>
-            {% if cosmos_settings.show_stage_details == "True" %}
-                <td>{%if 0 %}{{stage.get_all_tag_keys_used|join:', '}}{%endif%}</td>
+           {% if cosmos_settings.show_stage_details %}
+                <td>{{stage.get_all_tag_keys_used|join:', '}}</td>
                 <td>{{stage.wall_time.seconds|format_time}}</td>
                 <td>{% get_task_stat stage "cpu_requirement" "Avg"%}</td>
                 <td>{% get_sjob_stat stage "percent_cpu" "Avg" "format_percent"%}</td>

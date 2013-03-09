@@ -26,8 +26,8 @@
     </div>
 {% endif %}
 
-<table class="table table-condensed">
-    <tbody>
+<table class="table table-condensed table-striped">
+    <thead>
     <tr>
         <th>Task</th>
         <th>Parents</th>
@@ -36,6 +36,7 @@
         <th>Output Dir Size</th>
         <th>Job Attempts</th>
     </tr>
+    </thead><tbody>
     {% for task in paged_tasks %}
         <tr>
             <td>
@@ -44,7 +45,7 @@
                     {%if status == "failed"%}<i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>{%endif%}
                     {%if status == "in_progress"%}<i class="icon-refresh" rel="tooltip" title="In Progress"></i>{%endif%}
                 {%endwith%} 
-            <strong><a href="{{task.url}}" style="color:#C09853">{{task}}</a></strong>
+            <strong><a href="{{task.url}}">{{task}}</a></strong>
             </td>
             <td>
                 {%for parent in task.parents%}

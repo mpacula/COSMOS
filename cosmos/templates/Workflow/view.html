@@ -27,28 +27,42 @@
   <li class="active">{{workflow}}</li>
 </ul>
 
-<h1>{{workflow}}
-	<a href="{% url 'workflow_view_log' workflow.id %}"><button class="btn btn-info"><i class="icon-search icon-white"></i> Log</button></a>
-	<a href="{% url 'workflow_analysis' workflow.id %}"><button class="btn btn-info"><i class="icon-wrench icon-white"></i> Analyze</button></a>
-    <a href="{% url 'workflow_visualize' workflow.id %}"><button class="btn btn-info"><i class="icon-cog icon-white"></i> Visualize</button></a>
-</h1>
 
-<dl class="dl-horizontal">
-<dt>Output Dir</dt><dd>{{workflow.output_dir}}</dd>
-<dt>Default Queue</dt><dd>
-    {% if workflow.default_queue %}{{workflow.default_queue}}
-    {% else %} None
-    {% endif %}</dd>
-<dt>Max Reattempts</dt><dd>{{workflow.max_reattempts}}</dd>
-<dt>Delete Intermediates</dt><dd>{{workflow.delete_intermediates}}</dd>
-<dt>Created on</dt><dd>{{workflow.created_on}}</dd>
-<dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
-<dt>Wall Time</dt><dd>{{workflow.wall_time.seconds|format_time}}</dd>
-</dl>
+<div class="box-header">
+    <h2><i class="icon-retweet"></i><span class="break"></span> {{workflow}}</h2>
+    <div class="box-icon">
+        <a href="{% url 'workflow_view_log' workflow.id %}" class="btn btn-mini btn-success" rel="tooltip" title="View Log">
+            <i class="icon-search"></i> </a>
+    </div>
 
-<p><h3>Stages</h3>
-</p>
-<div id="stages">
+    <div class="box-icon">
+        <a href="{% url 'workflow_analysis' workflow.id %}" class="btn btn-mini btn-info" rel="tooltip" title="Analyse">
+            <i class="icon-wrench"></i> </a>
+    </div>
+    <div class="box-icon">
+        <a href="{% url 'workflow_visualize' workflow.id %}" class="btn btn-mini btn-danger" rel="tooltip" title="Visualise DAG">
+            <i class="icon-eye-open "></i> </a>
+    </div>
+</div>
+<div class="box-content">
+    <dl class="dl-horizontal">
+    <dt>Output Dir</dt><dd>{{workflow.output_dir}}</dd>
+    <dt>Default Queue</dt><dd>
+        {% if workflow.default_queue %}{{workflow.default_queue}}
+        {% else %} None
+        {% endif %}</dd>
+    <dt>Max Reattempts</dt><dd>{{workflow.max_reattempts}}</dd>
+    <dt>Delete Intermediates</dt><dd>{{workflow.delete_intermediates}}</dd>
+    <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
+    <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
+    <dt>Wall Time</dt><dd>{{workflow.wall_time.seconds|format_time}}</dd>
+    </dl>
+</div>
+<br/>
+<div class="box-header">
+    <h2><i class="icon-tasks"></i><span class="break"></span>Stages</h2>
+</div>
+<div id="stages" class="box-content">
 {%with stages=stages_ordered%}
     {%include "Workflow/Stage/table.html"%}
 {%endwith%}

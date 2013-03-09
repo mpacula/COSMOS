@@ -58,8 +58,8 @@ def Bam2Fastq(workflow,dag,settings,rgids):
 
         d['flowcell'] = d['rgid'][:5]
         d['lane'] = d['rgid'][6:]
-        for f in os.listdir(input_tool.output_files[0].path):
-            path = os.path.join(input_tool.output_files[0].path,f)
+        for f in os.listdir(input_tool._task_instance.output_files[0].path):
+            path = os.path.join(input_tool._task_instance.output_files[0].path,f)
             d2 = d.copy()
             d2['chunk'] = re.search("(\d+)\.fastq",f).group(1)
             new_tool = INPUT(path,tags=d2,stage_name='Load FASTQ Chunks')

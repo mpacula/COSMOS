@@ -51,7 +51,9 @@
       <li class="active">{{stage}}</li>
     </ul>
 
-    <h1>
+
+<div class="box-header">
+    <h2>
         {%if stage.status == "successful"%}
         <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>
         {%endif%}
@@ -62,52 +64,60 @@
         {%if stage.status == "in_progress"%}
         <i class="icon-refresh" rel="tooltip" title="Warning"></i>
         {%endif%}
+        <span class="break"></span>
         {{stage}}
-    </h1>
-
+    </h2>
+</div>
+<div id="stages" class="box-content">
     <div id="stage_table">
         {% with details=1 stages=stage|aslist%}
         {%include "Workflow/Stage/table.html"%}
         {% endwith %}
     </div>
+</div>
 
+<br/>
+
+<div class="box-header">
+    <h2><i class="icon-tasks"></i><span class="break"></span>
+        Tasks
+    </h2>
+</div>
+<div class="box-content">
     <div class="dropdown">
         <h3 style="display:inline" class="dropdown-toggle" data-toggle="dropdown"  id="filter_dropdown-toggle">
-            Tasks
-            <button class="btn btn-small">Filter
-            <span class="caret"></span>
+            <button class="btn btn-inverse">Filter
+                <span class="caret"></span>
             </button>
         </h3>
-       
+
         <div class="dropdown dropdown-menu" role="menu"  aria-labelledby="dLabel">
-        <form method="GET" action="{{ request.url }}" class="form-inline" id="filter_form">
-            <input type="hidden" name="filter" value="True"/>
-            {% csrf_token %}
-            <ul class="dropdown-form">
-                {% for key,values in filter_choices.items %}
-                <li>
-                <label class="control-label" for="id_{{key}}">{%if key == "f_status"%}status{%else%}{{key}}{%endif%}</label>
-                <select id="id_{{key}}" name="{{key}}">
-                        <option value="{{v}}"{% if current_filters.key == "" %}selected="selected"{%endif%}></option>
-                    {%for v in values%}
-                        <option value="{{v}}"{%if current_filters|key2val:key == v %}selected="selected"{%endif%}>{{v}}</option>
+            <form method="GET" action="{{ request.url }}" class="form-inline" id="filter_form">
+                <input type="hidden" name="filter" value="True"/>
+                {% csrf_token %}
+                <ul class="dropdown-form">
+                    {% for key,values in filter_choices.items %}
+                    <li>
+                        <label class="control-label" for="id_{{key}}">{%if key == "f_status"%}status{%else%}{{key}}{%endif%}</label>
+                        <select id="id_{{key}}" name="{{key}}">
+                            <option value="{{v}}"{% if current_filters.key == "" %}selected="selected"{%endif%}></option>
+                            {%for v in values%}
+                            <option value="{{v}}"{%if current_filters|key2val:key == v %}selected="selected"{%endif%}>{{v}}</option>
+                            {%endfor%}
+                        </select>
+                    </li>
                     {%endfor%}
-                </select>
-                </li>
-                {%endfor%}
-                <li class="divider">
-                </li>
-                <li>
-                <input type="submit" value="filter" class="btn" id="filter_submit">
-                </li>
-            </ul>
-        </form>
+                    <li class="divider">
+                    </li>
+                    <li>
+                        <input type="submit" value="filter" class="btn" id="filter_submit">
+                    </li>
+                </ul>
+            </form>
         </div>
     </div>
     <br/>
-
-    <div id="task_table">
-        {% include "Workflow/Task/table.html" %}
-    </div>
+    {% include "Workflow/Task/table.html" %}
+</div>
 
 {% endblock %}

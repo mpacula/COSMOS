@@ -1,6 +1,10 @@
 from cosmos.contrib.ezflow.tool import Tool
 import os
 
+def list2input(l):
+    return " ".join(map(lambda x: 'INPUT='+str(x),l))
+
+
 class Picard(Tool):
     time_req = 12*60
     mem_req = 3*1024
@@ -163,11 +167,11 @@ class MARK_DUPES(Picard):
     def cmd(self,i,s,p):
         return r"""
             {self.bin}
-            I={i[bam][0]}
+            {inputs}
             O=$OUT.bam
             METRICS_FILE=$OUT.metrics
             ASSUME_SORTED=True
-        """
+        """, {'inputs':list2input(i['bam'])}
 
 class INDEX_BAM(Picard):
     name = "Index Bam Files"

@@ -14,9 +14,10 @@ class CLI(object):
         parser.add_argument('-q','--default_queue',type=str,help="Deletes unsuccessful tasks in the workflow.  Defaults to the value in cosmos.session.settings.")
         parser.add_argument('-o','--root_output_dir',type=str,help="The root output directory.  Output will be stored in root_output_dir/{workflow.name}.  Defaults to the value in cosmos.session.settings.")
         parser.add_argument('-r','--restart',action='store_true',help="Complete restart the workflow by deleting it and creating a new one.")
-        parser.add_argument('-d','--delete_intermediates',action='store_true',help="Deletes intermediate files to save scratch space.")
+        parser.add_argument('-di','--delete_intermediates',action='store_true',help="Deletes intermediate files to save scratch space.")
+        parser.add_argument('-ds','--delete_unsuccessful_stages',action='store_true',help="If reloading, deletes any stages that are unsuccessful")
         parser.add_argument('-y','--prompt_confirm',action='store_false',help="Do not use confirmation prompts before restarting or deleting, and assume answer is always yes.")
-        parser.add_argument('-dry','--dry_run',action='store_true',help="Don't actually run any jobs.")
+        parser.add_argument('-dry','--dry_run',action='store_true',help="Don't actually run any jobs.  Experimental.")
 
     def parse_args(self):
         """

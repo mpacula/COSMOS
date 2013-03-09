@@ -7,8 +7,7 @@ modify this to send SMS texts instead of e-mails.
 
     Signals for status changes are not
     triggered when they occur due to a
-    workflow starting, or a workflow being
-    manually terminated.
+    workflow starting or terminating.
 """
 ####################
 # CLI
@@ -61,12 +60,12 @@ def email_on_fail(sender, status, **kwargs):
 # Workflow
 ####################
 
-from cosmos.contrib.ezflow.dag import DAG, Workflow, Split, Add
+from cosmos.contrib.ezflow.dag import DAG, Map, Split, Add
 import tools
 
 dag = ( DAG()
         |Add| [tools.ECHO(tags={'word': 'hello'}), tools.ECHO(tags={'word': 'world'})]
-        |Workflow| tools.FAIL # Automatically fail
+        |Map| tools.FAIL # Automatically fail
 )
 
 #################

@@ -27,7 +27,7 @@ elif settings['server_name']  == 'orchestra':
 
         if time_req < 10:
             queue = 'mini'
-        if time_req < 12*60:
+        if time_req <= 12*60:
             queue = 'short'
         else:
             queue = 'long'

@@ -2,6 +2,7 @@ from django import template
 import re
 import sys 
 import datetime
+from django.utils.safestring import mark_safe
 register = template.Library()
 
 @register.filter
@@ -49,6 +50,12 @@ def navactive(request, name):
     elif name in request.path.split('/'):
         return "active"
     return ""
+
+
+@register.filter
+def b2e(s):
+    "Returns a '&nbsp' if s is None or blank"
+    return mark_safe('&nbsp;') if s in [None,''] else s
 
 @register.simple_tag
 def status2csstype(status):

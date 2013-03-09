@@ -13,75 +13,84 @@
   <li class="active">{{task}}</li>
 </ul>
 
-<div>
-    <h1>
+
+<div class="box-header">
+    <h2>
         {%if task.status == "successful"%}
-            <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>
+        <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>
         {%endif%}
         {%if task.status == "failed"%}
         <i class="icon-thumbs-down" rel="tooltip" title="Failed"></i>
-            Failed
+        Failed
         {%endif%}
         {%if task.status == "in_progress"%}
-            <i class="icon-refresh" rel="tooltip" title="Warning"></i>
+        <i class="icon-refresh" rel="tooltip" title="Warning"></i>
         {%endif%}
+
+        <span class="break"></span>
         {{task}}
-    </h1>
-<strong>Tags</strong>:
-{% for k,v in task.tags.items %}
-<span class="label label-info">{{k}}:{{v}}</span>
-{% endfor %}
+        </h1>
+    </h2>
 </div>
-<dl class="dl-horizontal">
-<dt>Status</dt><dd><em>{{task.status}}</em></dd>
-<dt>Parents</dt><dd>
-	{%for parent in task.parents%}
-	<a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
-	{%empty%}None{%endfor%}
-</dd>
-<dt>Output Files</dt><dd>
-	{%for of in task.output_files%}
-	<a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
-	{%empty%}None{%endfor%}
-</dd>
-<dt>CPU Requirement</dt><dd>{{task.cpu_requirement}}</dd>
-<dt>Memory Requirement</dt><dd>{{task.memory_requirement}}MB</dd>
-<dt>Time Requirement</dt><dd>{{task.time_requirement}} min</dd>
-<dt>File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{task.output_file_size}}{%else%}off{%endif%}</dd>
-<dt>Wall time</dt><dd>{{task.wall_time|format_time}}</dd>
-<dt>Successful</dt><dd>{{task.successful}}</dd>
-<dt>NOOP</dt><dd>{{task.NOOP}}</dd>
-<dt>Cleared Outputs</dt><dd>{{task.cleared_output_files}}</dd>
-<dt>Don't Delete Outputs</dt><dd>{{task.dont_delete_output_files}}</dd>
-<dt>Succeed On Failure</dt><dd>{{task.succeed_on_failure}}</dd>
-<dt>Created On</dt><dd>{{task.created_on}}</dd>
-<dt>Finished On</dt><dd>{{task.finished_on}}</dd>
-<dt>Preformatted<br/>Command</dt><dd><pre class="pre-scrollable">{{task.pcmd}}</pre></dd>
-<dt>Output Directory</dt><dd><code>{{task.output_dir}}</code></dd>
-<dt>Output Files</dt><dd>
-    {%for of in task.output_files%}
+<div class="box-content">
+
+    <strong>Tags</strong>:
+    {% for k,v in task.tags.items %}
+    <span class="label label-info">{{k}}:{{v}}</span>
+    {%empty%}
+    None
+    {% endfor %}
+
+    <dl class="dl-horizontal">
+    <dt>Status</dt><dd><em>{{task.status}}</em></dd>
+    <dt>Parents</dt><dd>
+        {%for parent in task.parents%}
+        <a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
+        {%empty%}None{%endfor%}
+    </dd>
+    <dt>Output Files</dt><dd>
+        {%for of in task.output_files%}
         <a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
-    {%empty%}None{%endfor%}
-</dd>
+        {%empty%}None{%endfor%}
+    </dd>
+    <dt>CPU Requirement</dt><dd>{{task.cpu_requirement}}</dd>
+    <dt>Memory Requirement</dt><dd>{{task.memory_requirement}}MB</dd>
+    <dt>Time Requirement</dt><dd>{{task.time_requirement}} min</dd>
+    <dt>File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{task.output_file_size}}{%else%}off{%endif%}</dd>
+    <dt>Wall time</dt><dd>{{task.wall_time|format_time}}</dd>
+    <dt>Successful</dt><dd>{{task.successful}}</dd>
+    <dt>NOOP</dt><dd>{{task.NOOP}}</dd>
+    <dt>Cleared Outputs</dt><dd>{{task.cleared_output_files}}</dd>
+    <dt>Don't Delete Outputs</dt><dd>{{task.dont_delete_output_files}}</dd>
+    <dt>Succeed On Failure</dt><dd>{{task.succeed_on_failure}}</dd>
+    <dt>Created On</dt><dd>{{task.created_on}}</dd>
+    <dt>Finished On</dt><dd>{{task.finished_on}}</dd>
+    <dt>Preformatted<br/>Command</dt><dd><pre class="pre-scrollable">{{task.pcmd}}</pre></dd>
+    <dt>Output Directory</dt><dd><code>{{task.output_dir}}</code></dd>
+    <dt>Output Files</dt><dd>
+        {%for of in task.output_files%}
+            <a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
+        {%empty%}None{%endfor%}
+    </dd>
 
 
-</dl>
+    </dl>
 
-<h3>JobAttempts</h3>
-{% for j in jobAttempts_list %}
-<ul>
-    <li style="list-style-type:none">
-        {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
-        {%if j.queue_status == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
-        {%if j.queue_status == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>{%endif%}
-        {%if j.get_status == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
-        {%if j.get_status == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
+    <h3>JobAttempts</h3>
+    {% for j in jobAttempts_list %}
+    <ul>
+        <li style="list-style-type:none">
+            {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
+            {%if j.queue_status == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
+            {%if j.queue_status == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>{%endif%}
+            {%if j.get_status == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
+            {%if j.get_status == 'not sure'%}<i class="icon-question-sign" rel="tooltip" title="Not sure"></i>{%endif%}
 
-        <a href="{{j.url}}">{{ j }}</a>
-    </li>
-</ul>
-{% empty %}
-  No job attempts in this task.
-{% endfor %}
-
+            <a href="{{j.url}}">{{ j }}</a>
+        </li>
+    </ul>
+    {% empty %}
+      No job attempts in this task.
+    {% endfor %}
+</div>
 {% endblock %}

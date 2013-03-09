@@ -1,7 +1,7 @@
 .. _writing_workflows:
 
 Writing Workflows with EZFlow
-=============================s
+=============================
 
 The easiest way to write a workflow is to use the *ezflow* package.
 

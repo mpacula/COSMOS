@@ -161,13 +161,14 @@ class Workflow(models.Model):
 
     @staticmethod
     def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None,
-              default_queue=None, delete_intermediates = False,prompt_confirm=True,*args,**kwargs):
+              default_queue=None, delete_intermediates = False,
+              delete_unsuccessful_stages=False,prompt_confirm=True,*args,**kwargs):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
 
         :param name: (str) A unique name for this workflow. All spaces are converted to underscores. Required.
         :param restart: (bool) Complete restart the workflow by deleting it and creating a new one. Optional.
-        :param delete_unsuccessful: (bool) Deletes an unsuccessful tasks in the workflow before returning. Optional.
+        :param delete_unsuccessful_stages: (bool) Deletes any unsuccessful stages in the workflow. Optional.
         :param dry_run: (bool) Don't actually execute jobs. Optional.
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
@@ -189,7 +190,7 @@ class Workflow(models.Model):
         elif Workflow.objects.filter(name=name).count() > 0:
             if delete_unsuccessful:
                 #TODO make sure user didn't try to change unsupported params like root_output_dir when resuming or reloading
-                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
+                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,delete_unsuccessful_stages=delete_unsuccessful_stages,prompt_confirm=prompt_confirm)
             else:
                 wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
         else:
@@ -230,7 +231,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __reload(name, dry_run, default_queue, delete_intermediates,prompt_confirm=True):
+    def __reload(name, dry_run, default_queue, delete_intermediates,delete_unsuccessful_stages,prompt_confirm=True):
         """
         Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
 
@@ -238,9 +239,14 @@ class Workflow(models.Model):
         """
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
 
-        for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
-            wf.log.info('{0} has no successful tasks.'.format(s))
-            s.delete()
+        if delete_unsuccessful_stages:
+            for s in wf.stages.filter(successful=False):
+                s.delete()
+        else:
+            #only delete of ALL tasks are unsuccessful
+            for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
+                wf.log.info('{0} has no successful tasks.'.format(s))
+                s.delete()
 
         #Delete unsuccessful tasks
         utasks = wf.tasks.filter(successful=False)
@@ -1339,5 +1345,5 @@ class Task(models.Model):
         super(Task, self).delete(*args, **kwargs)
 
     def __str__(self):
-        return '{0}Task/[{1}] {2}'.format(self.stage,self.id,self.tags)
+        return '[{1}] Task {2} from {0}'.format(self.stage,self.id,self.tags)
 

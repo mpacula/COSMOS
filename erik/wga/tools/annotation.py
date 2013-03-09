@@ -44,7 +44,7 @@ class MergeAnno(Tool):
     name = "Merge Annotations"
     inputs = ['vcf_id','dir']
     outputs = ['dir']
-    mem_req = 20*1024
+    mem_req = 40*1024
     time_req = 120
     forward_input=True
     
