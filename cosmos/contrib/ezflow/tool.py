@@ -229,6 +229,8 @@ class INPUT(Tool):
         Lots of ways to init an INPUT File
         """
         super(INPUT,self).__init__(*args,**kwargs)
+        if output_path and not isinstance(output_path,str):
+            raise ToolValidationError, 'output_path parameter must be of type str'
         if output_paths == None: output_paths = []
         if taskfiles == None: taskfiles = []
         if output_path: output_paths.append(output_path)
