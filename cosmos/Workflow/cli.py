@@ -25,7 +25,7 @@ class CLI(object):
         runs the argument parser
 
         :param margs: arguments to set manually
-        :returns: a workflow instance
+        :returns: a workflow instancev
         """
         self.parsed_args = self.parser.parse_args()
         kwargs = dict(self.parsed_args._get_kwargs())

@@ -30,6 +30,6 @@ dag.create_dag_img('/tmp/ex_branch.svg')
 # Run Workflow
 #################
 
-WF = Workflow.start('Example 2',restart=True)
+WF = Workflow.start('Example Branch',restart=True)
 dag.add_to_workflow(WF)
 WF.run()

@@ -150,25 +150,26 @@ def visualize_as_img(request,pid):
 
 @never_cache
 def analysis(request,pid):
-    #from rpy2.robjects import r as R
-    from django.conf import settings as django_settings
-    from cosmos import config as cosmos_settings
-    
-    wf = Workflow.objects.get(pk=pid)
-    
-    resultsDir = 'Workflow/plots'
-    resultsFile = "{0}.png".format(wf.id)
-    resultsFile_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,resultsFile) 
-    plot_url = os.path.join(django_settings.MEDIA_URL,resultsDir,resultsFile)
-    plot_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,resultsFile)
-    
-    workflow = Workflow.objects.get(pk=pid)
-    ru_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,'resource_usage.csv')
-    ru_url = os.path.join(django_settings.MEDIA_URL,resultsDir,'resource_usage.csv')
-    plot_rscript_path = os.path.join(cosmos_settings.home_path,'Cosmos/profile/plot.R')
-    workflow.save_resource_usage_as_csv(ru_path)
-    cmd = 'Rscript {0} {1} {2}'.format(plot_rscript_path,ru_path, plot_path)
-    os.system(cmd)
+    # from django.conf import settings as django_settings
+    # from cosmos import config as cosmos_settings
+    #
+    # wf = Workflow.objects.get(pk=pid)
+    #
+    # resultsDir = 'Workflow/plots'
+    # resultsFile = "{0}.png".format(wf.id)
+    # resultsFile_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,resultsFile)
+    # plot_url = os.path.join(django_settings.MEDIA_URL,resultsDir,resultsFile)
+    # plot_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,resultsFile)
+    #
+    # workflow = Workflow.objects.get(pk=pid)
+    # ru_path = os.path.join(django_settings.MEDIA_ROOT,resultsDir,'resource_usage.csv')
+    # ru_url = os.path.join(django_settings.MEDIA_URL,resultsDir,'resource_usage.csv')
+    # plot_rscript_path = os.path.join(cosmos_settings.home_path,'Cosmos/profile/plot.R')
+    # workflow.save_resource_usage_as_csv(ru_path)
+    # cmd = 'Rscript {0} {1} {2}'.format(plot_rscript_path,ru_path, plot_path)
+    # os.system(cmd)
+    plot_url=''
+    ru_url=''
     return render_to_response('Workflow/analysis.html', { 'request':request,'plot_url':plot_url,'resource_usage_url':ru_url}, context_instance=RequestContext(request))
 
 

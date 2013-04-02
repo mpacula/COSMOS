@@ -12,8 +12,7 @@ dag = ( DAG()
     |Map| WC
 
 )
-dag.create_dag_img('/tmp/ex1.svg')
-#dag.configure(parameters={'WC':' -p'})
+dag.create_dag_img('/tmp/ex.svg')
 
 #################
 # Run Workflow

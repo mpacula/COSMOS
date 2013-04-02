@@ -10,7 +10,7 @@ dag = ( DAG()
     |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
     |Split| ([('i',[1,2])],CAT)
 )
-dag.create_dag_img('/tmp/ex1.svg')
+dag.create_dag_img('/tmp/ex.svg')
 
 #################
 # Run Workflow
