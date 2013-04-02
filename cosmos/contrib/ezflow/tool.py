@@ -97,7 +97,9 @@ class Tool(object):
         
         :param name: the name of the output file.
         """
+
         outputs = filter(lambda x: x.name == name,self.output_files)
+
         if len(outputs) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self))
 
         if len(outputs) == 0 and self.forward_input:
@@ -107,7 +109,6 @@ class Tool(object):
                 pass
 
         if len(outputs) == 0:
-            #x = [ x.name for x in self.get_output('*') ]
             raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
 
         return outputs[0]
@@ -142,21 +143,20 @@ class Tool(object):
         if not self.inputs:
             return {}
 
-        all_inputs = []
-        for name in self.inputs:
-            for p in self.parents:
-                all_inputs += [ p.get_output(name) ]
+        elif '*' in self.inputs:
+            return [ o for p in self.parents for o in p.output_files ]
 
-        input_dict = {}
-        for input_file in all_inputs:
-            input_dict.setdefault(input_file.name,[]).append(input_file)
+        else:
+            all_inputs = []
+            for name in self.inputs:
+                for p in self.parents:
+                    all_inputs += [ p.get_output(name) ]
 
-        # if self.one_parent:
-        #     for key in input_dict:
-        #         if len(input_dict[key]) == 1:
-        #             input_dict[key] = input_dict[key][0]
+            input_dict = {}
+            for input_file in all_inputs:
+                input_dict.setdefault(input_file.name,[]).append(input_file)
 
-        return input_dict
+            return input_dict
         
         
     @property
