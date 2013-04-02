@@ -45,8 +45,8 @@ class TaskFile(models.Model):
     fmt = models.CharField(max_length=10,null=True) #file format
 
 
-    def __init__(self,*args,**kwargs):
-        super(TaskFile,self).__init__(*args,**kwargs)
+    def __init__(self,path=None,name=None,fmt=None,*args,**kwargs):
+        super(TaskFile,self).__init__(path,name,fmt,*args,**kwargs)
         if not self.fmt and self.path:
             try:
                 # if path ends with .gz, the format includes the extensions before the gz
@@ -58,8 +58,10 @@ class TaskFile(models.Model):
 
             except AttributeError as e:
                 raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
+
         if not self.name and self.fmt:
             self.name = self.fmt
+
         self.tmp_id = get_tmp_id()
 
     @property
