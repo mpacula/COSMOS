@@ -46,7 +46,7 @@ class TaskFile(models.Model):
 
 
     def __init__(self,path=None,name=None,fmt=None,*args,**kwargs):
-        super(TaskFile,self).__init__(path,name,fmt,*args,**kwargs)
+        super(TaskFile,self).__init__(path=path,name=name,fmt=fmt,*args,**kwargs)
         if not self.fmt and self.path:
             try:
                 # if path ends with .gz, the format includes the extensions before the gz
@@ -79,7 +79,7 @@ class TaskFile(models.Model):
         return hashlib.sha1(file(self.path).read())
 
     def __str__(self):
-        return "#F[{0}:{1}:{2}]".format(self.id if self.id else 't{0}'.format(self.tmp_id),self.name,self.path)
+        return "#F[{0}:{1}:{2}]".format(self.id if self.id else 't_{0}'.format(self.tmp_id),self.name,self.path)
 
     @models.permalink
     def url(self):
