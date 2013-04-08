@@ -215,8 +215,8 @@ class INPUT(Tool):
 
     Does not actually execute anything, but provides a way to load an input file.
 
-    >>> INPUT('/path/to/file.ext')
-    >>> INPUT(path='/path/to/file.ext.gz',name='ext',fmt='ext.gz')
+    >>> INPUT('/path/to/file.ext',tags={'key':'val'})
+    >>> INPUT(path='/path/to/file.ext.gz',name='ext',fmt='ext.gz',tags={'key':'val'})
     """
     name = "Load Input Files"
     NOOP = True

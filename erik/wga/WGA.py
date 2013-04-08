@@ -62,7 +62,7 @@ def bam(workflow,input_bam,**kwargs):
     print 'RGIDS:'
     print rgids
 
-    dag = DAG() |Add| [ INPUT(input_bam) ]
+    dag = DAG() |Add| [ INPUT(input_bam,tags={'input':input_bam}) ]
 
     #Run bam2fastq
     Bam2Fastq(workflow,dag,wga_settings,rgids)
