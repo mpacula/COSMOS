@@ -220,7 +220,7 @@ class INPUT(Tool):
     mem_req = 0
     cpu_req = 0
     
-    def __init__(self,path=None,name=None,fmt=None,*args,**kwargs):
+    def __init__(self,path,name=None,fmt=None,*args,**kwargs):
         """
         :param path: the path to the input file
         :param name: the name or keyword for the input file

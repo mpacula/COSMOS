@@ -45,8 +45,13 @@ class TaskFile(models.Model):
     fmt = models.CharField(max_length=10,null=True) #file format
 
 
-    def __init__(self,path=None,name=None,fmt=None,*args,**kwargs):
-        super(TaskFile,self).__init__(path=path,name=name,fmt=fmt,*args,**kwargs)
+    def __init__(self,*args,**kwargs):
+        """
+        :param path: the path to the input file
+        :param name: the name or keyword for the input file
+        :param fmt: the format of the input file
+        """
+        super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
             try:
                 # if path ends with .gz, the format includes the extensions before the gz
