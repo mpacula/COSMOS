@@ -228,7 +228,7 @@ class INPUT(Tool):
         """
         super(INPUT,self).__init__(*args,**kwargs)
         self.add_output(TaskFile(path=path,name=name,fmt=fmt))
-        
+
     def __str__(self):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
 
