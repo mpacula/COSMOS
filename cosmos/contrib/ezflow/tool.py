@@ -210,37 +210,25 @@ class INPUT(Tool):
     """
     An Input File.
 
-    Does not actually execute anything, but sets self.output_files to the TaskFiles or paths it's initialized with
-
-    :property NOOP: Automatically set to True
+    Does not actually execute anything, but provides a way to load an input file.
 
     >>> INPUT('/path/to/file.ext')
-    >>> INPUT(TaskFile(path='/path/to/file.ext',name='myname'))
-    >>> INPUT(output_paths=['/path1','/path2'])
-    >>> INPUT(taskfiles=[TaskFile(path='/path1'),TaskFile(path='/path2')])
+    >>> INPUT(path='/path/to/file.ext.gz',name='ext',fmt='ext.gz')
     """
     name = "Load Input Files"
     NOOP = True
     mem_req = 0
     cpu_req = 0
     
-    def __init__(self,output_path=None,output_paths=None,taskfile=None,taskfiles=None,*args,**kwargs):
+    def __init__(self,path=None,name=None,fmt=None,*args,**kwargs):
         """
-        Lots of ways to init an INPUT File
+        :param path: the path to the input file
+        :param name: the name or keyword for the input file
+        :param fmt: the format of the input file
         """
         super(INPUT,self).__init__(*args,**kwargs)
-        if output_path and not isinstance(output_path,str):
-            raise ToolValidationError, 'output_path parameter must be of type str'
-        if output_paths == None: output_paths = []
-        if taskfiles == None: taskfiles = []
-        if output_path: output_paths.append(output_path)
-        for fp in output_paths:
-            tf = TaskFile(path=fp)
-            self.add_output(tf)
-
-        if taskfile: taskfiles.append(taskfile)
-        for tf in taskfiles:
-            self.add_output(tf)
+        self.add_output(TaskFile(path=path,name=name,fmt=fmt))
+        
     def __str__(self):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
 
