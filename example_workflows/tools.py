@@ -44,3 +44,10 @@ class FAIL(Tool):
     def cmd(self,i,s,p):
 
         return '__fail__'
+
+class MD5Sum(Tool):
+    inputs = ['*']
+    outputs = ['md5']
+
+    def cmd(self,i,s,p):
+        return 'md5sum {inp}', dict(inp=" ".join(map(lambda x: str(x), i)))

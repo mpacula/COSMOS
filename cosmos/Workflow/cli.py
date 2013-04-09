@@ -1,6 +1,7 @@
 import argparse
 import pprint
 from models import Workflow
+import sys
 
 class CLI(object):
 
@@ -22,6 +23,9 @@ class CLI(object):
     def parse_args(self):
         """
         runs the argument parser
+
+        :param margs: arguments to set manually
+        :returns: a workflow instancev
         """
         self.parsed_args = self.parser.parse_args()
         kwargs = dict(self.parsed_args._get_kwargs())

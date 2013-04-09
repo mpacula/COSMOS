@@ -46,6 +46,11 @@ class TaskFile(models.Model):
 
 
     def __init__(self,*args,**kwargs):
+        """
+        :param path: the path to the input file
+        :param name: the name or keyword for the input file
+        :param fmt: the format of the input file
+        """
         super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
             try:
@@ -58,8 +63,10 @@ class TaskFile(models.Model):
 
             except AttributeError as e:
                 raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
+
         if not self.name and self.fmt:
             self.name = self.fmt
+
         self.tmp_id = get_tmp_id()
 
     @property
@@ -77,7 +84,7 @@ class TaskFile(models.Model):
         return hashlib.sha1(file(self.path).read())
 
     def __str__(self):
-        return "#F[{0}:{1}:{2}]".format(self.id if self.id else 't{0}'.format(self.tmp_id),self.name,self.path)
+        return "#F[{0}:{1}:{2}]".format(self.id if self.id else 't_{0}'.format(self.tmp_id),self.name,self.path)
 
     @models.permalink
     def url(self):

@@ -59,6 +59,8 @@ class Tool(object):
         :param stage_name: (str) The name of the stage this tool belongs to. Required.
         :param dag: the dag this task belongs to.
         """
+        if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
+
         if not hasattr(self,'output_files'): self.output_files = []
         if not hasattr(self,'name'): self.name = self.__class__.__name__
         self.tags = tags
@@ -66,7 +68,8 @@ class Tool(object):
         self.dag = dag
         
         self.id = get_id()
-        
+
+        # Create empty output TaskFiles
         for output_ext in self.outputs:
             tf = TaskFile(fmt=output_ext)
             self.add_output(tf)
@@ -97,7 +100,9 @@ class Tool(object):
         
         :param name: the name of the output file.
         """
+
         outputs = filter(lambda x: x.name == name,self.output_files)
+
         if len(outputs) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self))
 
         if len(outputs) == 0 and self.forward_input:
@@ -107,7 +112,6 @@ class Tool(object):
                 pass
 
         if len(outputs) == 0:
-            #x = [ x.name for x in self.get_output('*') ]
             raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
 
         return outputs[0]
@@ -142,21 +146,20 @@ class Tool(object):
         if not self.inputs:
             return {}
 
-        all_inputs = []
-        for name in self.inputs:
-            for p in self.parents:
-                all_inputs += [ p.get_output(name) ]
+        elif '*' in self.inputs:
+            return [ o for p in self.parents for o in p.output_files ]
 
-        input_dict = {}
-        for input_file in all_inputs:
-            input_dict.setdefault(input_file.name,[]).append(input_file)
+        else:
+            all_inputs = []
+            for name in self.inputs:
+                for p in self.parents:
+                    all_inputs += [ p.get_output(name) ]
 
-        # if self.one_parent:
-        #     for key in input_dict:
-        #         if len(input_dict[key]) == 1:
-        #             input_dict[key] = input_dict[key][0]
+            input_dict = {}
+            for input_file in all_inputs:
+                input_dict.setdefault(input_file.name,[]).append(input_file)
 
-        return input_dict
+            return input_dict
         
         
     @property
@@ -210,35 +213,25 @@ class INPUT(Tool):
     """
     An Input File.
 
-    Does not actually execute anything, but sets self.output_files to the TaskFiles or paths it's initialized with
+    Does not actually execute anything, but provides a way to load an input file.
 
-    :property NOOP: Automatically set to True
-
-    >>> INPUT('/path/to/file.ext')
-    >>> INPUT(TaskFile(path='/path/to/file.ext',name='myname'))
-    >>> INPUT(output_paths=['/path1','/path2'])
-    >>> INPUT(taskfiles=[TaskFile(path='/path1'),TaskFile(path='/path2')])
+    >>> INPUT('/path/to/file.ext',tags={'key':'val'})
+    >>> INPUT(path='/path/to/file.ext.gz',name='ext',fmt='ext.gz',tags={'key':'val'})
     """
     name = "Load Input Files"
     NOOP = True
     mem_req = 0
     cpu_req = 0
     
-    def __init__(self,output_path=None,output_paths=None,taskfile=None,taskfiles=None,*args,**kwargs):
+    def __init__(self,path,name=None,fmt=None,*args,**kwargs):
         """
-        Lots of ways to init an INPUT File
+        :param path: the path to the input file
+        :param name: the name or keyword for the input file
+        :param fmt: the format of the input file
         """
         super(INPUT,self).__init__(*args,**kwargs)
-        if output_paths == None: output_paths = []
-        if taskfiles == None: taskfiles = []
-        if output_path: output_paths.append(output_path)
-        for fp in output_paths:
-            tf = TaskFile(path=fp)
-            self.add_output(tf)
+        self.add_output(TaskFile(path=path,name=name,fmt=fmt))
 
-        if taskfile: taskfiles.append(taskfile)
-        for tf in taskfiles:
-            self.add_output(tf)
     def __str__(self):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
 

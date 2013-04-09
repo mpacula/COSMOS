@@ -1,6 +1,10 @@
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Split, Add, Map
-from tools import ECHO, CAT, WC
+from cosmos.contrib.ezflow.dag import DAG, Split, Add, Map, Reduce
+from tools import ECHO, CAT, WC, MD5Sum
+from cosmos.Workflow.cli import CLI
+
+cli = CLI()
+WF = cli.parse_args() # parses command line arguments
 
 ####################
 # Workflow
@@ -8,17 +12,14 @@ from tools import ECHO, CAT, WC
 
 dag = ( DAG()
     |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
-    |Split| ([('i',[1,2])],CAT)
-    |Map| WC
-
+    |Reduce| ([],MD5Sum)
 )
-dag.create_dag_img('/tmp/ex1.svg')
-#dag.configure(parameters={'WC':' -p'})
+
+dag.create_dag_img('/tmp/ex.svg')
 
 #################
 # Run Workflow
 #################
 
-WF = Workflow.start('Example 1')
 dag.add_to_workflow(WF)
 WF.run()

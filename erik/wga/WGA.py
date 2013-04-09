@@ -43,7 +43,7 @@ def json_(workflow,input_dict,**kwargs):
     ]
     """
     input_json = json.load(open(input_dict,'r'))
-    inputs = [ INPUT(taskfile=TaskFile(name='fastq.gz',path=i['path'],fmt='fastq.gz'),tags=i) for i in input_json ]
+    inputs = [ INPUT(name='fastq.gz',path=i['path'],fmt='fastq.gz',tags=i) for i in input_json ]
 
     #Create DAG
     dag = DAG(mem_req_factor=1) |Add| inputs
@@ -62,7 +62,7 @@ def bam(workflow,input_bam,**kwargs):
     print 'RGIDS:'
     print rgids
 
-    dag = DAG() |Add| [ INPUT(input_bam) ]
+    dag = DAG() |Add| [ INPUT(input_bam,tags={'input':input_bam}) ]
 
     #Run bam2fastq
     Bam2Fastq(workflow,dag,wga_settings,rgids)

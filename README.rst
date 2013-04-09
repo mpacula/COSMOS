@@ -1,1 +1,1 @@
-Documentation available at: `bioseq.info/Cosmos <http://bioseq.info/Cosmos>`_.
+Documentation available at: `bioseq.info/docs/Cosmos <http://bioseq.info/Cosmos>`_.

@@ -37,7 +37,7 @@
         <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i> Successful </p>
         {%else%}
         {%if qs == "completed"%}
-        <p class="label label-error">
+        <p class="label label-important">
         <i class="icon-thumbs-down" rel="tooltip" title="Failed"></i> Failed
         </p>
         {%endif%}{%endif%}
@@ -60,7 +60,7 @@
         {%endif%}
         {% endwith%}
     </dd>
-    <dt>Shell Script</dt><dd><pre class="prettyprint linenums alert alert-success">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
+    <dt>Shell Script</dt><dd><pre class="linenums">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
     <dt><em>Profile</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
     <dt>Output Directory</dt><dd><code>{{jobAttempt.task.job_output_dir}}</code></dd>
     <dt>Task Output File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{jobAttempt.task.output_file_size|b2e}}{%else%}off{%endif%}</dd>
@@ -79,7 +79,6 @@
     <dt>Drmaa native_specification</dt>  <dd>{{jobAttempt.drmaa_native_specification|b2e}}</dd>
     <dt>Drmaa info</dt>  <dd>{{jobAttempt.extra_jobinfon|b2e}}</dd>
     </dl>
-
 </div>
 
 <br/>
@@ -92,12 +91,8 @@
             </h2>
         </div>
         <div class="box-content">
-            <p class="filepath">
-                {{jobAttempt.STDOUT_filepath}}
-            </p>
-            <pre class="pre-scrollable alert alert-info">
-            {{jobAttempt.STDOUT_txt}}
-            </pre>
+            <p class="filepath">{{jobAttempt.STDOUT_filepath}}</p>
+            <pre class="pre-scrollable alert alert-info">{{jobAttempt.STDOUT_txt}}</pre>
         </div>
     </div>
 
@@ -108,11 +103,8 @@
             </h2>
         </div>
         <div class="box-content">
-
-                <p class="filepath">{{jobAttempt.STDERR_filepath}}</p>
-            <pre class="pre-scrollable alert alert-error">
-            {{jobAttempt.STDERR_txt}}
-            </pre>
+            <p class="filepath">{{jobAttempt.STDERR_filepath}}</p>
+            <pre class="pre-scrollable alert alert-error">{{jobAttempt.STDERR_txt}}</pre>
         </div>
     </div>
 </div>
