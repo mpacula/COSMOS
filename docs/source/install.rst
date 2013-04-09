@@ -51,7 +51,7 @@ This will make sure all python libraries and files related to Cosmos are install
     source $HOME/.local/bin/virtualenvwrapper.sh
     echo "source $HOME/.local/bin/virtualenvwrapper.sh" >> ~/bash.rc
 
-    mkvirtualenv cosmos
+    mkvirtualenv cosmos --no-site-packages
     cd /dir/to/install/Cosmos/to
     pip install distribute --upgrade
     git clone git@github.com:ComputationalBiomedicine/Cosmos.git --depth=1
