@@ -9,8 +9,10 @@ _______________________________
 Type `cosmos` at the command line, and generate a default configuration file in :file:`~/.cosmos/config.ini`.
 Edit :file:`~/.cosmos/config.ini`, and configure it to your liking.
 
-Local DRM
-**********
+.. _local:
+
+Local Development and Testing
+******************************
 
 Setting DRM = local in your config file will cause jobs to be submitted as background
 processes on the local machine using :py:mod:`subprocess`.Popen.  The `DRM = local` setting's
@@ -24,9 +26,11 @@ primary purpose is for testing and developing workflows, not computing on large 
     A feature to set a ceiling on concurrent processes may be added in the
     future.
 
-If you do not have linux installed and want to use this feature,
-consider installing `Ubuntu <http://www.ubuntu.com/>`_
-inside `VirtualBox <https://www.virtualbox.org/>`_.  Cosmos does not support Windows.
+.. hint::
+
+    If you do not have linux installed and want to use this feature,
+    consider installing `Ubuntu <http://www.ubuntu.com/>`_
+    inside `VirtualBox <https://www.virtualbox.org/>`_.  Cosmos does not support Windows.
 
 
 2. Create SQL Tables and Load Static Files

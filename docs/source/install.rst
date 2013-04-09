@@ -6,16 +6,22 @@ Install
 Requirements
 _______________________________________
 
-Many python libraries won't be able to install unless their dependent software is already
-installed on the system.  For example, pygraphviz requires graphviz-dev and
-python-mysql require python-dev libmysqlclient-dev.  If pip install is failing, try running:
-:command:`apt-get update -y`
-:command:`apt-get install python-dev libmysqlclient-dev mysql-server graphviz graphviz-dev`
+* Many python libraries won't be able to install unless their dependent software is already
+  installed on the system.  For example, pygraphviz requires graphviz-dev and
+  python-mysql require python-dev libmysqlclient-dev.  If pip install is failing, try running:
 
-The only other requirement is that :term:`DRMAA` is installed on the system if you want Cosmos to submit
-jobs to a :term:`DRMS` like LSF or Grid Engine.
+.. code-block:: bash
 
-Cosmos requires python2.6 or python2.7 and is completely untested on python3.
+    sudo apt-get update -y
+    sudo apt-get install python-dev libmysqlclient-dev mysql-server graphviz graphviz-dev
+
+* The only other requirement is that :term:`DRMAA` is installed on the system if you want Cosmos to submit
+  jobs to a :term:`DRMS` like LSF or Grid Engine.
+
+* Cosmos requires python2.6 or python2.7 and is completely untested on python3.
+
+* For :ref:`local`, it is highly recommended that you install `Ubuntu <http://www.ubuntu.com/>`_
+  inside `VirtualBox <https://www.virtualbox.org/>`_.
 
 Quick Install
 ________________________________________
@@ -35,15 +41,15 @@ This is generally for advanced users who have worked with python packages before
 
     You need root access to install python packages to the system directories.  You may have to run pip install with
     'sudo pip install ...', or to install to the user level use 'pip install --user'.  99% of users should just
-    use the *Better Install* described next.
+    use the *Highly Recommended Install Method* described next.
 
-Better Install
-________________________
+Highly Recommended Install Method
+__________________________________
 
 Install Cosmos in a virtual environment using
 `virtualenvwrapper <http://www.doughellmann.com/projects/virtualenvwrapper/>`_.
 This will make sure all python libraries and files related to Cosmos are installed to a sandboxed location in
-:file:`$HOME/.virtualenvs/cosmos`.  People often ask me about this
+:file:`$HOME/.virtualenvs/cosmos`.
 
 .. code-block:: bash
 
@@ -59,10 +65,19 @@ This will make sure all python libraries and files related to Cosmos are install
     pip install .
 
 
-Now cosmos is installed to its own python virtual environment, which you can activate by typing
-:command:`workon cosmos`.  Make sure you type `workon cosmos` anytime you want to interact with Cosmos, or run a script
-that uses Cosmos.
-Deactivate the virtual environment by typing :command:`deactivate`.
+Now cosmos is installed to its own python virtual environment, which you can activate by executing the following
+`virtualenvwrapper <http://www.doughellmann.com/projects/virtualenvwrapper/>`_ command:
+
+.. code-block:: bash
+
+    $ workon cosmos
+
+Make sure you type :command`workon cosmos` anytime you want to interact with Cosmos, or run a script
+that uses Cosmos.  Deactivate the virtual environment by executing:
+
+.. code-block:: bash
+
+    $ deactivate
 
 
 Experimental Features
