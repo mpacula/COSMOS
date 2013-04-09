@@ -27,9 +27,9 @@ Reload a Workflow
 _________________
 
 You can add more stages to the workflow, without re-running tasks that were already successful.
-An example is in :file:`example_workflows/ex1_b.py`.
+An example is in :file:`example_workflows/ex2.py`.
 
-.. literalinclude:: ../../example_workflows/ex1_b.py
+.. literalinclude:: ../../example_workflows/ex2.py
 
 Run it with the command:
 
