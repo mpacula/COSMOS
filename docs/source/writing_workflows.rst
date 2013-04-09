@@ -51,7 +51,7 @@ Defining Input Files
 --------------------
 
 An Input file is an instantiation of :py:class:`tool.INPUT`, which is just a Tool with
-:py:attr:`tool.INPUT.NOOP` set to True, and a way to initialize its output files as existing paths on the filesystem.
+:py:attr:`tool.INPUT.NOOP` set to True, and a way to initialize its output files with an existing path on the filesystem.
 
 Here's an example of how to create an instance of an :py:class:`tool.INPUT` File:
 
@@ -69,7 +69,7 @@ A more fine grained approach to defining input files:
 
     from cosmos.Workflow.models import TaskFile
     from cosmos.contrib.ezflow import INPUT
-    INPUT(taskfile=TaskFile(name='favorite_txt',path='/path/to/favorite_txt.txt.gz',fmt='txt.gz'),tags={'color':'red'})
+    INPUT(name='favorite_txt',path='/path/to/favorite_txt.txt.gz',fmt='txt.gz',tags={'color':'red'})
 
 Designing Workflows
 --------------------
@@ -89,10 +89,13 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
 
 .. py:method:: |Add|
 
-    Always the first operator of a workflow.  Simply the list of tool instances in `tools` to the dag, without adding
-    any dependencies.
+    Always the first operator of a workflow.  Simply adds the list of tool instances in `tools` to the dag, without adding
+    any dependencies.  This behavior is significantly different from the other infix operators in that the main parameter
+    is a list of instantiated tools, rather than a :class:`ezflow.tool.Tool` class.
 
-    :param tools: (list of tools) A list of tool instances to add.
+    .. note:: This might be renamed to `Root` in a future release
+
+    :param tools: (list of tools) A list of tool instantiated tool instances to add.
     :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
     :returns: The modified dag.
 

@@ -41,7 +41,7 @@ ________________________
 Install Cosmos in a virtual environment using
 `virtualenvwrapper <http://www.doughellmann.com/projects/virtualenvwrapper/>`_.
 This will make sure all python libraries and files related to Cosmos are installed to a sandboxed location in
-:file:`$HOME/.virtualenvs/cosmos`.
+:file:`$HOME/.virtualenvs/cosmos`.  People often ask me about this
 
 .. code-block:: bash
 
