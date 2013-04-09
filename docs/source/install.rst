@@ -6,6 +6,14 @@ Install
 Requirements
 _______________________________________
 
+* The only other requirement is that :term:`DRMAA` is installed on the system if you want Cosmos to submit
+  jobs to a :term:`DRMS` like LSF or Grid Engine.
+
+* Cosmos requires python2.6 or python2.7 and is completely untested on python3.
+
+* For :ref:`local`, it is highly recommended that you install `Ubuntu <http://www.ubuntu.com/>`_
+  inside `VirtualBox <https://www.virtualbox.org/>`_.
+
 * Many python libraries won't be able to install unless their dependent software is already
   installed on the system.  For example, pygraphviz requires graphviz-dev and
   python-mysql require python-dev libmysqlclient-dev.  If pip install is failing, try running:
@@ -14,14 +22,6 @@ _______________________________________
 
     sudo apt-get update -y
     sudo apt-get install python-dev libmysqlclient-dev mysql-server graphviz graphviz-dev
-
-* The only other requirement is that :term:`DRMAA` is installed on the system if you want Cosmos to submit
-  jobs to a :term:`DRMS` like LSF or Grid Engine.
-
-* Cosmos requires python2.6 or python2.7 and is completely untested on python3.
-
-* For :ref:`local`, it is highly recommended that you install `Ubuntu <http://www.ubuntu.com/>`_
-  inside `VirtualBox <https://www.virtualbox.org/>`_.
 
 Quick Install
 ________________________________________
