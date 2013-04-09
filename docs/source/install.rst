@@ -15,6 +15,8 @@ python-mysql require python-dev libmysqlclient-dev.  If pip install is failing, 
 The only other requirement is that :term:`DRMAA` is installed on the system if you want Cosmos to submit
 jobs to a :term:`DRMS` like LSF or Grid Engine.
 
+Cosmos requires python2.6 or python2.7 and is completely untested on python3.
+
 Quick Install
 ________________________________________
 
