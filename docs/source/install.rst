@@ -65,14 +65,14 @@ This will make sure all python libraries and files related to Cosmos are install
     pip install .
 
 
-Now cosmos is installed to its own python virtual environment, which you can activate by executing the following
+Cosmos will be installed to its own python virtual environment, which you can activate by executing the following
 `virtualenvwrapper <http://www.doughellmann.com/projects/virtualenvwrapper/>`_ command:
 
 .. code-block:: bash
 
     $ workon cosmos
 
-Make sure you type :command`workon cosmos` anytime you want to interact with Cosmos, or run a script
+Make sure you execute :command:`workon cosmos` anytime you want to interact with Cosmos, or run a script
 that uses Cosmos.  Deactivate the virtual environment by executing:
 
 .. code-block:: bash

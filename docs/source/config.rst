@@ -43,7 +43,7 @@ cosmos configuration file.
 
 .. code-block:: bash
 
-   $ cosmos syncdb
+   $ cosmos syncdb --noinput
    $ cosmos collectstatic
 
 If you ever switch to a different database in your :file:`~/.cosmos/config.ini`, be sure to run `cosmos syncdb`

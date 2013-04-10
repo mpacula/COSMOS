@@ -14,7 +14,8 @@ features of Cosmos.  The number beside each object inside brackets, `[#]`, is th
 
 .. code-block:: bash
 
-   $ python ~/.cosmos/example_workflows/ex1.py
+   $ cd Cosmos
+   $ python example_workflows/ex1.py
    
    wrote to /tmp/ex1.svg
    INFO: 2012-12-06 16:45:51: Created Workflow Workflow[2] Example 1.

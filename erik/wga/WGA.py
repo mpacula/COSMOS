@@ -86,7 +86,7 @@ def downdbs(workflow,**kwargs):
     dag.add_run(workflow)
 
 
-def anno(workflow,input_files,tsv=False,**kwargs):
+def anno(workflow,input_files,file_format='vcf',**kwargs):
     """
     Annotate a vcf file
     """
@@ -95,14 +95,17 @@ def anno(workflow,input_files,tsv=False,**kwargs):
 
     dag = DAG()
 
-    if tsv:
+    if file_format == 'tsv':
         dag |Add| [ INPUT(i) for i in input_files ]
-    else:
+    elif file_format == 'vcf':
         (dag
          |Add| [ INPUT(i) for i in input_files ]
          |Map| annotation.SetID
          |Map| annotation.Vcf2Anno_in
          )
+    else:
+        print >> sys.stderr, 'file_format "{0}" not support'.format(file_format)
+        sys.exit(1)
 
     dag |SWF| annotate.Annotate
 
@@ -129,7 +132,7 @@ def main():
 
     anno_sp = subparsers.add_parser('anno',help=annotate.Annotate.__doc__)
     CLI.add_default_args(anno_sp)
-    anno_sp.add_argument('-f','--format',type=str,default='vcf',help='vcf or tsv.  If tsv: Input file is already a tsv file with ID as the 5th column')
+    anno_sp.add_argument('-f','--file_format',type=str,default='vcf',help='vcf or tsv.  If tsv: Input file is already a tsv file with ID as the 5th column')
     anno_sp.add_argument('input_files',help="input vcf files", nargs='+')
     anno_sp.set_defaults(func=anno)
 
