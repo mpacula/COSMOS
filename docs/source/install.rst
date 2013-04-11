@@ -55,7 +55,8 @@ This will make sure all python libraries and files related to Cosmos are install
 
     pip install virtualenvwrapper --user
     source $HOME/.local/bin/virtualenvwrapper.sh
-    echo "source $HOME/.local/bin/virtualenvwrapper.sh" >> ~/bash.rc
+    echo "\nsource $HOME/.local/bin/virtualenvwrapper.sh" >> ~/.bash.rc
+    echo "PATH=$HOME/.local/bin:$PATH" >> ~/.bash.rc
 
     mkvirtualenv cosmos --no-site-packages
     cd /dir/to/install/Cosmos/to

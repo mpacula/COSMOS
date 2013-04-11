@@ -66,7 +66,7 @@ You can use the web interface to explore the history and debug all workflows.  T
     Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the
     system you're running the workflow on.
    
-Visit `http://servername:8080`_ to access it (or`http://localhost:8080`_ if you're running cosmos locally.
+Visit `<http://servername:8080>`_ to access it (or`<http://localhost:8080>`_ if you're running cosmos locally.
 
 
 .. figure:: /imgs/web_interface.png
@@ -76,13 +76,13 @@ Visit `http://servername:8080`_ to access it (or`http://localhost:8080`_ if you'
 .. hint::
 
     If the cosmos webserver is running, but you can't connect, it is likely because there is a firewall
-    in front of the server.  You can get around it by using ssh port forwarding:
-    *$ ssh -L 8080:servername:8080 user@server*
+    in front of the server.  You can get around it by using **ssh port forwarding**, for example"
+    `$ ssh -L 8080:servername:8080 user@server`
 
 .. warning::
 
-    The webserver is *NOT* secure.  If you need it secured, you'll have to set it up in a production
-    Django web server environment (for example, using *mod_wsgi* with Apache2).
+    The webserver is **NOT** secure.  If you need it secured, you'll have to set it up in a production
+    Django web server environment (for example, using **mod_wsgi** with **Apache2**).
 
 Terminating a Workflow
 ______________________
@@ -103,4 +103,6 @@ A workflow can be resumed by re-running a script that originally.  The algorithm
 .. warning::
     If a task in a stage with the same tags has already been executed successfully, it
     will not be re-executed or altered, *even if the actual command has already changed because
-    you modified the script*.  In the future Cosmos will likely emmit a warning for when this occurs.
+    you modified the script*.  In the future Cosmos may emmit a warning when this occurs.  This can be
+    especially tricky when you try to change task that has no tags (because it's the only task
+    in it's stage), and has executed successfully.
