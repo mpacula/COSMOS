@@ -59,7 +59,7 @@ class Tool(object):
         :param stage_name: (str) The name of the stage this tool belongs to. Required.
         :param dag: the dag this task belongs to.
         """
-        if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
+        #if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
 
         if not hasattr(self,'output_files'): self.output_files = []
         if not hasattr(self,'name'): self.name = self.__class__.__name__

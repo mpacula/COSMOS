@@ -81,3 +81,16 @@ To terminate a workflow, simply press ctrl+c (or send the process a SIGINT signa
 Cosmos will terminate running jobs and mark them as failed.
 You can resume from the point in the workflow you left off later.
 
+Resuming a workflow
+____________________
+
+A workflow can be resumed by re-running a script that originally.  The algorithm for resuming is as follows:
+
+1) Delete any failed tasks
+2) Add any tasks that do not exist in the database (Keyed be the task's stage name and tags)
+3) Run the workflow
+
+.. warning::
+    If a task in a stage with the same tags has already been executed successfully, it
+    will not be re-executed or altered, *even if the actual command has already changed because
+    you modified the script*.  In the future Cosmos will likely emmit a warning for when this occurs.
