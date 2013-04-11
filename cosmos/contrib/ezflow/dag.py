@@ -217,20 +217,20 @@ def flowfxn(func,dag,*RHS):
 
 #Different from other flowfxns, so do not decorate with @flowfxn
 #Experimental
-def _subworkflow(dag,subflow_class,parser=None):
-    """
-    Applies a :py:class:`flow.SubWorkflow` to the last tools added to the dag.
-    :param dag:
-    :param subflow_class: An instance which is a subclass of py:class:`flow.SubWorkflow`
-    :return: the new dag
-
-    >>> DAG() |Workflow| SubWorkflowClass
-    """
-    if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
-    subflow_class().flow(dag)
-    return dag
-
-SWF=Infix(_subworkflow)
+# def _subworkflow(dag,subflow_class,parser=None):
+#     """
+#     Applies a :py:class:`flow.SubWorkflow` to the last tools added to the dag.
+#     :param dag:
+#     :param subflow_class: An instance which is a subclass of py:class:`flow.SubWorkflow`
+#     :return: the new dag
+#
+#     >>> DAG() |Workflow| SubWorkflowClass
+#     """
+#     if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
+#     subflow_class().flow(dag)
+#     return dag
+#
+# SWF=Infix(_subworkflow)
 
 @flowfxn
 def _add(dag,tools,stage_name=None):
