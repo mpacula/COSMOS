@@ -10,6 +10,7 @@ from jobmanager import JobManagerBase
 
 class JobStatusError(Exception):
     pass
+class DRMAA_Error(Exception):pass
 
 #######################
 # Initialize DRMAA
@@ -127,6 +128,7 @@ class JobManager(JobManagerBase):
         Waits for any job to finish, and returns that JobAttempt.  If there are no jobs left, returns None.
         All the enable/disable stderr stuff is because LSF drmaa prints really annoying messages that mean nothing.
         """
+        extra_jobinfo = None
         try:
             disable_stderr() #python drmaa prints whacky messages sometimes.  if the script just quits without printing anything, something really bad happend while stderr is disabled
             extra_jobinfo = drmaa_session.wait(jobId=drmaa.Session.JOB_IDS_SESSION_ANY,timeout=drmaa.Session.TIMEOUT_NO_WAIT)
@@ -145,6 +147,10 @@ class JobManager(JobManagerBase):
             print e
         finally:
             enable_stderr()
+
+        if extra_jobinfo is None:
+            raise DRMAA_Error, 'DRMAA did not return the job information.  This has been reported to happen with LSF and' \
+                               'can generally be fixed by trying again'
 
         jobAttempt = JobAttempt.objects.get(drmaa_jobID = extra_jobinfo.jobId)
 
