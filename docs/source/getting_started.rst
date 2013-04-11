@@ -66,13 +66,23 @@ You can use the web interface to explore the history and debug all workflows.  T
     Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the
     system you're running the workflow on.
    
-Visit http://localhost:8080 to access it.  If you can't access the website, its likely firewalled off.  Fortunately, the
-Cosmos website works well with lynx.  Use the command on the same server
-running the web interface: :command:`$ lynx localhost:8080`
+Visit `http://servername:8080`_ to access it (or`http://localhost:8080`_ if you're running cosmos locally.
+
 
 .. figure:: /imgs/web_interface.png
    :width: 90%
    :align: center
+
+.. hint::
+
+    If the cosmos webserver is running, but you can't connect, it is likely because there is a firewall
+    in front of the server.  You can get around it by using ssh port forwarding:
+    *$ ssh -L 8080:servername:8080 user@server*
+
+.. warning::
+
+    The webserver is *NOT* secure.  If you need it secured, you'll have to set it up in a production
+    Django web server environment (for example, using *mod_wsgi* with Apache2).
 
 Terminating a Workflow
 ______________________
