@@ -516,7 +516,8 @@ class Workflow(models.Model):
         self.stages.delete()
         self.log.info('{0} Deleted.'.format(self))
 
-        for h in list(self.log.handlers):
+        for h in self.log.handlers:
+            h.flush()
             h.close()
             self.log.removeHandler(h)
 
