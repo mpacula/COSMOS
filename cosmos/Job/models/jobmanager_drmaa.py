@@ -149,8 +149,8 @@ class JobManager(JobManagerBase):
             enable_stderr()
 
         if extra_jobinfo is None:
-            raise DRMAA_Error, 'DRMAA did not return the job information.  This has been reported to happen with LSF and' \
-                               'can generally be fixed by trying again'
+            raise DRMAA_Error, 'DRMAA did not return the job information.  This has been reported to happen with LSF and ' \
+                               'the only known fix is to try again, which usually works.'
 
         jobAttempt = JobAttempt.objects.get(drmaa_jobID = extra_jobinfo.jobId)
 
