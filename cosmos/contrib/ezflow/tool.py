@@ -178,14 +178,20 @@ class Tool(object):
         
         #if tuple is returned, second element is a dict to format with
         extra_format_dict = r[1] if len(r) == 2 and r else {}
-        pcmd = r[0] if len(r) == 2 else r 
-        
-        #replace $OUT with taskfile    
-        for out_name in re.findall('\$OUT\.([\.\w]+)',pcmd):
+        pcmd = r[0] if len(r) == 2 else r
+
+        #replace $OUT with a string representation of a taskfile
+        out_names = re.findall('\$OUT\.([\.\w]+)',pcmd)
+        for out_name in out_names:
             try:
                 pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
-            except KeyError as e:
-                raise KeyError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.get_output_file_names()))
+            except ToolValidationError as e:
+                raise ToolValidationError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.get_output_file_names()))
+
+        #Validate all outputs have an $OUT
+        for o in self.outputs:
+            if o not in out_names:
+                raise ToolValidationError, '{1} specified in {0}.outputs but not referenced with $OUT in the tool\'s command.'.format(self,o)
                 
         #format() return string with callargs
         callargs['self'] = self
