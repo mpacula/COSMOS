@@ -89,9 +89,9 @@ class Tool(object):
     def parent(self):
         ps = self.dag.G.predecessors(self)
         if len(ps) > 1:
-            raise Exception('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
+            raise ToolError('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
         elif len(ps) == 0:
-            raise Exception('{0} has no parents'.format(self))
+            raise ToolError('{0} has no parents'.format(self))
         else:
             return ps[0]
     
