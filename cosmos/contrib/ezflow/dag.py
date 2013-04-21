@@ -14,7 +14,7 @@ class DAG(object):
     
     def __init__(self,cpu_req_override=False,mem_req_factor=1):
         """
-        :param: set to an integer to override all task cpu_requirements.  Useful when a :term:`DRM` does not support requesting multiple cpus
+        :param cpu_req_override: set to an integer to override all task cpu_requirements.  Useful when a :term:`DRM` does not support requesting multiple cpus
         :param mem_req_factor: multiply all task mem_reqs by this number.
         """
         self.G = nx.DiGraph()
