@@ -108,7 +108,7 @@ class Tool(object):
 
         if len(outputs) == 0 and self.forward_input:
             try:
-                outputs +=  itertools.chain(*[ p.get_output(name) for p in self.parents ])
+                outputs +=  [ p.get_output(name) for p in self.parents ]
             except GetOutputError as e:
                 pass
 
