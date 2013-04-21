@@ -12,6 +12,8 @@ dag = ( DAG()
 )
 dag.create_dag_img('/tmp/ex.svg')
 
+import ipdb; ipdb.set_trace()
+
 #################
 # Run Workflow
 #################

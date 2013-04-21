@@ -147,6 +147,27 @@ class DAG(object):
         self.add_to_workflow(workflow)
         workflow.run()
 
+    def get_tasks_by(self,stage_name=None,tags={}):
+        """
+        :param stage_name: (str) Only returns tasks belonging to stage with stage_name.  If None, not used.
+        :param tags: (dict) The criteria used to decide which tasks to return
+        :return: (list) A list of tasks
+        """
+        def dict_intersection_is_equal(d1,d2):
+            for k,v in d2.items():
+                try:
+                    if d1[k] != v:
+                        return False
+                except KeyError:
+                    pass
+            return True
+
+        tasks = [ task for task in self.G.nodes()
+                  if (stage_name == None or task.stage_name == stage_name)
+                  and dict_intersection_is_equal(task.tags,tags)
+        ]
+        return tasks
+
 
     def __new_task(self,stage,tool):
         """
