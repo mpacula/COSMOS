@@ -23,14 +23,15 @@ class DAG(object):
         self.mem_req_factor = mem_req_factor
         self.stage_names_used = []
 
-    def get_tasks_by(self,stage_name=None,tags={}):
+    def get_tasks_by(self,stage_names=[],tags={}):
         """
-        :param stage_name: (str) Only returns tasks belonging to stage with stage_name.  If None, not used.
+        :param stage_names: (str) Only returns tasks belonging to stage in stage_names
         :param tags: (dict) The criteria used to decide which tasks to return.
         :return: (list) A list of tasks
         """
-        if stage_name not in self.stage_names_used:
-            raise KeyError, 'Stage name "{0}" does not exist.'.format(stage_name)
+        for stage_name in stage_names:
+            if stage_name not in self.stage_names_used:
+                raise KeyError, 'Stage name "{0}" does not exist.'.format(stage_name)
 
         def dict_intersection_is_equal(d1,d2):
             for k,v in d2.items():
@@ -42,22 +43,22 @@ class DAG(object):
             return True
 
         tasks = [ task for task in self.G.nodes()
-                  if (stage_name == None or task.stage_name == stage_name)
+                  if (task.stage_name in stage_names)
             and dict_intersection_is_equal(task.tags,tags)
         ]
         return tasks
 
-    def branch(self,stage_name=None,tags={}):
+    def branch(self,stage_names=[],tags={}):
         """
         Updates last_tools to be the tools in the stage with name stage_name.
         The next infix operation will thus be applied to `stage_name`.
         This way the infix operations an be applied to multiple stages if the workflow isn't "linear".
 
-        :param stage_name: (str) Only returns tasks belonging to stage with stage_name.  If None, not used.
+        :param stage_names: (str) Only returns tasks belonging to stage in stage_names
         :param tags: (dict) The criteria used to decide which tasks to return.
-        :return: The updated dag.
+        :return: (list) A list of tasks
         """
-        self.last_tools = self.get_tasks_by(stage_name=stage_name,tags=tags)
+        self.last_tools = self.get_tasks_by(stage_names=stage_names,tags=tags)
         return self
         
     def create_dag_img(self,path):
