@@ -23,19 +23,41 @@ class DAG(object):
         self.mem_req_factor = mem_req_factor
         self.stage_names_used = []
 
-    def branch(self,stage_name):
+    def get_tasks_by(self,stage_name=None,tags={}):
         """
-        Updates last_tools to be the tools in the stage with name stage_name.
-        The next infix operation will thus be applied to `stage_name`.
-        This way the infix operations
-        can be applied to multiple stages if the workflow isn't "linear".
-
-        :param stage_name: (str)The name of the stage.
-        :return: The updated dag.
+        :param stage_name: (str) Only returns tasks belonging to stage with stage_name.  If None, not used.
+        :param tags: (dict) The criteria used to decide which tasks to return.
+        :return: (list) A list of tasks
         """
         if stage_name not in self.stage_names_used:
             raise KeyError, 'Stage name "{0}" does not exist.'.format(stage_name)
-        self.last_tools = filter(lambda n: n.stage_name == stage_name, self.G.nodes())
+
+        def dict_intersection_is_equal(d1,d2):
+            for k,v in d2.items():
+                try:
+                    if d1[k] != v:
+                        return False
+                except KeyError:
+                    pass
+            return True
+
+        tasks = [ task for task in self.G.nodes()
+                  if (stage_name == None or task.stage_name == stage_name)
+            and dict_intersection_is_equal(task.tags,tags)
+        ]
+        return tasks
+
+    def branch(self,stage_name=None,tags={}):
+        """
+        Updates last_tools to be the tools in the stage with name stage_name.
+        The next infix operation will thus be applied to `stage_name`.
+        This way the infix operations an be applied to multiple stages if the workflow isn't "linear".
+
+        :param stage_name: (str) Only returns tasks belonging to stage with stage_name.  If None, not used.
+        :param tags: (dict) The criteria used to decide which tasks to return.
+        :return: The updated dag.
+        """
+        self.last_tools = self.get_tasks_by(stage_name=stage_name,tags=tags)
         return self
         
     def create_dag_img(self,path):
@@ -146,27 +168,6 @@ class DAG(object):
         """
         self.add_to_workflow(workflow)
         workflow.run()
-
-    def get_tasks_by(self,stage_name=None,tags={}):
-        """
-        :param stage_name: (str) Only returns tasks belonging to stage with stage_name.  If None, not used.
-        :param tags: (dict) The criteria used to decide which tasks to return
-        :return: (list) A list of tasks
-        """
-        def dict_intersection_is_equal(d1,d2):
-            for k,v in d2.items():
-                try:
-                    if d1[k] != v:
-                        return False
-                except KeyError:
-                    pass
-            return True
-
-        tasks = [ task for task in self.G.nodes()
-                  if (stage_name == None or task.stage_name == stage_name)
-                  and dict_intersection_is_equal(task.tags,tags)
-        ]
-        return tasks
 
 
     def __new_task(self,stage,tool):
