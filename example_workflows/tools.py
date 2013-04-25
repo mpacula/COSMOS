@@ -40,10 +40,10 @@ class WC(Tool):
                 }
 
 class FAIL(Tool):
-
+    outputs = ['txt']
     def cmd(self,i,s,p):
 
-        return '__fail__'
+        return '$OUT.txt __fail__'
 
 class MD5Sum(Tool):
     inputs = ['*']
