@@ -364,11 +364,12 @@ class Workflow(models.Model):
         #this basically a bulk task._has_finished and jobattempt.hasFinished
         task_ids = jobAttempts.values('task')
         tasks = Task.objects.filter(pk__in=task_ids)
+
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
 
         stages = Stage.objects.filter(task__in=tasks)
-        self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
+        self.log.info("Marking {0} terminated Stages as failed. {1}".format(len(stages)),stages)
         stages.update(status = 'failed',finished_on = timezone.now())
 
         self.log.info("Marking {0} terminated JobAttempts as failed.".format(len(jobAttempts)))
@@ -650,18 +651,6 @@ class Workflow(models.Model):
         self.save()
         self.log.info('Finished.')
 
-
-
-#    def restart_from_here(self):
-#        """
-#        Deletes any stages in the history that haven't been added yet
-#        """
-#        if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0} (All files will be deleted)? Answering no will simply exit.".format(self),default=True,timeout=30):
-#            self.log.info('Restarting Workflow from here.')
-#            for b in Stage.objects.filter(workflow=self,order_in_workflow=None): b.delete()
-#        else:
-#            sys.exit(1)
-
     def get_tasks_by(self,stage=None,tags={},op="and"):
         """
         Returns the list of tasks that are tagged by the keys and vals in tags dictionary
@@ -787,7 +776,7 @@ class WorkflowManager():
         for stage in self.workflow.stages:
             stage_name = stage.name
             for task in stage.tasks.all():
-                dag.add_node(task.id,tags=task.tags,status=task.stats,stage=stage_name,cleared_output_files=task.cleared_output_files,url=task.url())
+                dag.add_node(task.id,tags=task.tags,status=task.status,stage=stage_name,cleared_output_files=task.cleared_output_files,url=task.url())
         return dag
 
     def createAGraph(self):

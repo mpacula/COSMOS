@@ -6,6 +6,8 @@ from cosmos.Workflow.models import Task,TaskError
 from decorator import decorator
 
 class DAGError(Exception): pass
+class StageNameCollision(Exception):pass
+class FlowFxnValidationError(Exception):pass
 
 class DAG(object):
     """
@@ -22,6 +24,7 @@ class DAG(object):
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
         self.stage_names_used = []
+        self.ignore_stage_name_collisions = False
 
     def get_tasks_by(self,stage_names=[],tags={}):
         """
@@ -47,6 +50,15 @@ class DAG(object):
             and dict_intersection_is_equal(task.tags,tags)
         ]
         return tasks
+
+    def branch_from_tools(self,tools):
+        """
+        Branches from a list of tools
+        :param tools:
+        :return:
+        """
+        self.last_tools = tools
+        return self
 
     def branch(self,stage_names=[],tags={}):
         """
@@ -233,27 +245,12 @@ def flowfxn(func,dag,*RHS):
             func.__name__[1:].capitalize()
         )
 
-    if stage_name in dag.stage_names_used: raise DAGError, 'Duplicate stage_names detected {0}.'.format(stage_name)
+    if not dag.ignore_stage_name_collisions and stage_name in dag.stage_names_used:
+        raise StageNameCollision, 'Duplicate stage_names detected {0}.'.format(stage_name)
     dag.stage_names_used.append(stage_name)
 
     return dag
 
-#Different from other flowfxns, so do not decorate with @flowfxn
-#Experimental
-# def _subworkflow(dag,subflow_class,parser=None):
-#     """
-#     Applies a :py:class:`flow.SubWorkflow` to the last tools added to the dag.
-#     :param dag:
-#     :param subflow_class: An instance which is a subclass of py:class:`flow.SubWorkflow`
-#     :return: the new dag
-#
-#     >>> DAG() |Workflow| SubWorkflowClass
-#     """
-#     if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
-#     subflow_class().flow(dag)
-#     return dag
-#
-# SWF=Infix(_subworkflow)
 
 @flowfxn
 def _add(dag,tools,stage_name=None):
@@ -272,6 +269,8 @@ def _add(dag,tools,stage_name=None):
 
     >>> dag() |Add| [tool1,tool2,tool3,tool4]
     """
+    if not isinstance(tools,list):
+        raise FlowFxnValidationError, 'Tools must be a list'
     if stage_name is None:
         stage_name = tools[0].stage_name
     for tool in tools:
