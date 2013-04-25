@@ -233,7 +233,7 @@ class Workflow(models.Model):
         wf.delete_intermediates = delete_intermediates
 
         wf.save()
-        wf.log.info('Resuming workflow.')
+        wf.log.info('Resuming {0}'.format(wf))
         Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
         return wf
 
