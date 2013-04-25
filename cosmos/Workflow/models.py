@@ -786,8 +786,8 @@ class WorkflowManager():
         dag.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.task_edges.values('parent','child')])
         for stage in self.workflow.stages:
             stage_name = stage.name
-            for n in stage.tasks.values('id','tags','status','cleared_output_files'):
-                dag.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name,cleared_output_files=n['cleared_output_files'])
+            for task in stage.tasks.all():
+                dag.add_node(task.id,tags=task.tags,status=task.stats,stage=stage_name,cleared_output_files=task.cleared_output_files,url=task.url())
         return dag
 
     def createAGraph(self):
@@ -804,7 +804,7 @@ class WorkflowManager():
                     return "{0}: {1}".format(kv[0],v)
                 label = " \\n".join(map(truncate_val,attrs['tags'].items()))
                 status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
-                sg.add_node(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
+                sg.add_node(n,label=label,URL=attrs['url'].format(n),target="_blank",color=status2color[attrs['status']])
 
         return dag
 
