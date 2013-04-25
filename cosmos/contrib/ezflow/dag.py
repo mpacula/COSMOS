@@ -25,7 +25,7 @@ class DAG(object):
 
     def get_tasks_by(self,stage_names=[],tags={}):
         """
-        :param stage_names: (str) Only returns tasks belonging to stage in stage_names
+        :param stage_names: (str) Only returns tasks belonging to stages in stage_names
         :param tags: (dict) The criteria used to decide which tasks to return.
         :return: (list) A list of tasks
         """
@@ -50,11 +50,11 @@ class DAG(object):
 
     def branch(self,stage_names=[],tags={}):
         """
-        Updates last_tools to be the tools in the stage with name stage_name.
+        Updates last_tools to be the tools in the stages with name stage_name.
         The next infix operation will thus be applied to `stage_name`.
         This way the infix operations an be applied to multiple stages if the workflow isn't "linear".
 
-        :param stage_names: (str) Only returns tasks belonging to stage in stage_names
+        :param stage_names: (str) Only returns tasks belonging to stages in stage_names
         :param tags: (dict) The criteria used to decide which tasks to return.
         :return: (list) A list of tasks
         """
@@ -124,7 +124,7 @@ class DAG(object):
                 stages[stage_name] = workflow.add_stage(stage_name)
             tool.stage = stages[stage_name]
         
-        #update tool._task_instance and tool._output_files with existing data
+        #update tool._task_instance and tool.output_files with existing data
         stasks = list(workflow.tasks.select_related('_output_files','stage'))
         for tpl, group in groupby(stasks + self.G.nodes(), lambda x: (x.tags,x.stage.name)):
             group = list(group)
