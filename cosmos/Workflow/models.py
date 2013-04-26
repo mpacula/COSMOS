@@ -245,31 +245,22 @@ class Workflow(models.Model):
         see :py:meth:`start` for parameter definitions
         """
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
-        confirmed = False
-        def check_confirm():
-            global confirmed
-            if not confirmed and prompt_confirm and not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
-                print "Exiting."
-                sys.exit(1)
-            else:
-                confirmed=True
-
         if delete_unsuccessful_stages:
             for s in wf.stages.filter(successful=False):
-                check_confirm()
                 s.delete()
         else:
             #only delete if ALL tasks are unsuccessful
             for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
                 wf.log.info('{0} has no successful tasks.'.format(s))
-                check_confirm()
                 s.delete()
 
         #Delete unsuccessful tasks
         utasks = wf.tasks.filter(successful=False)
         num_utasks = len(utasks)
         if num_utasks > 0:
-            check_confirm()
+            # if not confirmed and prompt_confirm and not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
+            #     print "Exiting."
+            #     sys.exit(1)
             wf.bulk_delete_tasks(utasks)
 
             # Update stages that are resuming
@@ -908,7 +899,7 @@ class Stage(models.Model):
         aggr_fxn = getattr(models, statistic)
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
         r = Task.objects.filter(stage=self).aggregate(aggr_fxn(field))[aggr_field]
-        return int(r) if r else r
+        return int(r) if r or r == 0.0 else r
 
 
     @property
