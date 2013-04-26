@@ -2,6 +2,7 @@ from helpers import getcallargs,cosmos_format
 import re
 from cosmos.Workflow.models import TaskFile
 from cosmos.utils.helpers import parse_cmd
+import itertools
 
 i = 0
 def get_id():
@@ -88,9 +89,9 @@ class Tool(object):
     def parent(self):
         ps = self.dag.G.predecessors(self)
         if len(ps) > 1:
-            raise Exception('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
+            raise ToolError('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
         elif len(ps) == 0:
-            raise Exception('{0} has no parents'.format(self))
+            raise ToolError('{0} has no parents'.format(self))
         else:
             return ps[0]
     
@@ -107,7 +108,7 @@ class Tool(object):
 
         if len(outputs) == 0 and self.forward_input:
             try:
-                outputs +=  [ self.parent.get_output(name) ]
+                outputs +=  [ p.get_output(name) for p in self.parents ]
             except GetOutputError as e:
                 pass
 
@@ -140,7 +141,7 @@ class Tool(object):
 
     def map_inputs(self):
         """
-        Default method to map inputs.  Can be overriden of a different behavior is desired
+        Default method to map inputs.  Can be overriden if a different behavior is desired
         :returns: (dict) A dictionary of taskfiles which are inputs to this tool.  Keys are names of the taskfiles, values are a list of taskfiles.
         """
         if not self.inputs:

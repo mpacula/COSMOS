@@ -233,7 +233,7 @@ class Workflow(models.Model):
         wf.delete_intermediates = delete_intermediates
 
         wf.save()
-        wf.log.info('Resuming workflow.')
+        wf.log.info('Resuming {0}'.format(wf))
         Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
         return wf
 
@@ -245,23 +245,31 @@ class Workflow(models.Model):
         see :py:meth:`start` for parameter definitions
         """
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
+        confirmed = False
+        def check_confirm():
+            global confirmed
+            if not confirmed and prompt_confirm and not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
+                print "Exiting."
+                sys.exit(1)
+            else:
+                confirmed=True
 
         if delete_unsuccessful_stages:
             for s in wf.stages.filter(successful=False):
+                check_confirm()
                 s.delete()
         else:
-            #only delete of ALL tasks are unsuccessful
+            #only delete if ALL tasks are unsuccessful
             for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
                 wf.log.info('{0} has no successful tasks.'.format(s))
+                check_confirm()
                 s.delete()
 
         #Delete unsuccessful tasks
         utasks = wf.tasks.filter(successful=False)
         num_utasks = len(utasks)
         if num_utasks > 0:
-            if prompt_confirm and not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
-                print "Exiting."
-                sys.exit(1)
+            check_confirm()
             wf.bulk_delete_tasks(utasks)
 
             # Update stages that are resuming
@@ -364,10 +372,11 @@ class Workflow(models.Model):
         #this basically a bulk task._has_finished and jobattempt.hasFinished
         task_ids = jobAttempts.values('task')
         tasks = Task.objects.filter(pk__in=task_ids)
+
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
 
-        stages = Stage.objects.filter(task__in=tasks)
+        stages = Stage.objects.filter(Q(task__in=tasks)|Q(successful=False))
         self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
         stages.update(status = 'failed',finished_on = timezone.now())
 
@@ -650,18 +659,6 @@ class Workflow(models.Model):
         self.save()
         self.log.info('Finished.')
 
-
-
-#    def restart_from_here(self):
-#        """
-#        Deletes any stages in the history that haven't been added yet
-#        """
-#        if helpers.confirm("Are you sure you want to run restart_from_here() on workflow {0} (All files will be deleted)? Answering no will simply exit.".format(self),default=True,timeout=30):
-#            self.log.info('Restarting Workflow from here.')
-#            for b in Stage.objects.filter(workflow=self,order_in_workflow=None): b.delete()
-#        else:
-#            sys.exit(1)
-
     def get_tasks_by(self,stage=None,tags={},op="and"):
         """
         Returns the list of tasks that are tagged by the keys and vals in tags dictionary
@@ -786,8 +783,8 @@ class WorkflowManager():
         dag.add_edges_from([(ne['parent'],ne['child']) for ne in self.workflow.task_edges.values('parent','child')])
         for stage in self.workflow.stages:
             stage_name = stage.name
-            for n in stage.tasks.values('id','tags','status','cleared_output_files'):
-                dag.add_node(n['id'],tags=dbsafe_decode(n['tags']),status=n['status'],stage=stage_name,cleared_output_files=n['cleared_output_files'])
+            for task in stage.tasks.all():
+                dag.add_node(task.id,tags=task.tags,status=task.status,stage=stage_name,cleared_output_files=task.cleared_output_files,url=task.url())
         return dag
 
     def createAGraph(self):
@@ -804,7 +801,7 @@ class WorkflowManager():
                     return "{0}: {1}".format(kv[0],v)
                 label = " \\n".join(map(truncate_val,attrs['tags'].items()))
                 status2color = { 'no_attempt':'black','in_progress':'gold1','successful': 'darkgreen','failed':'darkred'}
-                sg.add_node(n,label=label,URL='/Workflow/Task/{0}/'.format(n),target="_blank",color=status2color[attrs['status']])
+                sg.add_node(n,label=label,URL=attrs['url'].format(n),target="_blank",color=status2color[attrs['status']])
 
         return dag
 

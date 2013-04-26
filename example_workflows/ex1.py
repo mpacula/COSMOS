@@ -16,6 +16,6 @@ dag.create_dag_img('/tmp/ex.svg')
 # Run Workflow
 #################
 
-WF = Workflow.start('Example 1',restart=True)
+WF = Workflow.start('Example Fail',restart=True)
 dag.add_to_workflow(WF)
 WF.run()

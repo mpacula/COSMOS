@@ -66,7 +66,7 @@
     <dt>Task Output File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{jobAttempt.task.output_file_size|b2e}}{%else%}off{%endif%}</dd>
     <dt>Output Files</dt><dd>
         {%for of in jobAttempt.task.output_files%}
-        <a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
+        <a href="{{of.url}}">{%if of.path%}{{of.path}}{%else%}{{of}}{%endif%}{%if not forloop.last%},{%endif%}</a>
         {%empty%}None{%endfor%}
     </dd>
 

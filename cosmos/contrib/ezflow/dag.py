@@ -6,6 +6,8 @@ from cosmos.Workflow.models import Task,TaskError
 from decorator import decorator
 
 class DAGError(Exception): pass
+class StageNameCollision(Exception):pass
+class FlowFxnValidationError(Exception):pass
 
 class DAG(object):
     """
@@ -14,7 +16,7 @@ class DAG(object):
     
     def __init__(self,cpu_req_override=False,mem_req_factor=1):
         """
-        :param: set to an integer to override all task cpu_requirements.  Useful when a :term:`DRM` does not support requesting multiple cpus
+        :param cpu_req_override: set to an integer to override all task cpu_requirements.  Useful when a :term:`DRM` does not support requesting multiple cpus
         :param mem_req_factor: multiply all task mem_reqs by this number.
         """
         self.G = nx.DiGraph()
@@ -22,20 +24,53 @@ class DAG(object):
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
         self.stage_names_used = []
+        self.ignore_stage_name_collisions = False
 
-    def branch(self,stage_name):
+    def get_tasks_by(self,stage_names=[],tags={}):
         """
-        Updates last_tools to be the tools in the stage with name stage_name.
+        :param stage_names: (str) Only returns tasks belonging to stages in stage_names
+        :param tags: (dict) The criteria used to decide which tasks to return.
+        :return: (list) A list of tasks
+        """
+        for stage_name in stage_names:
+            if stage_name not in self.stage_names_used:
+                raise KeyError, 'Stage name "{0}" does not exist.'.format(stage_name)
+
+        def dict_intersection_is_equal(d1,d2):
+            for k,v in d2.items():
+                try:
+                    if d1[k] != v:
+                        return False
+                except KeyError:
+                    pass
+            return True
+
+        tasks = [ task for task in self.G.nodes()
+                  if (task.stage_name in stage_names)
+            and dict_intersection_is_equal(task.tags,tags)
+        ]
+        return tasks
+
+    def branch_from_tools(self,tools):
+        """
+        Branches from a list of tools
+        :param tools:
+        :return:
+        """
+        self.last_tools = tools
+        return self
+
+    def branch(self,stage_names=[],tags={}):
+        """
+        Updates last_tools to be the tools in the stages with name stage_name.
         The next infix operation will thus be applied to `stage_name`.
-        This way the infix operations
-        can be applied to multiple stages if the workflow isn't "linear".
+        This way the infix operations an be applied to multiple stages if the workflow isn't "linear".
 
-        :param stage_name: (str)The name of the stage.
-        :return: The updated dag.
+        :param stage_names: (str) Only returns tasks belonging to stages in stage_names
+        :param tags: (dict) The criteria used to decide which tasks to return.
+        :return: (list) A list of tasks
         """
-        if stage_name not in self.stage_names_used:
-            raise KeyError, 'Stage name "{0}" does not exist.'.format(stage_name)
-        self.last_tools = filter(lambda n: n.stage_name == stage_name, self.G.nodes())
+        self.last_tools = self.get_tasks_by(stage_names=stage_names,tags=tags)
         return self
         
     def create_dag_img(self,path):
@@ -101,7 +136,7 @@ class DAG(object):
                 stages[stage_name] = workflow.add_stage(stage_name)
             tool.stage = stages[stage_name]
         
-        #update tool._task_instance and tool._output_files with existing data
+        #update tool._task_instance and tool.output_files with existing data
         stasks = list(workflow.tasks.select_related('_output_files','stage'))
         for tpl, group in groupby(stasks + self.G.nodes(), lambda x: (x.tags,x.stage.name)):
             group = list(group)
@@ -210,27 +245,12 @@ def flowfxn(func,dag,*RHS):
             func.__name__[1:].capitalize()
         )
 
-    if stage_name in dag.stage_names_used: raise DAGError, 'Duplicate stage_names detected {0}.'.format(stage_name)
+    if not dag.ignore_stage_name_collisions and stage_name in dag.stage_names_used:
+        raise StageNameCollision, 'Duplicate stage_names detected {0}.'.format(stage_name)
     dag.stage_names_used.append(stage_name)
 
     return dag
 
-#Different from other flowfxns, so do not decorate with @flowfxn
-#Experimental
-# def _subworkflow(dag,subflow_class,parser=None):
-#     """
-#     Applies a :py:class:`flow.SubWorkflow` to the last tools added to the dag.
-#     :param dag:
-#     :param subflow_class: An instance which is a subclass of py:class:`flow.SubWorkflow`
-#     :return: the new dag
-#
-#     >>> DAG() |Workflow| SubWorkflowClass
-#     """
-#     if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
-#     subflow_class().flow(dag)
-#     return dag
-#
-# SWF=Infix(_subworkflow)
 
 @flowfxn
 def _add(dag,tools,stage_name=None):
@@ -249,6 +269,8 @@ def _add(dag,tools,stage_name=None):
 
     >>> dag() |Add| [tool1,tool2,tool3,tool4]
     """
+    if not isinstance(tools,list):
+        raise FlowFxnValidationError, 'Tools must be a list'
     if stage_name is None:
         stage_name = tools[0].stage_name
     for tool in tools:

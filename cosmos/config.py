@@ -27,3 +27,6 @@ settings['cosmos_library_path'] = cosmos_library_path
 settings['cosmos_path'] = cosmos_path
 settings['config_path'] = config_path
 settings['user_home_path'] = user_home_path
+
+# Defaults
+settings.setdefault('working_directory','/tmp')

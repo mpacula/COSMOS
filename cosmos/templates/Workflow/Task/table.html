@@ -58,7 +58,7 @@
                 {{task.wall_time|format_time}}
             </td>
             <td>
-                {%if cosmos_settings.show_task_file_sizes%}{{task.output_file_size}}{%else%}off{%endif%}
+                {%if cosmos_settings.show_task_file_sizes == "True"%}{{task.output_file_size}}{%else%}off{%endif%}
             </td>
             <td>
                 {% for j in task.jobAttempts %}

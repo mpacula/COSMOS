@@ -101,7 +101,7 @@ class JobManager(JobManagerBase):
         cmd = self._create_cmd_str(jobAttempt)
 
         jt = drmaa_session.createJobTemplate()
-        jt.workingDirectory = session.settings['tmp_dir']
+        jt.workingDirectory = session.settings['working_directory']
         #jt.remoteCommand = self.command_script_path
         #jt.args = self.command_script_text.split(' ')[1:]
         jt.remoteCommand = cmd.split(' ')[0]
