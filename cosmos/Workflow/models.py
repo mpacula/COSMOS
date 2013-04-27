@@ -567,7 +567,7 @@ class Workflow(models.Model):
             jobName=""
         )
 
-        task.jobattempt_set.Add(jobAttempt)
+        task.jobattempt_set.add(jobAttempt)
         if self.dry_run:
             self.log.info('Dry Run: skipping submission of job {0}.'.format(jobAttempt))
         else:
@@ -658,8 +658,8 @@ class Workflow(models.Model):
         :param tags: (dict) tags to filter for
         :returns: (queryset) a queryset of the filtered tasks
 
-        >>> task.get_tasks_by(op='or',tags={'color':'grey','color':'orange'})
-        >>> task.get_tasks_by(op='and',tags={'color':'grey','shape':'square'})
+        >>> task.get_tools_by(op='or',tags={'color':'grey','color':'orange'})
+        >>> task.get_tools_by(op='and',tags={'color':'grey','shape':'square'})
         """
 
         if op == 'or':

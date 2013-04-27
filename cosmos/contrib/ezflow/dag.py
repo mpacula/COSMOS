@@ -49,7 +49,7 @@ class DAG(object):
         self.stage_names_used = []
         self.ignore_stage_name_collisions = False
 
-    def get_tasks_by(self,stage_names=[],tags={}):
+    def get_tools_by(self,stage_names=[],tags={}):
         """
         :param stage_names: (str) Only returns tasks belonging to stages in stage_names
         :param tags: (dict) The criteria used to decide which tasks to return.
@@ -93,7 +93,7 @@ class DAG(object):
         :param tags: (dict) The criteria used to decide which tasks to return.
         :return: (list) A list of tasks
         """
-        self.last_tools = self.get_tasks_by(stage_names=stage_names,tags=tags)
+        self.last_tools = self.get_tools_by(stage_names=stage_names,tags=tags)
         return self
         
     def create_dag_img(self,path):
