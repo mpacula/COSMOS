@@ -245,6 +245,9 @@ class Workflow(models.Model):
         see :py:meth:`start` for parameter definitions
         """
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
+        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
+            print "Exiting."
+            sys.exit(1)
         if delete_unsuccessful_stages:
             for s in wf.stages.filter(successful=False):
                 s.delete()
@@ -258,9 +261,6 @@ class Workflow(models.Model):
         utasks = wf.tasks.filter(successful=False)
         num_utasks = len(utasks)
         if num_utasks > 0:
-            # if not confirmed and prompt_confirm and not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
-            #     print "Exiting."
-            #     sys.exit(1)
             wf.bulk_delete_tasks(utasks)
 
             # Update stages that are resuming
@@ -567,7 +567,7 @@ class Workflow(models.Model):
             jobName=""
         )
 
-        task.jobattempt_set.add(jobAttempt)
+        task.jobattempt_set.Add(jobAttempt)
         if self.dry_run:
             self.log.info('Dry Run: skipping submission of job {0}.'.format(jobAttempt))
         else:

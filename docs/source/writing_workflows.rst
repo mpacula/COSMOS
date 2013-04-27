@@ -49,6 +49,11 @@ This tool will read a txt file, count the number of words, and write it to anoth
 See the :py:class:`Tool API <tool.Tool>` for more properties that can be overridden to obtain
 various behaviors.
 
+Overriding map_inputs
+++++++++++++++++++++++
+Todo
+
+
 Defining Input Files
 --------------------
 

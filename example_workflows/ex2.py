@@ -6,10 +6,10 @@ from tools import ECHO, CAT, WC
 # Workflow
 ####################
 
-dag = ( DAG()
-    |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
-    |Split| ([('i',[1,2])],CAT)
-    |Map| WC
+dag = ( DAG().
+    Add([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]).
+    split([('i',[1,2])],CAT).
+    Map(WC)
 
 )
 dag.create_dag_img('/tmp/ex.svg')
