@@ -7,9 +7,9 @@ from tools import ECHO, CAT, WC
 ####################
 
 dag = ( DAG().
-    Add([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]).
+    add([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]).
     split([('i',[1,2])],CAT).
-    Map(WC)
+    map(WC)
 
 )
 dag.create_dag_img('/tmp/ex.svg')

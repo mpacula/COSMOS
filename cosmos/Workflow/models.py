@@ -244,6 +244,8 @@ class Workflow(models.Model):
 
         see :py:meth:`start` for parameter definitions
         """
+        #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
+        #TODO idealy just change the queryset manager to do this automatically
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
         if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
             print "Exiting."
@@ -504,10 +506,15 @@ class Workflow(models.Model):
         """
         Deletes this workflow.
         """
-        self.log.info("Deleting {0}...".format(self))
+        self.log.info("Deleting {0} and it's output dir {1}...".format(self,self.output_dir))
+
+
+        for h in self.log.handlers:
+            h.flush()
+            h.close()
+            self.log.removeHandler(h)
 
         if os.path.exists(self.output_dir):
-            self.log.info('Deleting directory {0}...'.format(self.output_dir))
             os.system('rm -rf {0}'.format(self.output_dir))
 
         self.jobManager.delete()
@@ -515,11 +522,6 @@ class Workflow(models.Model):
         self.log.info('Bulk Deleting Stages...'.format(self.name))
         self.stages.delete()
         self.log.info('{0} Deleted.'.format(self))
-
-        for h in self.log.handlers:
-            h.flush()
-            h.close()
-            self.log.removeHandler(h)
 
         super(Workflow, self).delete(*args, **kwargs)
 

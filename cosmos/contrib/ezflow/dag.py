@@ -153,7 +153,7 @@ class DAG(object):
 
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
-        for tool in nx.topological_sort(self.G):
+        for tool in nx.topological_sort_recursive(self.G):
             stage_name = tool.stage_name
             if stage_name not in stages: #have not seen this stage yet
                 stages[stage_name] = workflow.add_stage(stage_name)
@@ -230,7 +230,7 @@ class DAG(object):
             raise TaskError('{0}. Task is {1}.'.format(e,tool))
 
     @flowfxn
-    def Add(dag,tools,stage_name=None):
+    def add(dag,tools,stage_name=None):
         """
         Always the first operator of a workflow.  Simply adds a list of tool instances to the dag, without adding any
         dependencies.
@@ -256,7 +256,7 @@ class DAG(object):
             yield tool
 
     @flowfxn
-    def Map(dag,tool_class,stage_name=None):
+    def map(dag,tool_class,stage_name=None):
         """
         Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
         type `tool_class`.
@@ -267,7 +267,7 @@ class DAG(object):
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :return: (list) The tools added.
 
-        >>> dag.Map(Tool_Class)
+        >>> dag.map(Tool_Class)
         """
         parent_tools = dag.last_tools
         for parent_tool in parent_tools:
@@ -276,7 +276,7 @@ class DAG(object):
             yield new_tool
             
     @flowfxn
-    def Split(dag,split_by,tool_class,stage_name=None):
+    def split(dag,split_by,tool_class,stage_name=None):
         """
         Creates one2many relationships for each tool in the stage last added to the dag, with every possible combination
         of keywords in split_by.  New tools will be of class `tool_class` and tagged with one of the possible keyword
@@ -303,7 +303,7 @@ class DAG(object):
 
 
     @flowfxn
-    def Reduce(dag,keywords,tool_class,stage_name=None):
+    def reduce(dag,keywords,tool_class,stage_name=None):
         """
         Create new tools with a many2one to parent_tools.
 
@@ -327,7 +327,7 @@ class DAG(object):
             yield new_tool
 
     @flowfxn
-    def ReduceAndSplit(dag,keywords,split_by,tool_class,stage_name=None):
+    def reduce_split(dag,keywords,split_by,tool_class,stage_name=None):
         """
         Create new tools by first reducing then splitting.
 
