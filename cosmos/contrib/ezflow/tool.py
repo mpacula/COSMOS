@@ -61,11 +61,10 @@ class Tool(object):
         :param dag: the dag this task belongs to.
         """
         #if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
-
-        if not hasattr(self,'output_files'): self.output_files = []
         if not hasattr(self,'name'): self.name = self.__class__.__name__
-        self.tags = tags
+        if not hasattr(self,'output_files'): self.output_files = []
         self.stage_name = stage_name if stage_name else self.name
+        self.tags = tags
         self.dag = dag
         
         self.id = get_id()
@@ -127,7 +126,7 @@ class Tool(object):
             except GetOutputError as e:
                 pass
 
-        if error_if_missing and (outputs) == 0:
+        if error_if_missing and len(outputs) == 0:
             raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
 
         return outputs[0]

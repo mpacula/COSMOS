@@ -507,23 +507,24 @@ class Workflow(models.Model):
         Deletes this workflow.
         """
         self.log.info("Deleting {0} and it's output dir {1}...".format(self,self.output_dir))
-
-
-        for h in self.log.handlers:
-            h.flush()
-            h.close()
-            self.log.removeHandler(h)
-
-        if os.path.exists(self.output_dir):
-            os.system('rm -rf {0}'.format(self.output_dir))
+        wf_output_dir = self.output_dir
 
         self.jobManager.delete()
         self.bulk_delete_tasks(self.tasks)
         self.log.info('Bulk Deleting Stages...'.format(self.name))
         self.stages.delete()
-        self.log.info('{0} Deleted.'.format(self))
 
         super(Workflow, self).delete(*args, **kwargs)
+
+        self.log.info('{0} Deleted.'.format(self))
+        x = list(self.log.handlers)
+        for h in x:
+            self.log.removeHandler(h)
+            h.flush()
+            h.close()
+
+        if os.path.exists(wf_output_dir):
+            os.system('rm -rf {0}'.format(self.output_dir))
 
     def _run_task(self,task):
         """

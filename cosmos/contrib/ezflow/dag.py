@@ -14,16 +14,16 @@ class FlowFxnValidationError(Exception):pass
 def flowfxn(func,dag,*RHS):
     """
     - The decorated function should return a generator, so evaluate it
-    - Set the dag.last_tools to the decorated function's return value
+    - Set the dag.active_tools to the decorated function's return value
     - Return the dag
     """
     if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
-    dag.last_tools = list(func(dag,*RHS))
+    dag.active_tools = list(func(dag,*RHS))
     try:
-        stage_name = dag.last_tools[0].stage_name
+        stage_name = dag.active_tools[0].stage_name
     except IndexError:
-        raise DAGError, 'Tried to apply |{0}| to DAG, but dag.last_tools is not set.  Make sure to |Add| some INPUTs first.'.format(
-            func.__name__[1:].capitalize()
+        raise DAGError, 'Tried to DAG.{0}(), but dag.active_tools is not set.  Make sure to |Add| some INPUTs first.'.format(
+            func.__name__
         )
 
     if not dag.ignore_stage_name_collisions and stage_name in dag.stage_names_used:
@@ -43,7 +43,7 @@ class DAG(object):
         :param mem_req_factor: multiply all task mem_reqs by this number.
         """
         self.G = nx.DiGraph()
-        self.last_tools = []
+        self.active_tools = []
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
         self.stage_names_used = []
@@ -80,12 +80,12 @@ class DAG(object):
         :param tools: (list) a list of tools
         :return: (DAG) self
         """
-        self.last_tools = tools
+        self.active_tools = tools
         return self
 
     def branch(self,stage_names=[],tags={}):
         """
-        Updates last_tools to be the tools in the stages with name stage_name.
+        Updates active_tools to be the tools in the stages with name stage_name.
         The next infix operation will thus be applied to `stage_name`.
         This way the infix operations an be applied to multiple stages if the workflow isn't "linear".
 
@@ -93,7 +93,7 @@ class DAG(object):
         :param tags: (dict) The criteria used to decide which tasks to return.
         :return: (list) A list of tasks
         """
-        self.last_tools = self.get_tools_by(stage_names=stage_names,tags=tags)
+        self.active_tools = self.get_tools_by(stage_names=stage_names,tags=tags)
         return self
         
     def create_dag_img(self,path):
@@ -269,7 +269,7 @@ class DAG(object):
 
         >>> dag.map(Tool_Class)
         """
-        parent_tools = dag.last_tools
+        parent_tools = dag.active_tools
         for parent_tool in parent_tools:
             new_tool = tool_class(stage_name=stage_name,dag=dag,tags=parent_tool.tags)
             dag.G.add_edge(parent_tool,new_tool)
@@ -291,7 +291,7 @@ class DAG(object):
 
         >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
         """
-        parent_tools = dag.last_tools
+        parent_tools = dag.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
         for parent_tool in parent_tools:
             for new_tags in it.product(*splits):
@@ -316,7 +316,7 @@ class DAG(object):
 
         >>> dag() |Reduce| (['shape'],Tool_Class)
         """
-        parent_tools = dag.last_tools
+        parent_tools = dag.active_tools
         if type(keywords) != list:
             raise dagError('Invalid Right Hand Side of reduce')
         for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
@@ -341,7 +341,7 @@ class DAG(object):
 
         >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
         """
-        parent_tools = dag.last_tools
+        parent_tools = dag.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
 
         for group_tags,parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
@@ -418,7 +418,7 @@ def _map(dag,tool_class,stage_name=None):
 
     >>> dag() |Map| Tool_Class
     """
-    parent_tools = dag.last_tools
+    parent_tools = dag.active_tools
     for parent_tool in parent_tools:
         new_tool = tool_class(stage_name=stage_name,dag=dag,tags=parent_tool.tags)
         dag.G.add_edge(parent_tool,new_tool)
@@ -444,7 +444,7 @@ def _split(dag,split_by,tool_class,stage_name=None):
 
     >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
     """
-    parent_tools = dag.last_tools
+    parent_tools = dag.active_tools
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     for parent_tool in parent_tools:
         for new_tags in it.product(*splits):
@@ -470,7 +470,7 @@ def _reduce(dag,keywords,tool_class,stage_name=None):
 
     >>> dag() |Reduce| (['shape'],Tool_Class)
     """
-    parent_tools = dag.last_tools
+    parent_tools = dag.active_tools
     if type(keywords) != list:
         raise dagError('Invalid Right Hand Side of reduce')
     for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
@@ -496,7 +496,7 @@ def _reduce_and_split(dag,keywords,split_by,tool_class,stage_name=None):
 
     >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
     """
-    parent_tools = dag.last_tools
+    parent_tools = dag.active_tools
     splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
     
     for group_tags,parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
