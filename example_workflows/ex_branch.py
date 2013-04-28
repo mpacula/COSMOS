@@ -15,13 +15,12 @@ import tools
 ####################
 
 dag = ( DAG()
-        |Add| [ tools.ECHO(tags={'word':'hello'}), tools.ECHO(tags={'word':'world'}) ]
-        |Split| ([('i',[1,2])],tools.CAT)
-        |Map| tools.WC
-
+          .add([ tools.ECHO(tags={'word':'hello'}), tools.ECHO(tags={'word':'world'}) ])
+          .split([('i',[1,2])],tools.CAT)
+          .map(tools.WC)
+        .branch('ECHO')
+          .map(tools.WC,'Extra Independent Word Count')
 )
-# Add an independent Word Count Job, who's stage's name will be "Extra Word Count"
-dag.branch('ECHO') |Map| (tools.WC,'Extra Independent Word Count')
 
 # Generate image
 dag.create_dag_img('/tmp/ex_branch.svg')

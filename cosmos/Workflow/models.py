@@ -106,7 +106,8 @@ class Workflow(models.Model):
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
     delete_intermediates = models.BooleanField(default=False,help_text="Delete intermediate files")
-    #comments - models.TextField()
+    #cmd_executed = models.CharField(max_length=255,default=None,null=True)
+    comments = models.TextField(null=True,default=None)
 
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
@@ -172,41 +173,36 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
 
     @staticmethod
-    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None,
-              default_queue=None, delete_intermediates = False,
-              delete_unsuccessful_stages=False,prompt_confirm=True,*args,**kwargs):
+    def start(name,**kwargs):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
 
         :param name: (str) A unique name for this workflow. All spaces are converted to underscores. Required.
         :param restart: (bool) Complete restart the workflow by deleting it and creating a new one. Optional.
-        :param delete_unsuccessful_stages: (bool) Deletes any unsuccessful stages in the workflow. Optional.
         :param dry_run: (bool) Don't actually execute jobs. Optional.
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         :param delete_intermediates: (str) Deletes intermediate files to save scratch space.
         """
 
-        if name is None:
-            raise ValidationError('Name of a workflow cannot be None')
+        kwargs.setdefault('dry_run',False)
+        kwargs.setdefault('root_output_dir',settings['default_root_output_dir'])
+        kwargs.setdefault('default_queue',settings['default_queue'])
+        kwargs.setdefault('delete_intermediates', False)
+        kwargs.setdefault('comments',None)
+
+        restart = kwargs.pop('restart',False)
+        prompt_confirm = kwargs.pop('prompt_confirm',True)
+
         name = re.sub("\s","_",name)
 
-        if root_output_dir is None:
-            root_output_dir = settings['default_root_output_dir']
-
-        if default_queue is None:
-            default_queue = session.settings['default_queue']
-
         if restart:
-            wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
+            wf = Workflow.__restart(name, prompt_confirm=prompt_confirm, **kwargs)
         elif Workflow.objects.filter(name=name).count() > 0:
-            if delete_unsuccessful:
-                #TODO make sure user didn't try to change unsupported params like root_output_dir when resuming or reloading
-                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,delete_unsuccessful_stages=delete_unsuccessful_stages,prompt_confirm=prompt_confirm)
-            else:
-                wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
+            wf = Workflow.__reload(name=name, prompt_confirm=prompt_confirm, **kwargs)
+            wf = Workflow.__resume(name=name, **kwargs)
         else:
-            wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue, delete_intermediates=delete_intermediates)
+            wf = Workflow.__create(name=name, **kwargs)
 
         #remove stale objects
         wf._delete_stale_objects()
@@ -222,7 +218,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __resume(name,dry_run, default_queue, delete_intermediates):
+    def __resume(name,dry_run, default_queue, delete_intermediates, comments,**kwargs):
         """
         Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be called by anything except __reload
 
@@ -236,6 +232,8 @@ class Workflow(models.Model):
         wf.finished_on = None
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
+        if comments:
+            wf.comments = comments
 
         wf.save()
         wf.log.info('Resuming {0}'.format(wf))
@@ -243,7 +241,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __reload(name, dry_run, default_queue, delete_intermediates,delete_unsuccessful_stages,prompt_confirm=True):
+    def __reload(name, dry_run, default_queue, delete_intermediates,delete_unsuccessful_stages=False, prompt_confirm=True,**kwargs):
         """
         Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
 
@@ -251,7 +249,7 @@ class Workflow(models.Model):
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
         #TODO idealy just change the queryset manager to do this automatically
-        wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
+        wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
             print "Exiting."
             sys.exit(1)
@@ -278,7 +276,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __restart(name,root_output_dir,dry_run,default_queue,delete_intermediates,prompt_confirm=True):
+    def __restart(name,prompt_confirm=True,**kwargs):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
@@ -295,12 +293,12 @@ class Workflow(models.Model):
             wf_id = old_wf.id
             old_wf.delete()
 
-        new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue,delete_intermediates=delete_intermediates)
+        new_wf = Workflow.__create(_wf_id=wf_id, name=name, **kwargs)
 
         return new_wf
 
     @staticmethod
-    def __create(name,dry_run,root_output_dir,default_queue,delete_intermediates,_wf_id=None):
+    def __create(name,root_output_dir,_wf_id=None,**kwargs):
         """
         Creates a new workflow
 
@@ -311,7 +309,7 @@ class Workflow(models.Model):
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
 
-        wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
+        wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, **kwargs)
 
         wf.log.info('Created Workflow {0}.'.format(wf))
 
@@ -481,7 +479,7 @@ class Workflow(models.Model):
 
         ### Bulk add parents
         task_edges = map(lambda e: TaskEdge(parent=e[0],child=e[1]),edges)
-        self.log.info("Bulk adding {0} task edges...".format(len(task_edges)))
+        self.log.info("Bulk adding {0} TaskEdges...".format(len(task_edges)))
         TaskEdge.objects.bulk_create(task_edges)
 
     @transaction.commit_on_success

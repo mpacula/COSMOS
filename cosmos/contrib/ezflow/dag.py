@@ -28,6 +28,7 @@ def flowfxn(func,dag,*RHS):
 
     if not dag.ignore_stage_name_collisions and stage_name in dag.stage_names_used:
         raise StageNameCollision, 'Duplicate stage_names detected {0}.'.format(stage_name)
+
     dag.stage_names_used.append(stage_name)
 
     return dag
@@ -154,12 +155,20 @@ class DAG(object):
 
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
-        for tool in nx.topological_sort(self.G):
-            stage_name = tool.stage_name
-            if stage_name not in stages: #have not seen this stage yet
-                stages[stage_name] = workflow.add_stage(stage_name)
-            tool.stage = stages[stage_name]
-        
+        # for tool in nx.topological_sort(self.G):
+        #     stage_name = tool.stage_name
+        #     if stage_name not in stages: #have not seen this stage yet
+        #         stages[stage_name] = workflow.add_stage(stage_name)
+        #     tool.stage = stages[stage_name]
+
+        # Load stages or add if they don't exist
+        for stage_name in self.stage_names_used:
+            stages[stage_name] = workflow.add_stage(stage_name)
+
+        # Set tool.stage
+        for tool in self.G.nodes():
+            tool.stage = stages[tool.stage_name]
+
         #update tool._task_instance and tool.output_files with existing data
         stasks = list(workflow.tasks.select_related('_output_files','stage'))
         for tpl, group in groupby(stasks + self.G.nodes(), lambda x: (x.tags,x.stage.name)):

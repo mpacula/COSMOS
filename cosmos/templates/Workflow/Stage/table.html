@@ -13,16 +13,15 @@
             <th>Stage Wall Time</th>
             <th>Avg CPU Req</th>
             <th>Avg % CPU</th>
-            <th>Avg Task Wall Time</th>
-            {% if details %}
-                <th>Max Task Wall Time</th>
-                <th>Total Task Wall Time</th>
-                <th>Avg Task Blocked I/O Time</th>
-            {% endif %}
+            <th>Avg Time Req</th>
+            <th>Avg Wall Time</th>
+            <th>Max Wall Time</th>
+            <th>Sum Wall Time</th>
+            <th>Avg Blocked I/O Time</th>
 
             <th>Avg Mem Req</th>
-            <th>Avg RSS</th>
-            <th>Max RSS</th>
+            <th>Avg Mem Used (RSS)</th>
+            <th>Max Mem Used (RSS)</th>
             {% if details%}
                 <th>Avg Virtual Ram</th>
                 <th>Started</th>
@@ -54,12 +53,12 @@
                 <td>{{stage.wall_time.seconds|format_time}}</td>
                 <td>{% get_task_stat stage "cpu_requirement" "Avg"%}</td>
                 <td>{% get_sjob_stat stage "percent_cpu" "Avg" "format_percent"%}</td>
+
+                <td>{% get_task_stat stage "time_requirement" "Avg" "format_time" "minutes"%}</td>
                 <td>{% get_sjob_stat stage "wall_time" "Avg" "format_time"%}</td>
-                {% if details and cosmos_settings.show_stage_details == 'True' %}
                 <td>{% get_sjob_stat stage "wall_time" "Max" "format_time"%}</td>
                 <td>{% get_sjob_stat stage "wall_time" "Sum" "format_time"%}</td>
                 <td>{% get_sjob_stat stage "block_io_delays" "Avg" "format_time"%}</td>
-                {% endif %}
 
                 <td>{% get_task_stat stage "memory_requirement" "Avg" "format_memory_mb"%}</td>
                 <td>{% get_sjob_stat stage "avg_rss_mem" "Avg" "format_memory_kb"%}</td>

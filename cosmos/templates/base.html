@@ -1,10 +1,8 @@
 {% load extras %}
 {% load staticfiles %}
 <!DOCTYPE html>
-<html><head profile="http://www.w3.org/2005/10/profile">
-    <link rel="icon"
-          type="image/png"
-          href="{%static "img/favicon2.ico"%}">
+<html>
+  <head>
     <title>Cosmos {%block title%}{%endblock%}</title>
     <!-- Bootstrap -->
       <!--
@@ -52,7 +50,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </a>
-          <a class="brand" href="/">
+          <a class="brand" href="/Workflow/">
               <img src="{% static "img/logo.png" %}">
               Cosmos</a>
           <div class="nav-collapse collapse pull-right">
