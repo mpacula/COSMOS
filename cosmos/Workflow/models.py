@@ -28,6 +28,7 @@ status_choices=(
 
 
 class TaskError(Exception): pass
+class TaskValidationError(Exception): pass
 class WorkflowError(Exception): pass
 
 i = 0
@@ -47,9 +48,10 @@ class TaskFile(models.Model):
 
     def __init__(self,*args,**kwargs):
         """
-        :param path: the path to the input file
-        :param name: the name or keyword for the input file
-        :param fmt: the format of the input file
+        :param name: This is the name of the file, and is used as the key for obtaining it.  No Tool an
+            have multiple TaskFiles with the same name.  Defaults to ``fmt``.
+        :param fmt: The format of the file.  Defaults to the extension of ``path``.
+        :param path: The path to the file.  Required.
         """
         super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
@@ -58,11 +60,13 @@ class TaskFile(models.Model):
                 #   ie fmt = fastq.gz if path=file.blah.fastq.gz
                 # otherwise take the last extension
                 #   ie fmt = fastq if path=file.blah.fastq
-                groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
-                self.fmt = groups[0] if groups[0] else groups[1]
+                # groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
+                # self.fmt = groups[0] if groups[0] else groups[1]
+                groups = re.search('\.([^\.]+)$',self.path).groups()
+                self.fmt = groups[0]
 
             except AttributeError as e:
-                raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
+                raise AttributeError('{0}. Probably malformed path: {1}'.format(e,self.path))
 
         if not self.name and self.fmt:
             self.name = self.fmt
@@ -102,6 +106,7 @@ class Workflow(models.Model):
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
     delete_intermediates = models.BooleanField(default=False,help_text="Delete intermediate files")
+    #comments - models.TextField()
 
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
@@ -424,23 +429,22 @@ class Workflow(models.Model):
         id_start =  m + 1 if m else 1
         for i,t in enumerate(tasks): t.id = id_start + i
 
-        try:
-            Task.objects.bulk_create(tasks)
-        except IntegrityError as e:
-            for tpl, tasks in helpers.groupby(tasks + list(self.tasks), lambda t: (t.tags,t.stage)):
-                if len(list(tasks)) > 1:
-                    print 'ERROR! Duplicate tags in {0}, which are:'.format(tpl[1])
-                    pprint.pprint(tpl[0])
-
-            raise(IntegrityError('{0}'.format(e)))
+        # try:
+        Task.objects.bulk_create(tasks)
+        # except IntegrityError as e:
+        #     for tpl, tasks in helpers.groupby(tasks + list(self.tasks), lambda t: (t.tags,t.stage)):
+        #         if len(list(tasks)) > 1:
+        #             print 'ERROR! Duplicate tags in {0}, which are:'.format(tpl[1])
+        #             pprint.pprint(tpl[0])
+        #
+        #     raise(IntegrityError('{0}'.format(e)))
 
         #create output directories
         for t in tasks:
             os.mkdir(t.output_dir)
-            os.mkdir(t.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
+            os.mkdir(t.job_output_dir) #this is not in JobManager because JobMasmanager should be not care about these details
 
         ### Bulk add tags
-        #TODO validate that all tags use the same keywords
         tasktags = []
         for t in tasks:
             for k,v in t.tags.items():
@@ -969,19 +973,19 @@ class Stage(models.Model):
             if sja:
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
 
-    def add_task(self, pcmd, tags={}, **kwargs):
-        """
-        Creates a new task for this stage, and saves it.
-        If a task with `tags` already exists in this stage, just return it.
-        Has the same signature as :meth:`Task.__init__` minus the stage argument.
-        
-        :returns: The task added.
-        """
-        q = Task.objects.filter(stage=self,tags=tags)
-        # if q.count() > 0:
-        #     return q.all()[0]
-
-        return Task.create(stage=self,pcmd=pcmd,**kwargs)
+    # def add_task(self, pcmd, tags={}, **kwargs):
+    #     """
+    #     Creates a new task for this stage, and saves it.
+    #     If a task with `tags` already exists in this stage, just return it.
+    #     Has the same signature as :meth:`Task.__init__` minus the stage argument.
+    #
+    #     :returns: The task added.
+    #     """
+    #     q = Task.objects.filter(stage=self,tags=tags)
+    #     # if q.count() > 0:
+    #     #     return q.all()[0]
+    #
+    #     return Task.create(stage=self,pcmd=pcmd,**kwargs)
 
     def is_done(self):
         """
@@ -1153,14 +1157,10 @@ class Task(models.Model):
         :returns: A new task instance.  The instance has not been saved to the database.
         """
         kwargs['created_on'] = timezone.now()
-        return super(Task,self).__init__(*args, **kwargs)
+        super(Task,self).__init__(*args, **kwargs)
 
-        if not self.pcmd: raise TaskError, 'pcmd is required'
-        if not self.stage: raise TaskError, 'stage is required'
-
-        if self.pcmd == '' and not self.NOOP:
-            raise TaskError('pcmd cannot be blank if NOOP==False')
-
+        # if len(self.tags) == 0:
+        #     raise TaskValidationError, '{0} has no tags, at least one tag is required'.format(self)
 
     @staticmethod
     def create(stage,pcmd,**kwargs):

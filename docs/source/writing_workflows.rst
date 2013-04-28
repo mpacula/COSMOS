@@ -49,6 +49,8 @@ This tool will read a txt file, count the number of words, and write it to anoth
 See the :py:class:`Tool API <tool.Tool>` for more properties that can be overridden to obtain
 various behaviors.
 
+
+
 Overriding map_inputs
 ++++++++++++++++++++++
 Todo
@@ -58,7 +60,16 @@ Defining Input Files
 --------------------
 
 An Input file is an instantiation of :py:class:`tool.INPUT`, which is just a Tool with
-:py:attr:`tool.INPUT.NOOP` set to True, and a way to initialize its output files with an existing path on the filesystem.
+:py:attr:`tool.INPUT.NOOP` set to True, and a way to initialize it with a single output file from an existing
+path on the filesystem.
+
+An INPUT has one outputfile, which is an instance of :py:class:`Workflow.models.TaskFile`.  It has 3 important
+attributes:
+
+* ``name``: This is the name of the file, and is used as the key for obtaining it.  No Tool an
+    have multiple TaskFiles with the same name.  Defaults to ``fmt``.
+* ``fmt``: The format of the file.  Defaults to the extension of ``path``.
+* ``path``: The path to the file. Required.
 
 Here's an example of how to create an instance of an :py:class:`tool.INPUT` File:
 
@@ -66,7 +77,7 @@ Here's an example of how to create an instance of an :py:class:`tool.INPUT` File
 
     from cosmos.contrib.ezflow import INPUT
 
-    input_file = INPUT('/path/to/file.txt')
+    input_file = INPUT('/path/to/file.txt',tags={'i':1})
 
 ``input_file`` will now be a tool instance with an output file called 'txt' that points to :file:`/path/to/file.txt`.
 
@@ -74,7 +85,6 @@ A more fine grained approach to defining input files:
 
 .. code-block:: python
 
-    from cosmos.Workflow.models import TaskFile
     from cosmos.contrib.ezflow import INPUT
     INPUT(name='favorite_txt',path='/path/to/favorite_txt.txt.gz',fmt='txt.gz',tags={'color':'red'})
 

@@ -145,6 +145,7 @@ class DAG(object):
         #Validation
         taskfiles = list(it.chain(*[ n.output_files for n in self.G.nodes() ]))
         #check paths
+        #TODO this code is really weird.
         v = map(lambda tf: tf.path,taskfiles)
         v = filter(lambda x:x,v)
         if len(map(lambda t: t,v)) != len(map(lambda t: t,set(v))):
@@ -153,7 +154,7 @@ class DAG(object):
 
         #Add stages, and set the tool.stage reference for all tools
         stages = {}
-        for tool in nx.topological_sort_recursive(self.G):
+        for tool in nx.topological_sort(self.G):
             stage_name = tool.stage_name
             if stage_name not in stages: #have not seen this stage yet
                 stages[stage_name] = workflow.add_stage(stage_name)
@@ -247,7 +248,11 @@ class DAG(object):
         >>> dag() |Add| [tool1,tool2,tool3,tool4]
         """
         if not isinstance(tools,list):
-            raise FlowFxnValidationError, 'Tools must be a list'
+            raise FlowFxnValidationError, 'The parameter `tools` must be a list'
+        for t in tools:
+            if len(t.tags) == 0:
+                raise FlowFxnValidationError, '{0} has no tags, at least one tag is required'.format(t)
+
         if stage_name is None:
             stage_name = tools[0].stage_name
         for tool in tools:
