@@ -107,7 +107,7 @@ class JobManager(JobManagerBase):
         jt.remoteCommand = cmd.split(' ')[0]
         jt.args = cmd.split(' ')[1:]
         jt.workingDirectory = os.getcwd()
-        jt.jobName = jobAttempt.task.workflow.name+'/'+jobAttempt.task.stage.name
+        jt.jobName = jobAttempt.task.stage.name
         jt.outputPath = ':'+jobAttempt.STDOUT_filepath
         jt.errorPath = ':'+jobAttempt.STDERR_filepath
 
