@@ -16,7 +16,6 @@
             <th>Avg Time Req</th>
             <th>Avg Wall Time</th>
             <th>Max Wall Time</th>
-            <th>Sum Wall Time</th>
             <th>Avg Blocked I/O Time</th>
 
             <th>Avg Mem Req</th>
@@ -57,7 +56,6 @@
                 <td>{% get_task_stat stage "time_requirement" "Avg" "format_time" "minutes"%}</td>
                 <td>{% get_sjob_stat stage "wall_time" "Avg" "format_time"%}</td>
                 <td>{% get_sjob_stat stage "wall_time" "Max" "format_time"%}</td>
-                <td>{% get_sjob_stat stage "wall_time" "Sum" "format_time"%}</td>
                 <td>{% get_sjob_stat stage "block_io_delays" "Avg" "format_time"%}</td>
 
                 <td>{% get_task_stat stage "memory_requirement" "Avg" "format_memory_mb"%}</td>

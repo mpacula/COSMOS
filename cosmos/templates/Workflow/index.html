@@ -13,7 +13,6 @@
             <th>Created On</th>
             <th>Finished On</th>
             <th>Wall Time</th>
-            <th>Total Stage Time</th>
         </tr></thead><tbody>
         {% for workflow in workflows %}
         <tr>
@@ -21,7 +20,6 @@
             <td>{{workflow.created_on|date:"SHORT_DATETIME_FORMAT"}}</td>
             <td>{{workflow.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
             <td>{{workflow.wall_time.seconds|format_time}}</td>
-            <td>{{workflow.total_stage_wall_time.seconds|format_time}}</td>
         </tr>
         {% endfor %}
         </tbody>

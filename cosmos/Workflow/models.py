@@ -149,13 +149,14 @@ class Workflow(models.Model):
         """Time between this workflow's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
 
-    @property
-    def total_stage_wall_time(self):
-        """
-        Sum(stage_wall_times).  Can be different from workflow.wall_time due to workflow stops and reloads.
-        """
-        times = map(lambda x: x['finished_on']-x['started_on'],Stage.objects.filter(workflow=self).values('finished_on','started_on'))
-        return reduce(lambda x,y: x+y, filter(lambda wt: wt,times))
+    # not sure if this works so commented
+    # @property
+    # def total_stage_wall_time(self):
+    #     """
+    #     Sum(stage_wall_times).  Can be different from workflow.wall_time due to workflow stops and reloads.
+    #     """
+    #     times = map(lambda x: x['finished_on']-x['started_on'],Stage.objects.filter(workflow=self).values('finished_on','started_on'))
+    #     return reduce(lambda x,y: x+y, filter(lambda wt: wt,times))
 
     @property
     def stages(self):
