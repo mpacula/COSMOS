@@ -29,7 +29,8 @@ def flowfxn(func,dag,*RHS):
     if not dag.ignore_stage_name_collisions and stage_name in dag.stage_names_used:
         raise StageNameCollision, 'Duplicate stage_names detected {0}.'.format(stage_name)
 
-    dag.stage_names_used.append(stage_name)
+    if stage_name not in dag.stage_names_used:
+        dag.stage_names_used.append(stage_name)
 
     return dag
 
@@ -332,7 +333,7 @@ class DAG(object):
         """
         parent_tools = dag.active_tools
         if type(keywords) != list:
-            raise dagError('Invalid Right Hand Side of reduce')
+            raise TypeError('keywords must be a list')
         for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
             parent_tool_group = list(parent_tool_group)
             new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
