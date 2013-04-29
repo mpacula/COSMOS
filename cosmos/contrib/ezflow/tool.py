@@ -61,11 +61,10 @@ class Tool(object):
         :param dag: the dag this task belongs to.
         """
         #if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
-
-        if not hasattr(self,'output_files'): self.output_files = []
         if not hasattr(self,'name'): self.name = self.__class__.__name__
-        self.tags = tags
+        if not hasattr(self,'output_files'): self.output_files = []
         self.stage_name = stage_name if stage_name else self.name
+        self.tags = tags
         self.dag = dag
         
         self.id = get_id()
@@ -82,12 +81,26 @@ class Tool(object):
             raise ToolValidationError('Duplicate output names detected.  Perhaps try using [1.ext,2.ext,...]')
 
     @property
+    def children(self):
+        return self.dag.G.successors(self)
+
+    @property
+    def child(self):
+        cs = self.children
+        if len(cs) > 1:
+            raise ToolError('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
+        elif len(cs) == 0:
+            raise ToolError('{0} has no parents'.format(self))
+        else:
+            return cs[0]
+
+    @property
     def parents(self):
         return self.dag.G.predecessors(self)
     
     @property
     def parent(self):
-        ps = self.dag.G.predecessors(self)
+        ps = self.parents
         if len(ps) > 1:
             raise ToolError('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
         elif len(ps) == 0:
@@ -95,11 +108,12 @@ class Tool(object):
         else:
             return ps[0]
     
-    def get_output(self,name):
+    def get_output(self,name,error_if_missing=True):
         """
         Returns the output TaskFiles who's name == name.  This should always be one element.
         
         :param name: the name of the output file.
+        :param error_if_missing: (bool) Raises a GetOutputError if the output cannot be found
         """
 
         outputs = filter(lambda x: x.name == name,self.output_files)
@@ -112,7 +126,7 @@ class Tool(object):
             except GetOutputError as e:
                 pass
 
-        if len(outputs) == 0:
+        if error_if_missing and len(outputs) == 0:
             raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
 
         return outputs[0]
@@ -154,11 +168,15 @@ class Tool(object):
             all_inputs = []
             for name in self.inputs:
                 for p in self.parents:
-                    all_inputs += [ p.get_output(name) ]
+                    all_inputs += [ p.get_output(name,error_if_missing=False) ]
 
             input_dict = {}
             for input_file in all_inputs:
                 input_dict.setdefault(input_file.name,[]).append(input_file)
+
+            for k,v in input_dict.items():
+                if len(v) == 0:
+                    raise ToolValidationError, "Could not find input '{0}' in {1}".format(k,self)
 
             return input_dict
         

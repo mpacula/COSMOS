@@ -16,9 +16,9 @@ def get_sjob_stat(stage,field,statistic,pipe=None):
     return getattr(sys.modules[__name__],pipe)(r) if pipe else r
 
 @register.simple_tag
-def get_task_stat(stage,field,statistic,pipe=None):
+def get_task_stat(stage,field,statistic,pipe=None,*args):
     r =  stage.get_task_stat(field,statistic)
-    return getattr(sys.modules[__name__],pipe)(r) if pipe else r
+    return getattr(sys.modules[__name__],pipe)(r,*args) if pipe else r
 
 @register.simple_tag
 def convert2int(x):
@@ -113,7 +113,9 @@ def format_memory_mb(mb):
     return format_memory_kb(mb*1024.0) if mb else ""
 
 @register.filter
-def format_time(seconds):
-    if seconds == None or seconds == '': return '0'
-    return datetime.timedelta(seconds=int(seconds))
+def format_time(amount,type="seconds"):
+    if amount == None or amount == '': return '0'
+    if type == 'minutes':
+        amount = amount*60
+    return datetime.timedelta(seconds=int(amount))
         

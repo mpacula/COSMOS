@@ -1,15 +1,16 @@
 from cosmos.Workflow.models import Workflow
 from cosmos.contrib.ezflow.dag import DAG, Split, Add, Map
-from tools import ECHO, CAT, WC
+from tools import ECHO, CAT, WC, FAIL
 
 ####################
 # Workflow
 ####################
 
-dag = ( DAG().
-    add([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]).
-    split([('i',[1,2])],CAT).
-    map(WC)
+dag = ( DAG()
+    |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
+    |Split| ([('i',[1,2])],CAT)
+    |Map| FAIL
+    |Map| WC
 
 )
 dag.create_dag_img('/tmp/ex.svg')
@@ -18,6 +19,6 @@ dag.create_dag_img('/tmp/ex.svg')
 # Run Workflow
 #################
 
-WF = Workflow.start('Example 1')
+WF = Workflow.start('Example Fail')
 dag.add_to_workflow(WF)
 WF.run()

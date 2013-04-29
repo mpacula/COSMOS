@@ -66,7 +66,7 @@ def __get_context_for_stage_task_table(request,pid):
         tag_filters = all_filters.copy()
         for k,v in tag_filters.items():
             if v=='' or v==None or k =='f_status': del tag_filters[k] #filter tag_filters
-        tasks_list = stage.get_tasks_by(tag_filters) 
+        tasks_list = stage.get_tasks_by(tag_filters)
         fs = request.GET.get('f_status')
         if fs != None and fs != '': #might be none or ''
             tasks_list = tasks_list.filter(status=request.GET['f_status'])

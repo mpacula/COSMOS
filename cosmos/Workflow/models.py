@@ -28,6 +28,7 @@ status_choices=(
 
 
 class TaskError(Exception): pass
+class TaskValidationError(Exception): pass
 class WorkflowError(Exception): pass
 
 i = 0
@@ -47,9 +48,10 @@ class TaskFile(models.Model):
 
     def __init__(self,*args,**kwargs):
         """
-        :param path: the path to the input file
-        :param name: the name or keyword for the input file
-        :param fmt: the format of the input file
+        :param name: This is the name of the file, and is used as the key for obtaining it.  No Tool an
+            have multiple TaskFiles with the same name.  Defaults to ``fmt``.
+        :param fmt: The format of the file.  Defaults to the extension of ``path``.
+        :param path: The path to the file.  Required.
         """
         super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
@@ -58,11 +60,13 @@ class TaskFile(models.Model):
                 #   ie fmt = fastq.gz if path=file.blah.fastq.gz
                 # otherwise take the last extension
                 #   ie fmt = fastq if path=file.blah.fastq
-                groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
-                self.fmt = groups[0] if groups[0] else groups[1]
+                # groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
+                # self.fmt = groups[0] if groups[0] else groups[1]
+                groups = re.search('\.([^\.]+)$',self.path).groups()
+                self.fmt = groups[0]
 
             except AttributeError as e:
-                raise AttributeError('{0}. probably malformed path ( {1} )'.format(e,self.path))
+                raise AttributeError('{0}. Probably malformed path: {1}'.format(e,self.path))
 
         if not self.name and self.fmt:
             self.name = self.fmt
@@ -102,6 +106,8 @@ class Workflow(models.Model):
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
     delete_intermediates = models.BooleanField(default=False,help_text="Delete intermediate files")
+    #cmd_executed = models.CharField(max_length=255,default=None,null=True)
+    comments = models.TextField(null=True,default=None)
 
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
@@ -143,13 +149,14 @@ class Workflow(models.Model):
         """Time between this workflow's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
         return self.finished_on - self.created_on if self.finished_on else timezone.now().replace(microsecond=0) - self.created_on
 
-    @property
-    def total_stage_wall_time(self):
-        """
-        Sum(stage_wall_times).  Can be different from workflow.wall_time due to workflow stops and reloads.
-        """
-        times = map(lambda x: x['finished_on']-x['started_on'],Stage.objects.filter(workflow=self).values('finished_on','started_on'))
-        return reduce(lambda x,y: x+y, filter(lambda wt: wt,times))
+    # not sure if this works so commented
+    # @property
+    # def total_stage_wall_time(self):
+    #     """
+    #     Sum(stage_wall_times).  Can be different from workflow.wall_time due to workflow stops and reloads.
+    #     """
+    #     times = map(lambda x: x['finished_on']-x['started_on'],Stage.objects.filter(workflow=self).values('finished_on','started_on'))
+    #     return reduce(lambda x,y: x+y, filter(lambda wt: wt,times))
 
     @property
     def stages(self):
@@ -167,41 +174,36 @@ class Workflow(models.Model):
         return file(self.log_path,'rb').read()
 
     @staticmethod
-    def start(name=None, delete_unsuccessful=True,restart=False, dry_run=False, root_output_dir=None,
-              default_queue=None, delete_intermediates = False,
-              delete_unsuccessful_stages=False,prompt_confirm=True,*args,**kwargs):
+    def start(name,**kwargs):
         """
         Starts a workflow.  If a workflow with this name already exists, return the workflow.
 
         :param name: (str) A unique name for this workflow. All spaces are converted to underscores. Required.
         :param restart: (bool) Complete restart the workflow by deleting it and creating a new one. Optional.
-        :param delete_unsuccessful_stages: (bool) Deletes any unsuccessful stages in the workflow. Optional.
         :param dry_run: (bool) Don't actually execute jobs. Optional.
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         :param delete_intermediates: (str) Deletes intermediate files to save scratch space.
         """
 
-        if name is None:
-            raise ValidationError('Name of a workflow cannot be None')
+        kwargs.setdefault('dry_run',False)
+        kwargs.setdefault('root_output_dir',settings['default_root_output_dir'])
+        kwargs.setdefault('default_queue',settings['default_queue'])
+        kwargs.setdefault('delete_intermediates', False)
+        kwargs.setdefault('comments',None)
+
+        restart = kwargs.pop('restart',False)
+        prompt_confirm = kwargs.pop('prompt_confirm',True)
+
         name = re.sub("\s","_",name)
 
-        if root_output_dir is None:
-            root_output_dir = settings['default_root_output_dir']
-
-        if default_queue is None:
-            default_queue = session.settings['default_queue']
-
         if restart:
-            wf = Workflow.__restart(name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
+            wf = Workflow.__restart(name, prompt_confirm=prompt_confirm, **kwargs)
         elif Workflow.objects.filter(name=name).count() > 0:
-            if delete_unsuccessful:
-                #TODO make sure user didn't try to change unsupported params like root_output_dir when resuming or reloading
-                wf = Workflow.__reload(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,delete_unsuccessful_stages=delete_unsuccessful_stages,prompt_confirm=prompt_confirm)
-            else:
-                wf = Workflow.__resume(name=name, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates,prompt_confirm=prompt_confirm)
+            wf = Workflow.__reload(name=name, prompt_confirm=prompt_confirm, **kwargs)
+            wf = Workflow.__resume(name=name, **kwargs)
         else:
-            wf = Workflow.__create(name=name, dry_run=dry_run, root_output_dir=root_output_dir, default_queue=default_queue, delete_intermediates=delete_intermediates)
+            wf = Workflow.__create(name=name, **kwargs)
 
         #remove stale objects
         wf._delete_stale_objects()
@@ -217,7 +219,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __resume(name,dry_run, default_queue, delete_intermediates):
+    def __resume(name,dry_run, default_queue, delete_intermediates, comments,**kwargs):
         """
         Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be called by anything except __reload
 
@@ -231,6 +233,8 @@ class Workflow(models.Model):
         wf.finished_on = None
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
+        if comments:
+            wf.comments = comments
 
         wf.save()
         wf.log.info('Resuming {0}'.format(wf))
@@ -238,13 +242,18 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __reload(name, dry_run, default_queue, delete_intermediates,delete_unsuccessful_stages,prompt_confirm=True):
+    def __reload(name, dry_run, default_queue, delete_intermediates,delete_unsuccessful_stages=False, prompt_confirm=True,**kwargs):
         """
         Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
 
         see :py:meth:`start` for parameter definitions
         """
-        wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates)
+        #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
+        #TODO idealy just change the queryset manager to do this automatically
+        wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
+        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
+            print "Exiting."
+            sys.exit(1)
         if delete_unsuccessful_stages:
             for s in wf.stages.filter(successful=False):
                 s.delete()
@@ -258,9 +267,6 @@ class Workflow(models.Model):
         utasks = wf.tasks.filter(successful=False)
         num_utasks = len(utasks)
         if num_utasks > 0:
-            # if not confirmed and prompt_confirm and not helpers.confirm("Are you sure you want to delete the sql records for and output files of {0} unsuccessful tasks?".format(num_utasks),default=True,timeout=30):
-            #     print "Exiting."
-            #     sys.exit(1)
             wf.bulk_delete_tasks(utasks)
 
             # Update stages that are resuming
@@ -271,7 +277,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __restart(name,root_output_dir,dry_run,default_queue,delete_intermediates,prompt_confirm=True):
+    def __restart(name,prompt_confirm=True,**kwargs):
         """
         Restarts a workflow.  Will delete the old workflow and all of its files
         but will retain the old workflow id for convenience
@@ -288,12 +294,12 @@ class Workflow(models.Model):
             wf_id = old_wf.id
             old_wf.delete()
 
-        new_wf = Workflow.__create(_wf_id=wf_id, name=name, root_output_dir=root_output_dir, dry_run=dry_run, default_queue=default_queue,delete_intermediates=delete_intermediates)
+        new_wf = Workflow.__create(_wf_id=wf_id, name=name, **kwargs)
 
         return new_wf
 
     @staticmethod
-    def __create(name,dry_run,root_output_dir,default_queue,delete_intermediates,_wf_id=None):
+    def __create(name,root_output_dir,_wf_id=None,**kwargs):
         """
         Creates a new workflow
 
@@ -304,7 +310,7 @@ class Workflow(models.Model):
         check_and_create_output_dir(root_output_dir)
         output_dir = os.path.join(root_output_dir,name)
 
-        wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, dry_run=dry_run, default_queue=default_queue, delete_intermediates=delete_intermediates)
+        wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, **kwargs)
 
         wf.log.info('Created Workflow {0}.'.format(wf))
 
@@ -367,7 +373,7 @@ class Workflow(models.Model):
         self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
         tasks.update(status = 'failed',finished_on = timezone.now())
 
-        stages = Stage.objects.filter(Q(task__in=tasks)|Q(successful=False))
+        stages = Stage.objects.filter(Q(task__in=tasks)|Q(workflow=self,successful=False))
         self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
         stages.update(status = 'failed',finished_on = timezone.now())
 
@@ -422,23 +428,22 @@ class Workflow(models.Model):
         id_start =  m + 1 if m else 1
         for i,t in enumerate(tasks): t.id = id_start + i
 
-        try:
-            Task.objects.bulk_create(tasks)
-        except IntegrityError as e:
-            for tpl, tasks in helpers.groupby(tasks + list(self.tasks), lambda t: (t.tags,t.stage)):
-                if len(list(tasks)) > 1:
-                    print 'ERROR! Duplicate tags in {0}, which are:'.format(tpl[1])
-                    pprint.pprint(tpl[0])
-
-            raise(IntegrityError('{0}'.format(e)))
+        # try:
+        Task.objects.bulk_create(tasks)
+        # except IntegrityError as e:
+        #     for tpl, tasks in helpers.groupby(tasks + list(self.tasks), lambda t: (t.tags,t.stage)):
+        #         if len(list(tasks)) > 1:
+        #             print 'ERROR! Duplicate tags in {0}, which are:'.format(tpl[1])
+        #             pprint.pprint(tpl[0])
+        #
+        #     raise(IntegrityError('{0}'.format(e)))
 
         #create output directories
         for t in tasks:
             os.mkdir(t.output_dir)
-            os.mkdir(t.job_output_dir) #this is not in JobManager because JobMaster should be not care about these details
+            os.mkdir(t.job_output_dir) #this is not in JobManager because JobMasmanager should be not care about these details
 
         ### Bulk add tags
-        #TODO validate that all tags use the same keywords
         tasktags = []
         for t in tasks:
             for k,v in t.tags.items():
@@ -475,7 +480,7 @@ class Workflow(models.Model):
 
         ### Bulk add parents
         task_edges = map(lambda e: TaskEdge(parent=e[0],child=e[1]),edges)
-        self.log.info("Bulk adding {0} task edges...".format(len(task_edges)))
+        self.log.info("Bulk adding {0} TaskEdges...".format(len(task_edges)))
         TaskEdge.objects.bulk_create(task_edges)
 
     @transaction.commit_on_success
@@ -504,24 +509,25 @@ class Workflow(models.Model):
         """
         Deletes this workflow.
         """
-        self.log.info("Deleting {0}...".format(self))
-
-        if os.path.exists(self.output_dir):
-            self.log.info('Deleting directory {0}...'.format(self.output_dir))
-            os.system('rm -rf {0}'.format(self.output_dir))
+        self.log.info("Deleting {0} and it's output dir {1}...".format(self,self.output_dir))
+        wf_output_dir = self.output_dir
 
         self.jobManager.delete()
         self.bulk_delete_tasks(self.tasks)
         self.log.info('Bulk Deleting Stages...'.format(self.name))
         self.stages.delete()
-        self.log.info('{0} Deleted.'.format(self))
-
-        for h in self.log.handlers:
-            h.flush()
-            h.close()
-            self.log.removeHandler(h)
 
         super(Workflow, self).delete(*args, **kwargs)
+
+        self.log.info('{0} Deleted.'.format(self))
+        x = list(self.log.handlers)
+        for h in x:
+            self.log.removeHandler(h)
+            h.flush()
+            h.close()
+
+        if os.path.exists(wf_output_dir):
+            os.system('rm -rf {0}'.format(self.output_dir))
 
     def _run_task(self,task):
         """
@@ -658,8 +664,8 @@ class Workflow(models.Model):
         :param tags: (dict) tags to filter for
         :returns: (queryset) a queryset of the filtered tasks
 
-        >>> task.get_tasks_by(op='or',tags={'color':'grey','color':'orange'})
-        >>> task.get_tasks_by(op='and',tags={'color':'grey','shape':'square'})
+        >>> task.get_tools_by(op='or',tags={'color':'grey','color':'orange'})
+        >>> task.get_tools_by(op='and',tags={'color':'grey','shape':'square'})
         """
 
         if op == 'or':
@@ -966,19 +972,19 @@ class Stage(models.Model):
             if sja:
                 yield [jru for jru in sja.resource_usage_short] + task.tags.items() #add in tags to resource usage tuples
 
-    def add_task(self, pcmd, tags={}, **kwargs):
-        """
-        Creates a new task for this stage, and saves it.
-        If a task with `tags` already exists in this stage, just return it.
-        Has the same signature as :meth:`Task.__init__` minus the stage argument.
-        
-        :returns: The task added.
-        """
-        q = Task.objects.filter(stage=self,tags=tags)
-        # if q.count() > 0:
-        #     return q.all()[0]
-
-        return Task.create(stage=self,pcmd=pcmd,**kwargs)
+    # def add_task(self, pcmd, tags={}, **kwargs):
+    #     """
+    #     Creates a new task for this stage, and saves it.
+    #     If a task with `tags` already exists in this stage, just return it.
+    #     Has the same signature as :meth:`Task.__init__` minus the stage argument.
+    #
+    #     :returns: The task added.
+    #     """
+    #     q = Task.objects.filter(stage=self,tags=tags)
+    #     # if q.count() > 0:
+    #     #     return q.all()[0]
+    #
+    #     return Task.create(stage=self,pcmd=pcmd,**kwargs)
 
     def is_done(self):
         """
@@ -1150,14 +1156,10 @@ class Task(models.Model):
         :returns: A new task instance.  The instance has not been saved to the database.
         """
         kwargs['created_on'] = timezone.now()
-        return super(Task,self).__init__(*args, **kwargs)
+        super(Task,self).__init__(*args, **kwargs)
 
-        if not self.pcmd: raise TaskError, 'pcmd is required'
-        if not self.stage: raise TaskError, 'stage is required'
-
-        if self.pcmd == '' and not self.NOOP:
-            raise TaskError('pcmd cannot be blank if NOOP==False')
-
+        # if len(self.tags) == 0:
+        #     raise TaskValidationError, '{0} has no tags, at least one tag is required'.format(self)
 
     @staticmethod
     def create(stage,pcmd,**kwargs):
