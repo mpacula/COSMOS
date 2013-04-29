@@ -18,7 +18,7 @@ def _get_stages_dict(workflow):
 
 @never_cache
 def index(request):
-    workflows = Workflow.objects.all().order_by('-id')
+    workflows = Workflow.objects.all().order_by('-created_on')
     return render_to_response('Workflow/index.html', { 'request':request,'workflows': workflows }, context_instance=RequestContext(request))
 
 @never_cache
