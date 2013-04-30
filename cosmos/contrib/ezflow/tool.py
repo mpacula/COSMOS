@@ -129,6 +129,8 @@ class Tool(object):
         if len(outputs) == 0:
             if error_if_missing:
                 raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
+            else:
+                return None
         else:
             return outputs[0]
     

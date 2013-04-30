@@ -198,7 +198,7 @@ class Workflow(models.Model):
         name = re.sub("\s","_",name)
 
         if restart:
-            wf = Workflow.__restart(name, prompt_confirm=prompt_confirm, **kwargs)
+            wf = Workflow.__restart(name=name, prompt_confirm=prompt_confirm, **kwargs)
         elif Workflow.objects.filter(name=name).count() > 0:
             wf = Workflow.__reload(name=name, prompt_confirm=prompt_confirm, **kwargs)
             wf = Workflow.__resume(name=name, **kwargs)
@@ -219,7 +219,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __resume(name,dry_run, default_queue, delete_intermediates, comments,**kwargs):
+    def __resume(name,dry_run, default_queue, delete_intermediates, root_output_dir, comments,**kwargs):
         """
         Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be called by anything except __reload
 
@@ -233,6 +233,7 @@ class Workflow(models.Model):
         wf.finished_on = None
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
+        wf.root_output_dir = wf.root_output_dir
         if comments:
             wf.comments = comments
 
@@ -249,7 +250,7 @@ class Workflow(models.Model):
         see :py:meth:`start` for parameter definitions
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
-        #TODO idealy just change the queryset manager to do this automatically
+        #TODO ideally just change the queryset manager to do this automatically
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
             print "Exiting."
