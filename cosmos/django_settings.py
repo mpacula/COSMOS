@@ -117,7 +117,7 @@ INSTALLED_APPS = (
     'cosmos.Job',
     #'django_pdb',
     #'gunicorn',
-    'south',
+    #'south',
     #'debug_toolbar',
     'django.contrib.auth',
     'django.contrib.contenttypes',

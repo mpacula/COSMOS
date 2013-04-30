@@ -387,142 +387,25 @@ class Infix:
         return self.function(other)
     def __call__(self, value1, value2):
         return self.function(value1, value2)
-    
-#WF = None
 
-#TODO clear out duplicate infix code
-
-@flowfxn
-def _add(dag,tools,stage_name=None):
-    """
-    Always the first operator of a workflow.  Simply adds a list of tool instances to the dag, without adding any
-    dependencies.
-
-    .. warning::
-        This operator is different than the others in that its input is a list of
-        instantiated instances of Tools.
-
-    :param dag: The dag to add to.
-    :param tools: (list) Tool instances.
-    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
-    :return: (list) The tools added.
-
-    >>> dag() |Add| [tool1,tool2,tool3,tool4]
-    """
-    if not isinstance(tools,list):
-        raise FlowFxnValidationError, 'Tools must be a list'
-    if stage_name is None:
-        stage_name = tools[0].stage_name
-    for tool in tools:
-        tool.stage_name = stage_name
-        dag.G.add_node(tool)
-        yield tool
+def _add(dag,*args,**kwargs):
+    return dag.add(*args,**kwargs)
 Add = Infix(_add)
 
-@flowfxn
-def _map(dag,tool_class,stage_name=None):
-    """
-    Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
-    type `tool_class`.
-
-    :param dag: (dag) The dag to add to.
-    :param parent_tools: (list) A list of parent tools.
-    :param tool_class: (subclass of Tool)
-    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
-    :return: (list) The tools added.
-
-    >>> dag() |Map| Tool_Class
-    """
-    parent_tools = dag.active_tools
-    for parent_tool in parent_tools:
-        new_tool = tool_class(stage_name=stage_name,dag=dag,tags=parent_tool.tags)
-        dag.G.add_edge(parent_tool,new_tool)
-        yield new_tool
-        
+def _map(dag,*args,**kwargs):
+    return dag.map(*args,**kwargs)
 Map = Infix(_map)
 
-
-#TODO raise exceptions if user submits bad kwargs for any infix commands
-@flowfxn
-def _split(dag,split_by,tool_class,stage_name=None):
-    """
-    Creates one2many relationships for each tool in the stage last added to the dag, with every possible combination
-    of keywords in split_by.  New tools will be of class `tool_class` and tagged with one of the possible keyword
-    combinations.
-
-    :param dag: (dag) The dag to add to.
-    :param parent_tools: (list) A list of parent tools.
-    :param split_by: (list of (str,list)) Tags to split by.
-    :param tool_class: (list) Tool instances.
-    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
-    :return: (list) The tools added.
-
-    >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
-    """
-    parent_tools = dag.active_tools
-    splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
-    for parent_tool in parent_tools:
-        for new_tags in it.product(*splits):
-            tags = dict(parent_tool.tags).copy()
-            tags.update(dict(new_tags))
-            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags) 
-            dag.G.add_edge(parent_tool,new_tool)
-            yield new_tool
+def _split(dag,*args,**kwargs):
+    return dag.split(*args,**kwargs)
 Split = Infix(_split)
 
-
-@flowfxn
-def _reduce(dag,keywords,tool_class,stage_name=None):
-    """
-    Create new tools with a many2one to parent_tools.
-
-    :param dag: (dag) The dag to add to.
-    :param parent_tools: (list) A list of parent tools.
-    :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
-    :param tool_class: (list) Tool instances.
-    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
-    :return: (list) The tools added.
-
-    >>> dag() |Reduce| (['shape'],Tool_Class)
-    """
-    parent_tools = dag.active_tools
-    if type(keywords) != list:
-        raise dagError('Invalid Right Hand Side of reduce')
-    for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-        parent_tool_group = list(parent_tool_group)
-        new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
-        for parent_tool in parent_tool_group:
-            dag.G.add_edge(parent_tool,new_tool)
-        yield new_tool
+def _reduce(dag,*args,**kwargs):
+    return dag.reduce(*args,**kwargs)
 Reduce = Infix(_reduce)
 
-@flowfxn
-def _reduce_and_split(dag,keywords,split_by,tool_class,stage_name=None):
-    """
-    Create new tools by first reducing then splitting.
-
-    :param dag: (dag) The dag to add to.
-    :param parent_tools: (list) A list of parent tools.
-    :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
-    :param split_by: (list of (str,list)) Tags to split by.  Creates every possible product of the tags.
-    :param tool_class: (list) Tool instances.
-    :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
-    :return: (list) The tools added.
-
-    >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
-    """
-    parent_tools = dag.active_tools
-    splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
-    
-    for group_tags,parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-        parent_tool_group = list(parent_tool_group)
-        for new_tags in it.product(*splits):
-            tags = group_tags.copy()
-            tags.update(dict(new_tags))
-            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
-            for parent_tool in parent_tool_group:
-                dag.G.add_edge(parent_tool,new_tool)
-            yield new_tool
-ReduceSplit = Infix(_reduce_and_split)
+def _reduce_split(dag,*args,**kwargs):
+    return dag.reduce_split(*args,**kwargs)
+ReduceSplit = Infix(_reduce_split)
 
     
