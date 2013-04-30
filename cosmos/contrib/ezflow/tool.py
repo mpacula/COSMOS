@@ -126,10 +126,11 @@ class Tool(object):
             except GetOutputError as e:
                 pass
 
-        if error_if_missing and len(outputs) == 0:
-            raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
-
-        return outputs[0]
+        if len(outputs) == 0:
+            if error_if_missing:
+                raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
+        else:
+            return outputs[0]
     
     def get_output_file_names(self):
         return set(map(lambda x: x.name, self.output_files))
@@ -168,7 +169,7 @@ class Tool(object):
             all_inputs = []
             for name in self.inputs:
                 for p in self.parents:
-                    all_inputs += [ p.get_output(name,error_if_missing=False) ]
+                    all_inputs += filter(lambda x: x,[ p.get_output(name,error_if_missing=False) ]) #filter out Nones
 
             input_dict = {}
             for input_file in all_inputs:
