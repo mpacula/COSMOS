@@ -269,7 +269,7 @@ class DAG(object):
         :param tools: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (list) The tools added.
+        :return: (dag) self
 
         >>> dag() |Add| [tool1,tool2,tool3,tool4]
         """
@@ -299,7 +299,7 @@ class DAG(object):
         :param tool_class: (subclass of Tool)
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (list) The tools added.
+        :return: (DAG) self
 
         >>> dag.map(Tool_Class)
         """
@@ -322,7 +322,7 @@ class DAG(object):
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (list) The tools added.
+        :return: (DAG) self
 
         >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
         """
@@ -347,7 +347,7 @@ class DAG(object):
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (list) The tools added.
+        :return: (DAG) self
 
         >>> dag() |Reduce| (['shape'],Tool_Class)
         """
@@ -375,7 +375,7 @@ class DAG(object):
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (list) The tools added.
+        :return: (DAG) self
 
         >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
         """
@@ -396,7 +396,7 @@ class DAG(object):
     def combine_(self,*flowlist):
         """
         Applys all `flowfxn`s in ``*flowlist`` to self.active_tools.
-        Self.active_tools will be set to the union of all tools produced by this combine.
+        After completion, self.active_tools will be set to the union of all tools produced by this combine.
 
         :param *flowlist: A sequence of flowfxns
         :returns: (DAG) this dag
@@ -420,7 +420,12 @@ class DAG(object):
 
     def apply_(self,*flowlist):
         """
-        Applies each flowfxn in *flowlist to dag.active_tools.  Afterwords dag.active_tools will be the tools added
+        Applies each flowfxn in *flowlist to current dag.active_tools.  This is different from
+        :py:meth:`sequence_`, because sequence_ applies the flowfns in flowlist to each other
+        sequentially.  With apply_, all functions in *flowlist are applied onto the current
+        active_tools.
+
+        After the apply_, dag.active_tools will be the tools added
         by the last flowfxn in *flowlist.
 
         :param *flowlist: A sequence of flowfxns
@@ -444,7 +449,8 @@ class DAG(object):
 
     def sequence_(self,*flowlist):
         """
-        Applies each flowfxn in *flowlist in sequential order.
+        Applies each flowfxn in *flowlist sequentially to each other.  Very similar to python's :py:meth:`reduce`
+        function (not to be confused with :py:meth:`reduce_`, initialized with the current active_nodes.
 
         :param *flowlist: A sequence of flowfxns
         :returns: (DAG) this dag
