@@ -223,13 +223,14 @@ class DAG(object):
         task_edges = [ (parent._task_instance,child._task_instance) for parent,child in new_edges ]
         workflow.bulk_save_task_edges(task_edges)
 
-    def add_run(self,workflow):
+    def add_run(self,workflow,finish=True):
         """
         Shortcut to add to workflow and then run the workflow
-        :param workflow:
+        :param workflow: the workflow this dag will be added to
+        :param finish: pass to workflow.run()
         """
         self.add_to_workflow(workflow)
-        workflow.run()
+        workflow.run(finish=finish)
 
 
     def __new_task(self,stage,tool):
@@ -304,7 +305,7 @@ class DAG(object):
         """
         parent_tools = self.active_tools
         for parent_tool in parent_tools:
-            tags2 = parent_tool.tags
+            tags2 = parent_tool.tags.copy()
             tags2.update(tag)
             new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags2)
             self.G.add_edge(parent_tool,new_tool)
@@ -353,13 +354,16 @@ class DAG(object):
         parent_tools = self.active_tools
         if type(keywords) != list:
             raise TypeError('keywords must be a list')
-        for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-            parent_tool_group = list(parent_tool_group)
-            tags.update(tag)
-            new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
-            for parent_tool in parent_tool_group:
-                self.G.add_edge(parent_tool,new_tool)
-            yield new_tool
+        try:
+            for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
+                parent_tool_group = list(parent_tool_group)
+                tags.update(tag)
+                new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
+                for parent_tool in parent_tool_group:
+                    self.G.add_edge(parent_tool,new_tool)
+                yield new_tool
+        except KeyError, e:
+            raise FlowFxnValidationError, "Can't reduce by {0}, at least one parent of stage `{1}` is not tagged with it".format(e.args[0],stage_name)
 
     @flowfxn
     def reduce_split_(self,keywords,split_by,tool_class,stage_name=None,tag={}):
@@ -382,7 +386,7 @@ class DAG(object):
             parent_tool_group = list(parent_tool_group)
             for new_tags in it.product(*splits):
                 tags = group_tags.copy()
-                tags.update(tag).\
+                tags.update(tag)
                 tags.update(dict(new_tags))
                 new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
                 for parent_tool in parent_tool_group:
@@ -470,7 +474,7 @@ class add_(FlowFxn):pass
 class map_(FlowFxn):pass
 class split_(FlowFxn):pass
 class reduce_(FlowFxn): pass
-class reduceSplit_(FlowFxn):pass
+class reduce_split_(FlowFxn):pass
 class branch_(FlowFxn):pass
 
 class combine_(FlowFxn):pass
