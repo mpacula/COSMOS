@@ -4,52 +4,57 @@ import networkx as nx
 import pygraphviz as pgv
 from cosmos.Workflow.models import Task,TaskError
 from decorator import decorator
+from tool import Tool
+import itertools
 
 class DAGError(Exception): pass
 class StageNameCollision(Exception):pass
 class FlowFxnValidationError(Exception):pass
 
-
 @decorator
 def flowfxn(func,dag,*RHS):
     """
-    - The decorated function should return a generator, so evaluate it
-    - Set the dag.active_tools to the decorated function's return value
-    - Return the dag
+    * The decorated function should return a generator, so evaluate it
+    * Set the dag.active_tools to the decorated function's return value, if the function was not sequence_, which handles
+      this automatically
+    * Return the dag
     """
+
     if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
     dag.active_tools = list(func(dag,*RHS))
+
     try:
         stage_name = dag.active_tools[0].stage_name
     except IndexError:
-        raise DAGError, 'Tried to DAG.{0}(), but dag.active_tools is not set.  Make sure to |Add| some INPUTs first.'.format(
+        raise DAGError,'Tried to DAG.{0}(), but dag.active_tools is not set.  Make sure to |Add| some INPUTs first.'.format(
             func.__name__
         )
 
     if not dag.ignore_stage_name_collisions and stage_name in dag.stage_names_used:
-        raise StageNameCollision, 'Duplicate stage_names detected {0}.'.format(stage_name)
+        raise StageNameCollision, 'Duplicate stage_names detected {0}.  If you want to have flowfxns add tools to'.format(stage_name) + \
+                                  'existing stages, set dag.ignore_stage_name_collusions=True.'
 
     if stage_name not in dag.stage_names_used:
         dag.stage_names_used.append(stage_name)
 
-    return dag
 
 class DAG(object):
     """
     A Representation of a workflow as a :term:`DAG` of jobs.
     """
     
-    def __init__(self,cpu_req_override=False,mem_req_factor=1):
+    def __init__(self,cpu_req_override=False,ignore_stage_name_collisions=False,mem_req_factor=1):
         """
         :param cpu_req_override: set to an integer to override all task cpu_requirements.  Useful when a :term:`DRM` does not support requesting multiple cpus
         :param mem_req_factor: multiply all task mem_reqs by this number.
+        :param dag.ignore_stage_name_collisions:  Allows the flowfxns to add to stages that already exists.
         """
         self.G = nx.DiGraph()
         self.active_tools = []
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
         self.stage_names_used = []
-        self.ignore_stage_name_collisions = False
+        self.ignore_stage_name_collisions = ignore_stage_name_collisions
 
     def get_tools_by(self,stage_names=[],tags={}):
         """
@@ -76,6 +81,16 @@ class DAG(object):
         ]
         return tasks
 
+    def add_edge(self,parent,child):
+        """
+        Adds a dependency
+        :param parent: (Tool) a parent
+        :param child: (Tool) a child
+        :return: (DAG) self
+        """
+        self.G.add_edge(parent,child)
+        return self
+
     def branch_from_tools(self,tools):
         """
         Branches from a list of tools
@@ -85,7 +100,7 @@ class DAG(object):
         self.active_tools = tools
         return self
 
-    def branch(self,stage_names=[],tags={}):
+    def branch_(self,stage_names=[],tags={}):
         """
         Updates active_tools to be the tools in the stages with name stage_name.
         The next infix operation will thus be applied to `stage_name`.
@@ -241,7 +256,7 @@ class DAG(object):
             raise TaskError('{0}. Task is {1}.'.format(e,tool))
 
     @flowfxn
-    def add(dag,tools,stage_name=None):
+    def add_(self,tools,stage_name=None,tag={}):
         """
         Always the first operator of a workflow.  Simply adds a list of tool instances to the dag, without adding any
         dependencies.
@@ -250,9 +265,9 @@ class DAG(object):
             This operator is different than the others in that its input is a list of
             instantiated instances of Tools.
 
-        :param dag: The dag to add to.
         :param tools: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (list) The tools added.
 
         >>> dag() |Add| [tool1,tool2,tool3,tool4]
@@ -262,150 +277,205 @@ class DAG(object):
         for t in tools:
             if len(t.tags) == 0:
                 raise FlowFxnValidationError, '{0} has no tags, at least one tag is required'.format(t)
+        if len(tools) > 0:
+            if not isinstance(tools[0],Tool):
+                raise FlowFxnValidationError, '`tools` must be a list of Tools'
 
-        if stage_name is None:
-            stage_name = tools[0].stage_name
-        for tool in tools:
-            tool.stage_name = stage_name
-            dag.G.add_node(tool)
-            yield tool
+            if stage_name is None:
+                stage_name = tools[0].stage_name
+            for tool in tools:
+                tool.stage_name = stage_name
+                tool.tags.update(tag)
+                self.G.add_node(tool)
+                yield tool
 
     @flowfxn
-    def map(dag,tool_class,stage_name=None):
+    def map_(self,tool_class,stage_name=None,tag={}):
         """
         Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
         type `tool_class`.
 
-        :param dag: (dag) The dag to add to.
-        :param parent_tools: (list) A list of parent tools.
         :param tool_class: (subclass of Tool)
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (list) The tools added.
 
         >>> dag.map(Tool_Class)
         """
-        parent_tools = dag.active_tools
+        parent_tools = self.active_tools
         for parent_tool in parent_tools:
-            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=parent_tool.tags)
-            dag.G.add_edge(parent_tool,new_tool)
+            tags2 = parent_tool.tags
+            tags2.update(tag)
+            new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags2)
+            self.G.add_edge(parent_tool,new_tool)
             yield new_tool
             
     @flowfxn
-    def split(dag,split_by,tool_class,stage_name=None):
+    def split_(self,split_by,tool_class,stage_name=None,tag={}):
         """
         Creates one2many relationships for each tool in the stage last added to the dag, with every possible combination
         of keywords in split_by.  New tools will be of class `tool_class` and tagged with one of the possible keyword
         combinations.
 
-        :param dag: (dag) The dag to add to.
-        :param parent_tools: (list) A list of parent tools.
         :param split_by: (list of (str,list)) Tags to split by.
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (list) The tools added.
 
         >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
         """
-        parent_tools = dag.active_tools
+        parent_tools = self.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
         for parent_tool in parent_tools:
             for new_tags in it.product(*splits):
                 tags = dict(parent_tool.tags).copy()
+                tags.update(tag)
                 tags.update(dict(new_tags))
-                new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
-                dag.G.add_edge(parent_tool,new_tool)
+                new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
+                self.G.add_edge(parent_tool,new_tool)
                 yield new_tool
 
 
     @flowfxn
-    def reduce(dag,keywords,tool_class,stage_name=None):
+    def reduce_(self,keywords,tool_class,stage_name=None,tag={}):
         """
         Create new tools with a many2one to parent_tools.
 
-        :param dag: (dag) The dag to add to.
-        :param parent_tools: (list) A list of parent tools.
         :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (list) The tools added.
 
         >>> dag() |Reduce| (['shape'],Tool_Class)
         """
-        parent_tools = dag.active_tools
+        parent_tools = self.active_tools
         if type(keywords) != list:
             raise TypeError('keywords must be a list')
         for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
             parent_tool_group = list(parent_tool_group)
-            new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
+            tags.update(tag)
+            new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
             for parent_tool in parent_tool_group:
-                dag.G.add_edge(parent_tool,new_tool)
+                self.G.add_edge(parent_tool,new_tool)
             yield new_tool
 
     @flowfxn
-    def reduce_split(dag,keywords,split_by,tool_class,stage_name=None):
+    def reduce_split_(self,keywords,split_by,tool_class,stage_name=None,tag={}):
         """
         Create new tools by first reducing then splitting.
 
-        :param dag: (dag) The dag to add to.
-        :param parent_tools: (list) A list of parent tools.
         :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
         :param split_by: (list of (str,list)) Tags to split by.  Creates every possible product of the tags.
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
+        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (list) The tools added.
 
         >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
         """
-        parent_tools = dag.active_tools
+        parent_tools = self.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
 
         for group_tags,parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
             parent_tool_group = list(parent_tool_group)
             for new_tags in it.product(*splits):
                 tags = group_tags.copy()
+                tags.update(tag).\
                 tags.update(dict(new_tags))
-                new_tool = tool_class(stage_name=stage_name,dag=dag,tags=tags)
+                new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
                 for parent_tool in parent_tool_group:
-                    dag.G.add_edge(parent_tool,new_tool)
+                    self.G.add_edge(parent_tool,new_tool)
                 yield new_tool
 
-class dagError(Exception):pass
+    def combine_(self,*flowlist):
+        """
+        Applys all `flowfxn`s in ``*flowlist`` to self.active_tools.
+        Self.active_tools will be set to the union of all tools produced by this combine.
 
-def f(LHS,params):
-    pass
+        :param *flowlist: A sequence of flowfxns
+        :returns: (DAG) this dag
 
-class Infix:
-    def __init__(self, function):
-        self.function = function
-    def __ror__(self, other):
-        return Infix(lambda x, self=self, other=other: self.function(other, *x if type(x) == tuple else (x,)))
-    def __or__(self, other):
-        return self.function(other)
-    def __rlshift__(self, other):
-        return Infix(lambda x, self=self, other=other: self.function(other, *x if type(x) == tuple else (x,)))
-    def __rshift__(self, other):
-        return self.function(other)
-    def __call__(self, value1, value2):
-        return self.function(value1, value2)
+        >>> dag.combine_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
+        # The next flowfxn will apply to all tools of type ToolA, ToolB, ToolC
+        """
+        if not isinstance(flowlist,tuple):
+            raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
 
-def _add(dag,*args,**kwargs):
-    return dag.add(*args,**kwargs)
-Add = Infix(_add)
+        original_active_tools = self.active_tools
+        combined_active_tools = []
+        for flowclass in flowlist:
+            fxn_name = flowclass.__class__.__name__
+            fxn = getattr(self,fxn_name)
+            fxn(*flowclass.args,**flowclass.kwargs)
+            combined_active_tools.extend(self.active_tools)
+            self.active_tools = original_active_tools
+        self.active_tools = combined_active_tools
+        return self
 
-def _map(dag,*args,**kwargs):
-    return dag.map(*args,**kwargs)
-Map = Infix(_map)
+    def apply_(self,*flowlist):
+        """
+        Applies each flowfxn in *flowlist to dag.active_tools.  Afterwords dag.active_tools will be the tools added
+        by the last flowfxn in *flowlist.
 
-def _split(dag,*args,**kwargs):
-    return dag.split(*args,**kwargs)
-Split = Infix(_split)
+        :param *flowlist: A sequence of flowfxns
+        :returns: (DAG) this dag
 
-def _reduce(dag,*args,**kwargs):
-    return dag.reduce(*args,**kwargs)
-Reduce = Infix(_reduce)
+        >>> dag.apply_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
 
-def _reduce_split(dag,*args,**kwargs):
-    return dag.reduce_split(*args,**kwargs)
-ReduceSplit = Infix(_reduce_split)
+        In the above example, ToolA, ToolB and ToolC will all be applied to the instances generated by ToolX.
+        The next flowfxn will only apply to the tools generated by ToolC.
+        """
+        if not isinstance(flowlist,tuple):
+            raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
 
-    
+        original_active_tools = self.active_tools
+        for flowclass in flowlist:
+            fxn_name = flowclass.__class__.__name__
+            fxn = getattr(self,fxn_name)
+            self.active_tools = original_active_tools
+            fxn(*flowclass.args,**flowclass.kwargs)
+        return self
+
+    def sequence_(self,*flowlist):
+        """
+        Applies each flowfxn in *flowlist in sequential order.
+
+        :param *flowlist: A sequence of flowfxns
+        :returns: (DAG) this dag
+
+        >>> dag.sequence_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
+
+        In the above example, ToolA will be applied to Toolx, ToolB to ToolA, and ToolC applied to ToolB.  ToolC
+        will be set as dag.active_tools
+        """
+        if not isinstance(flowlist,tuple):
+            raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
+
+        for flowclass in flowlist:
+            fxn_name = flowclass.__class__.__name__
+            fxn = getattr(self,fxn_name)
+            fxn(*flowclass.args,**flowclass.kwargs)
+        return self
+
+
+
+class FlowFxn(object):
+    def __init__(self,*args,**kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+class add_(FlowFxn):pass
+class map_(FlowFxn):pass
+class split_(FlowFxn):pass
+class reduce_(FlowFxn): pass
+class reduceSplit_(FlowFxn):pass
+class branch_(FlowFxn):pass
+
+class combine_(FlowFxn):pass
+class sequence_(FlowFxn):pass
+class apply_(FlowFxn):pass
+
+class configure(FlowFxn):pass
+class add_run(FlowFxn):pass

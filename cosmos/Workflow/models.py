@@ -233,7 +233,7 @@ class Workflow(models.Model):
         wf.finished_on = None
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
-        wf.root_output_dir = wf.root_output_dir
+        wf.output_dir = os.path.join(root_output_dir,wf.name)
         if comments:
             wf.comments = comments
 

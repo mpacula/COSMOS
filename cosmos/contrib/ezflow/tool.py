@@ -58,7 +58,9 @@ class Tool(object):
     def __init__(self,stage_name=None,tags={},dag=None):
         """
         :param stage_name: (str) The name of the stage this tool belongs to. Required.
-        :param dag: the dag this task belongs to.
+        :param tags: (dict) A dictionary of tags.
+        :param dag: The dag this task belongs to.
+        :param parents: A list of tool instances which this tool is dependent on
         """
         #if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
         if not hasattr(self,'name'): self.name = self.__class__.__name__
