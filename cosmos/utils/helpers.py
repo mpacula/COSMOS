@@ -25,7 +25,19 @@ def disable_stdout():
 def enable_stdout():
     sys.stderr.flush()
     os.dup2(real_stdout,1)
-    
+
+
+def representsInt(s):
+    """
+    :param s: A string
+    :return: True of `s` can be converted to an int, otherwise False
+    """
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
 def confirm(prompt=None, default=False, timeout=0):
     """prompts for yes or no defaultonse from the user. Returns True for yes and
     False for no.

@@ -1,23 +1,24 @@
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Split, Add, Map
-from tools import ECHO, CAT, WC
+from cosmos.contrib.ezflow.dag import DAG, split_,add_,map_,reduce_
+from tools import ECHO, CAT, WC, PASTE
 
 ####################
 # Workflow
 ####################
 
-dag = ( DAG().
-    add([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]).
-    split([('i',[1,2])],CAT).
-    map(WC)
-
+dag = DAG().sequence_(
+    add_([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]),
+    split_([('i',[1,2])], CAT),
+    reduce_([], PASTE),
+    map_(WC)
 )
+
 dag.create_dag_img('/tmp/ex.svg')
 
 #################
 # Run Workflow
 #################
 
-WF = Workflow.start('Example 1')
+WF = Workflow.start('Example 2',restart=True,delete_intermediates=True)
 dag.add_to_workflow(WF)
 WF.run()

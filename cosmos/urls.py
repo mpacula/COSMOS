@@ -34,8 +34,8 @@ urlpatterns = patterns('',
     url(r'Workflow/(\d+)/stage_table/$', 'cosmos.Workflow.views.workflow_stage_table',name='workflow_stage_table'),
     url(r'Workflow/Stage/(\d+)/table/$', 'cosmos.Workflow.views.stage_table',name='stage_table'),
     url(r'Workflow/Stage/(\d+)/stage_task_table/$', 'cosmos.Workflow.views.stage_task_table',name='stage_task_table'),
-    url(r'Workflow/(?P<wf_id>\d+)/Stage/(?P<stage_name>\w+?)/$', 'cosmos.Workflow.views.stage_view',name='stage_view'),
-    url(r'Workflow/(?P<wf_id>\d+)/Stage/(?P<stage_name>\w+?)/Task/(?P<tags_qs>.*)/$', 'cosmos.Workflow.views.task_view',name='task_view'),
+    url(r'Workflow/(?P<wf_id>\d+)/Stage/(?P<stage_name>[\w-]+?)/$', 'cosmos.Workflow.views.stage_view',name='stage_view'),
+    url(r'Workflow/(?P<wf_id>\d+)/Stage/(?P<stage_name>[\w-]+?)/Task/(?P<tags_qs>.*)/$', 'cosmos.Workflow.views.task_view',name='task_view'),
     url(r'^$', 'cosmos.utils.views.index',name='home'),
 )
 from django.conf import settings

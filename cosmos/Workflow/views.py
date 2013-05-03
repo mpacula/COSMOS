@@ -129,7 +129,10 @@ def taskfile_view(request,tfid):
         if output.strip() == '': output = 'Empty Directory'
 
     else:
-        output = file(tf.path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
+        if os.path.exists(tf.path):
+            output = file(tf.path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
+        else:
+            output = 'File does not exist'
     return render_to_response('Workflow/TaskFile/view.html', { 'request':request,'taskfile': tf, 'output':output, 'jobAttempt':None }, context_instance=RequestContext(request))
 
 

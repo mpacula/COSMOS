@@ -206,7 +206,7 @@ class JobAttempt(models.Model):
         return ('jobAttempt_view',[str(self.id)])
 
     def __str__(self):
-        return 'JobAttempt [{0}] [drmaa_jobId:{1}]'.format(self.id,self.drmaa_jobID)
+        return '<JobAttempt[{0}] [drmaa_jobId:{1}]>'.format(self.id,self.drmaa_jobID)
 
     def toString(self):
         attrs_to_list = ['command_script_text','successful','queue_status','STDOUT_filepath','STDERR_filepath']

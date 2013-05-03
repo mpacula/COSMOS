@@ -204,8 +204,7 @@ class DAG(object):
         #bulk save task_files.  All inputs have to at some point be an output, so just bulk save the outputs.
         #Must come before adding tasks, since taskfile.ids must be populated to compute the proper pcmd.
         taskfiles = list(it.chain(*[ n.output_files for n in new_nodes ]))
-
-        workflow.bulk_save_task_files(taskfiles)
+        workflow.bulk_save_taskfiles(taskfiles)
         
         #bulk save tasks
         for node in new_nodes:
@@ -251,7 +250,6 @@ class DAG(object):
                       cpu_requirement = tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
                       time_requirement = tool.time_req,
                       NOOP = tool.NOOP,
-                      dont_delete_output_files = tool.dont_delete_output_files,
                       succeed_on_failure = tool.succeed_on_failure)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e,tool))
@@ -301,7 +299,7 @@ class DAG(object):
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (DAG) self
 
-        >>> dag.map(Tool_Class)
+        >>> dag.map_(Tool_Class)
         """
         parent_tools = self.active_tools
         for parent_tool in parent_tools:
@@ -471,21 +469,56 @@ class DAG(object):
 
 
 
-class FlowFxn(object):
+
+
+class MethodStore(object):
     def __init__(self,*args,**kwargs):
         self.args = args
         self.kwargs = kwargs
 
-class add_(FlowFxn):pass
-class map_(FlowFxn):pass
-class split_(FlowFxn):pass
-class reduce_(FlowFxn): pass
-class reduce_split_(FlowFxn):pass
-class branch_(FlowFxn):pass
+class add_(MethodStore):pass
+class map_(MethodStore):pass
+class split_(MethodStore):pass
+class reduce_(MethodStore): pass
+class reduce_split_(MethodStore):pass
+class branch_(MethodStore):pass
 
-class combine_(FlowFxn):pass
-class sequence_(FlowFxn):pass
-class apply_(FlowFxn):pass
+class combine_(MethodStore):pass
+class sequence_(MethodStore):pass
+class apply_(MethodStore):pass
 
-class configure(FlowFxn):pass
-class add_run(FlowFxn):pass
+class configure(MethodStore):pass
+class add_run(MethodStore):pass
+
+import types
+#TODO: this might work really well with named pipes
+# def pipe_(*tool_classes):
+    # if len(tool_classes) <2:
+    #     raise FlowFxnValidationError, 'pipe_ requires at least two tools'
+    # if not issubclass(tool_classes[0],Tool):
+    #     raise FlowFxnValidationError, 'pipe_ requires its inputs to be a list of Tools'
+    # if len(tool_classes[0].outputs) > 1 or len(tool_classes[0].inputs) > 1:
+    #     raise FlowFxnValidationError, 'pipe_ does not currently support tools with multiple inputs or outputs'
+    #
+    #
+    # class Piped(tool_classes[-1]):
+    #     def cmd(self,i,s,p):
+    #         minidag = DAG()
+    #         cmds = []
+    #         last_parents = self.parents
+    #         for tool_num,tc in enumerate(self.tool_classes):
+    #             tc = tc(dag=minidag,stage_name=self.stage_name,tags=self.tags)
+    #             for parent in last_parents: #should only be more than one for the first tool
+    #                 minidag.G.add_edge(parent,tc)
+    #             i2 = {tc.inputs[0]:['/dev/stdin']} if tool_num>0 else i
+    #             cmd = tc.cmd(i2,s,p)
+    #             if tool_num<len(tool_classes)-1:
+    #                 cmd = cmd.replace('$OUT.'+tc.outputs[0],'/dev/stdout')
+    #             cmds.append(cmd)
+    #         return '\n|\n'.join(cmds)
+    #
+    # Piped.tool_classes = tool_classes
+    # Piped.inputs = tool_classes[0].inputs
+    # Piped.outputs = tool_classes[-1].outputs
+    # Piped.name = 'Pipetest'
+    # return Piped
