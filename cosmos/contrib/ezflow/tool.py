@@ -2,7 +2,7 @@ from helpers import getcallargs,cosmos_format
 import re
 from cosmos.Workflow.models import TaskFile
 from cosmos.utils.helpers import parse_cmd
-import itertools
+import itertools, copy
 
 i = 0
 def get_id():
@@ -17,6 +17,7 @@ class ToolError(Exception): pass
 class ToolValidationError(Exception):pass
 class GetOutputError(Exception): pass
 
+
 class Tool(object):
     """
     A Tool is a class who's instances represent a command that gets executed.  It also contains properties which
@@ -29,7 +30,6 @@ class Tool(object):
     :property NOOP: (bool) If True, these tasks do not contain commands that are executed.  Used for INPUT.  Default is False. Can be overridden.
     :property forward_input: (bool) If True, the input files of this tool will also be input files of children of this tool.  Default is False.  Can be overridden.
     :property succeed_on_failure: (bool) If True, if this tool's tasks' job attempts fail, the task will still be considered successful.  Default is False.  Can be overridden.
-    :property dont_delete_output_files: (bool) If True, this tool's output files will not be deleted when a workflow is executed with delete_intermediates=True.  Default is False.  Can be overridden.
     :property default_params: (dict) A dictionary of default parameters.  Defaults to {}.  Can be overridden.
     :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
     :property dag: (DAG) The dag that is keeping track of this Tool
@@ -48,17 +48,19 @@ class Tool(object):
     NOOP = False
     forward_input = False # If True, input of this tool can be accessed by its output files
     succeed_on_failure = False
-    dont_delete_output_files = False
     default_params = {}
 
     settings = {}
     parameters = {}
     tags = {}
+
     
     def __init__(self,stage_name=None,tags={},dag=None):
         """
         :param stage_name: (str) The name of the stage this tool belongs to. Required.
-        :param dag: the dag this task belongs to.
+        :param tags: (dict) A dictionary of tags.
+        :param dag: The dag this task belongs to.
+        :param parents: A list of tool instances which this tool is dependent on
         """
         #if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
         if not hasattr(self,'name'): self.name = self.__class__.__name__
@@ -66,19 +68,34 @@ class Tool(object):
         self.stage_name = stage_name if stage_name else self.name
         self.tags = tags
         self.dag = dag
+
+        # Because defining attributes in python creates a reference to a single instance across all class instance
+        # Thus, any TaskFiles in self.outputs must only be used as a template when instantiating a class
+        self.outputs = [ copy.copy(o) if isinstance(o,TaskFile) else o for o in self.outputs ]
+
         
         self.id = get_id()
 
         # Create empty output TaskFiles
-        for output_ext in self.outputs:
-            tf = TaskFile(fmt=output_ext)
-            self.add_output(tf)
+        for output in self.outputs:
+            if isinstance(output, TaskFile):
+                self.add_output(output)
+            elif isinstance(output,str):
+                tf = TaskFile(fmt=output)
+                self.add_output(tf)
+            else:
+                raise ToolValidationError, "{0}.outputs must be a list strs or Taskfile instances.".format(self)
+
+        #validate inputs are strs
+        if any([ not isinstance(i,str) for i in self.inputs]):
+            raise ToolValidationError,"{0} has elements in self.inputs that are not of type str".format(self)
 
         if len(self.inputs) != len(set(self.inputs)):
-            raise ToolValidationError('Duplicate input names detected.  Perhaps try using [1.ext,2.ext,...]')
+            raise ToolValidationError('Duplicate names in tool.inputs detected in {0}.  Perhaps try using [1.ext,2.ext,...]'.format(self))
 
-        if len(self.outputs) != len(set(self.outputs)):
-            raise ToolValidationError('Duplicate output names detected.  Perhaps try using [1.ext,2.ext,...]')
+        output_names = [ o.name for o in self.output_files ]
+        if len(output_names) != len(set(output_names)):
+            raise ToolValidationError('Duplicate names in tool.output_files detected in {0}.  Perhaps try using [1.ext,2.ext,...] when defining outputs'.format(self))
 
     @property
     def children(self):
@@ -116,20 +133,23 @@ class Tool(object):
         :param error_if_missing: (bool) Raises a GetOutputError if the output cannot be found
         """
 
-        outputs = filter(lambda x: x.name == name,self.output_files)
+        output_files = filter(lambda x: x.name == name,self.output_files)
 
-        if len(outputs) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self))
+        if len(output_files) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self),name)
 
-        if len(outputs) == 0 and self.forward_input:
+        if len(output_files) == 0 and self.forward_input:
             try:
-                outputs +=  [ p.get_output(name) for p in self.parents ]
+                output_files +=  [ p.get_output(name) for p in self.parents ]
             except GetOutputError as e:
                 pass
 
-        if error_if_missing and len(outputs) == 0:
-            raise GetOutputError('No output file in {0} with name {1}.'.format(self,name))
-
-        return outputs[0]
+        if len(output_files) == 0:
+            if error_if_missing:
+                raise GetOutputError('No output file in {0} with name {1}.'.format(self,name),name)
+            else:
+                return None
+        else:
+            return output_files[0]
     
     def get_output_file_names(self):
         return set(map(lambda x: x.name, self.output_files))
@@ -168,7 +188,7 @@ class Tool(object):
             all_inputs = []
             for name in self.inputs:
                 for p in self.parents:
-                    all_inputs += [ p.get_output(name,error_if_missing=False) ]
+                    all_inputs += filter(lambda x: x,[ p.get_output(name,error_if_missing=False) ]) #filter out Nones
 
             input_dict = {}
             for input_file in all_inputs:
@@ -204,13 +224,15 @@ class Tool(object):
         for out_name in out_names:
             try:
                 pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
-            except ToolValidationError as e:
-                raise ToolValidationError('Invalid key in $OUT.key. Available output_file keys in {1} are {2}'.format(e,self,self.get_output_file_names()))
+            except GetOutputError as e:
+                raise ToolValidationError('Invalid key in $OUT.key ({0}), available output_file keys in {1} are {2}'.format(out_name,self,self.get_output_file_names()))
 
-        #Validate all outputs have an $OUT
-        for o in self.outputs:
-            if o not in out_names:
-                raise ToolValidationError, '{1} specified in {0}.outputs but not referenced with $OUT in the tool\'s command.'.format(self,o)
+        #Validate all output_files have an $OUT
+        for tf in self.output_files:
+            if tf.name not in out_names:
+                raise ToolValidationError,\
+                    'An output taskfile with name {1} is in {0}.output_files but not referenced with $OUT in the tool\'s command.'.\
+                        format(self,tf.name)
                 
         #format() return string with callargs
         callargs['self'] = self

@@ -185,8 +185,6 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
     two new dependent tools with tags ``{'size':'large'}`` and ``{'size':'small'}``, plus the ``color`` and ``shape``
     of their parents.
 
-
-
 API
 -----------
 

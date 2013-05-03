@@ -18,7 +18,7 @@ def _get_stages_dict(workflow):
 
 @never_cache
 def index(request):
-    workflows = Workflow.objects.all().order_by('-id')
+    workflows = Workflow.objects.all().order_by('-created_on')
     return render_to_response('Workflow/index.html', { 'request':request,'workflows': workflows }, context_instance=RequestContext(request))
 
 @never_cache
@@ -129,7 +129,10 @@ def taskfile_view(request,tfid):
         if output.strip() == '': output = 'Empty Directory'
 
     else:
-        output = file(tf.path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
+        if os.path.exists(tf.path):
+            output = file(tf.path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
+        else:
+            output = 'File does not exist'
     return render_to_response('Workflow/TaskFile/view.html', { 'request':request,'taskfile': tf, 'output':output, 'jobAttempt':None }, context_instance=RequestContext(request))
 
 

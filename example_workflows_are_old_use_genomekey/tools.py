@@ -1,4 +1,5 @@
 from cosmos.contrib.ezflow.tool import Tool
+from cosmos.Workflow.models import TaskFile
 
 class ECHO(Tool):
     outputs = ['txt']
@@ -9,7 +10,7 @@ class ECHO(Tool):
     
 class CAT(Tool):
     inputs = ['txt']
-    outputs = ['txt']
+    outputs = [TaskFile(fmt='txt',basename='cat.txt')]
     time_req = 1
     
     def cmd(self,i,s,p):
@@ -19,7 +20,7 @@ class CAT(Tool):
     
 class PASTE(Tool):
     inputs = ['txt']
-    outputs = ['txt']
+    outputs = [TaskFile(name='txt',basename='paste.txt',persist=True)]
     time_req = 1
     
     def cmd(self,i,s,p):

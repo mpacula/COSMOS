@@ -16,6 +16,7 @@ from django.utils import timezone
 import networkx as nx
 import pygraphviz as pgv
 import hashlib
+import copy
 import pprint
 import signals
 
@@ -37,13 +38,16 @@ def get_tmp_id():
     i +=1
     return i
 
-class TaskFile(models.Model):
+class TaskFile(models.Model,object):
     """
     Task File
     """
     path = models.CharField(max_length=250,null=True)
     name = models.CharField(max_length=50,null=True)
-    fmt = models.CharField(max_length=10,null=True) #file format
+    fmt = models.CharField(max_length=30,null=True) #file format
+    basename = models.CharField(max_length=50,null=True)
+    persist = models.BooleanField(default=False)
+    deleted_because_intermediate = models.BooleanField(default=False)
 
 
     def __init__(self,*args,**kwargs):
@@ -52,16 +56,14 @@ class TaskFile(models.Model):
             have multiple TaskFiles with the same name.  Defaults to ``fmt``.
         :param fmt: The format of the file.  Defaults to the extension of ``path``.
         :param path: The path to the file.  Required.
+        :param basename: (str) The name to use for the file for auto-generated paths.  You must explicitly
+            specify the extension of the filename, if you want one i.e. 'myfile.txt' not 'myfile'
+        :param persist: (bool) If True, this file will not be deleted even if it is an intermediate
+            file, and workflow.delete_intermediates is turned on.  Defaults to False.
         """
         super(TaskFile,self).__init__(*args,**kwargs)
         if not self.fmt and self.path:
             try:
-                # if path ends with .gz, the format includes the extensions before the gz
-                #   ie fmt = fastq.gz if path=file.blah.fastq.gz
-                # otherwise take the last extension
-                #   ie fmt = fastq if path=file.blah.fastq
-                # groups = re.search('.+\.([^\.]+\.gz)$|\.([^\.]+)$',self.path).groups()
-                # self.fmt = groups[0] if groups[0] else groups[1]
                 groups = re.search('\.([^\.]+)$',self.path).groups()
                 self.fmt = groups[0]
 
@@ -70,8 +72,14 @@ class TaskFile(models.Model):
 
         if not self.name and self.fmt:
             self.name = self.fmt
+        if not self.fmt and self.name:
+            self.fmt = self.name
 
         self.tmp_id = get_tmp_id()
+
+    @property
+    def workflow(self):
+        return self.task.workflow
 
     @property
     def task(self):
@@ -81,7 +89,8 @@ class TaskFile(models.Model):
     @property
     def file_size(self,human_readable=True):
         "Size of the taskfile's output_dir"
-        return folder_size(self.path,human_readable=human_readable)
+        return folder_size(self.path,human_readable=human_readable) or 'NA'
+
 
     @property
     def sha1sum(self):
@@ -93,6 +102,18 @@ class TaskFile(models.Model):
     @models.permalink
     def url(self):
         return ('taskfile_view',[str(self.id)])
+
+    def delete_because_intermediate(self):
+        """
+        Deletes this file and marks it as deleted because it is an intermediate file.
+        """
+        if not self.persist:
+            self.workflow.log.info('Deleting Intermediate file {0}'.format(self.path))
+            self.deleted_because_intermediate = True
+            os.system('rm -rf {0}'.format(self.path))
+            self.save()
+        else:
+            raise WorkflowError, "This file should not be deleted just because it is an intermediate."
 
 class Workflow(models.Model):
     """   
@@ -198,7 +219,7 @@ class Workflow(models.Model):
         name = re.sub("\s","_",name)
 
         if restart:
-            wf = Workflow.__restart(name, prompt_confirm=prompt_confirm, **kwargs)
+            wf = Workflow.__restart(name=name, prompt_confirm=prompt_confirm, **kwargs)
         elif Workflow.objects.filter(name=name).count() > 0:
             wf = Workflow.__reload(name=name, prompt_confirm=prompt_confirm, **kwargs)
             wf = Workflow.__resume(name=name, **kwargs)
@@ -219,7 +240,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __resume(name,dry_run, default_queue, delete_intermediates, comments,**kwargs):
+    def __resume(name,dry_run, default_queue, delete_intermediates, root_output_dir, comments,**kwargs):
         """
         Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be called by anything except __reload
 
@@ -233,6 +254,7 @@ class Workflow(models.Model):
         wf.finished_on = None
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
+        wf.output_dir = os.path.join(root_output_dir,wf.name)
         if comments:
             wf.comments = comments
 
@@ -249,7 +271,7 @@ class Workflow(models.Model):
         see :py:meth:`start` for parameter definitions
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
-        #TODO idealy just change the queryset manager to do this automatically
+        #TODO ideally just change the queryset manager to do this automatically
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
             print "Exiting."
@@ -359,7 +381,7 @@ class Workflow(models.Model):
         """
         Terminates this workflow and Exits
         """
-        self.log.warning("Terminating this workflow...")
+        self.log.warning("Terminating {0}...".format(self))
         self.save()
         jobAttempts = self.jobManager.jobAttempts.filter(queue_status='queued')
         self.log.info("Sending Terminate signal to all running jobs.")
@@ -379,6 +401,8 @@ class Workflow(models.Model):
 
         self.log.info("Marking {0} terminated JobAttempts as failed.".format(len(jobAttempts)))
         jobAttempts.update(queue_status='completed',finished_on = timezone.now())
+
+        self.comments = "{0}<br/>{1}".format(self.comments if self.comments else '',"terimate()ed")
 
         self.finished()
 
@@ -458,7 +482,7 @@ class Workflow(models.Model):
         return
 
     @transaction.commit_on_success
-    def bulk_save_task_files(self,taskfiles):
+    def bulk_save_taskfiles(self,taskfiles):
         """
         :param taskfiles: (list) A list of taskfiles.
         """
@@ -552,7 +576,8 @@ class Workflow(models.Model):
         #set output_file paths to the task's job_output_dir
         for f in task.output_files:
             if not f.path:
-                f.path = os.path.join(task.job_output_dir,'{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt))
+                basename = '{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt) if not f.basename else f.basename
+                f.path = os.path.join(task.job_output_dir,basename)
                 f.save()
             if f.fmt == 'dir':
                 check_and_create_output_dir(f.path)
@@ -654,7 +679,8 @@ class Workflow(models.Model):
         """
         self.finished_on = timezone.now()
         self.save()
-        self.log.info('Finished.')
+        self.log.info("Finished {0}, last stage's output dir: {1}".format(self,
+                                                                           self.stages.order_by('-order_in_workflow')[0].output_dir))
 
     def get_tasks_by(self,stage=None,tags={},op="and"):
         """
@@ -709,6 +735,9 @@ class Workflow(models.Model):
     def __str__(self):
         return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
 
+    def describe(self):
+        return 'output_dir: {0.output_dir}'.format(self)
+
     @models.permalink
     def url(self):
         return ('workflow_view',[str(self.id)])
@@ -730,45 +759,31 @@ class WorkflowManager():
         for n in ready_tasks:
             self.queue_task(n)
             self.workflow._run_task(n)
-        if self.workflow.delete_intermediates:
-            self.clear_intermediate_tasks()  #TODO could just check the parent node of successful job for clearing instead of the whole graph
         return ready_tasks
 
     def complete_task(self,task):
         self.dag_queue.remove_node(task.id)
         self.dag.node[task.id]['status'] = task.status
+
+        if task.status == 'successful' and self.workflow.delete_intermediates:
+            #parents may be ready for intermediate deleting
+            intermediate_ids = [ p_id for p_id in self.dag.predecessors(task.id) if self.is_task_intermediate(p_id) ]
+            tasks = Task.objects.filter(pk__in=intermediate_ids)
+            for t in tasks:
+                for o in t.output_files:
+                    if not o.persist:
+                        o.delete_because_intermediate()
         return self
+
 
     def is_task_intermediate(self,task_id):
         """
         Checks to see if a task_id is an intermediary task.
-        An intermediary task is has at least 1 child and 1 parent, and all of its children are all successful.
+        An intermediary task has at least 1 child and 1 parent, and all of its children are all successful.
         """
         successors = self.dag.successors(task_id)
         if len(self.dag.predecessors(task_id)) > 0 and len(successors) > 0:
-            return any( self.dag.node[s]['status'] == 'successful' for s in successors )
-
-    def clear_intermediate_tasks(self):
-        """
-        Deletes all intermediary task output files.
-
-        Example:
-        from Workflow.models import WorkflowManager
-        wf = Workflow.objects.all()[1]
-        wm = WorkflowManager(wf)
-        wm.clear_intermediary_tasks()
-        """
-        # get a list of intermediary tasks
-        intermediate_tasks = []
-        nodes_not_cleared = [x[0] for x in filter(lambda x: not x[1]['cleared_output_files'],self.dag.node.items())]
-        for task_id in nodes_not_cleared:
-            if self.is_task_intermediate(task_id):
-                intermediate_tasks.append(task_id)
-
-        #delete output files
-        for task in self.workflow.tasks.filter(id__in=intermediate_tasks):
-            task.clear_job_output_dir()
-            self.dag.node[task.id]['cleared_output_files'] = True
+            return all( self.dag.node[s]['status'] == 'successful' for s in successors )
 
     def get_ready_tasks(self):
         degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
@@ -781,7 +796,7 @@ class WorkflowManager():
         for stage in self.workflow.stages:
             stage_name = stage.name
             for task in stage.tasks.all():
-                dag.add_node(task.id,tags=task.tags,status=task.status,stage=stage_name,cleared_output_files=task.cleared_output_files,url=task.url())
+                dag.add_node(task.id,tags=task.tags,status=task.status,stage=stage_name,url=task.url())
         return dag
 
     def createAGraph(self):
@@ -1092,7 +1107,7 @@ class TaskTag(models.Model):
     value = models.CharField(max_length=255)
 
     def __str__(self):
-        return "TaskTag[self.id] {self.key}: {self.value} for Task[{task.id}]".format(self=self,task=self.task)
+        return "<TaskTag[self.id] {self.key}: {self.value} for Task[{task.id}]>".format(self=self,task=self.task)
 
 class TaskEdge(models.Model):
     parent = models.ForeignKey('Task',related_name='parent_edge_set')
@@ -1101,7 +1116,7 @@ class TaskEdge(models.Model):
     "The keys associated with the relationship.  ex, the group_by parameter of a many2one"
 
     def __str__(self):
-        return "{0.parent}->{0.child}".format(self)
+        return "Edge {0.parent}->{0.child}".format(self)
 
 class Task(models.Model):
     """
@@ -1119,8 +1134,8 @@ class Task(models.Model):
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
     NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
     succeed_on_failure = models.BooleanField(default=False, help_text="If True, Task will succeed and workflow will progress even if its JobAttempts fail.")
-    cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
-    dont_delete_output_files = models.BooleanField(default=False,help_text="If True, prevents output files from being deleted even when this task becomes an intermediate and workflow.delete_intermediates == True.")
+    # cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
+    # dont_delete_output_files = models.BooleanField(default=False,help_text="If True, prevents output files from being deleted even when this task becomes an intermediate and workflow.delete_intermediates == True.")
 
     tags = PickledObjectField(null=False,default={})
     #on_success = PickledObjectField(null=False)
@@ -1227,13 +1242,13 @@ class Task(models.Model):
         """Where the job output goes"""
         return os.path.join(self.output_dir,'out')
 
-    @property
-    def output_paths(self):
-        "Dict of this task's outputs appended to this task's output_dir."
-        r = {}
-        for key,val in self.outputs.items():
-            r[key] = os.path.join(self.job_output_dir,val)
-        return r
+    # @property
+    # def output_paths(self):
+    #     "Dict of this task's outputs appended to this task's output_dir."
+    #     r = {}
+    #     for key,val in self.outputs.items():
+    #         r[key] = os.path.join(self.job_output_dir,val)
+    #     return r
 
     @property
     def jobAttempts(self):
@@ -1308,12 +1323,9 @@ class Task(models.Model):
         """
         Removes all files in this task's output directory
         """
-        if not self.dont_delete_output_files:
-            self.log.info('Clearing outputs for {0}'.format(self))
-            os.system('rm -rf {0}'.format(os.path.join(self.job_output_dir,'*')))
-        self.cleared_output_files = True
-        self.save()
-        return self
+        for otf in self.output_files:
+            if not otf.persist and not otf.deleted_because_intermediate:
+                otf.delete_because_intermediate()
 
     @models.permalink
     def url(self):
@@ -1343,5 +1355,5 @@ class Task(models.Model):
         super(Task, self).delete(*args, **kwargs)
 
     def __str__(self):
-        return '[{1}] Task {2} from {0}'.format(self.stage,self.id,self.tags)
+        return 'Task[{1}] {2} from {0}'.format(self.stage,self.id,self.tags)
 
