@@ -20,7 +20,7 @@ class CAT(Tool):
     
 class PASTE(Tool):
     inputs = ['txt']
-    outputs = ['txt']
+    outputs = [TaskFile(name='txt',basename='paste.txt',persist=True)]
     time_req = 1
     
     def cmd(self,i,s,p):

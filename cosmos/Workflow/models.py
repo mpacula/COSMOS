@@ -402,6 +402,8 @@ class Workflow(models.Model):
         self.log.info("Marking {0} terminated JobAttempts as failed.".format(len(jobAttempts)))
         jobAttempts.update(queue_status='completed',finished_on = timezone.now())
 
+        self.comments = self.comments+"<br/>terimate()ed"
+
         self.finished()
 
         self.log.info("Exiting.")

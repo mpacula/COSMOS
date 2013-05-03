@@ -45,7 +45,7 @@
     </div>
 </div>
 <div class="box-content">
-    <dl class="dl-horizontal">
+    <dl class="dl-horizontal dl-multicolumn" data-colcount="2">
     <dt>Output Dir</dt><dd>{{workflow.output_dir}}</dd>
     <dt>Default Queue</dt><dd>
         {% if workflow.default_queue %}{{workflow.default_queue}}
@@ -56,10 +56,10 @@
     <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
     <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
     <dt>Wall Time</dt><dd>{{workflow.wall_time.seconds|format_time}}</dd>
-    <dt>Comments</dt><dd>{{workflow.comments}}</dd>
+    <dt>Comments</dt><dd>{{workflow.comments|safe}}</dd>
     </dl>
-</div>
-<br/>
+
+
 <div class="box-header">
     <h2><i class="icon-tasks"></i><span class="break"></span>Stages</h2>
 </div>
@@ -68,4 +68,7 @@
     {%include "Workflow/Stage/table.html"%}
 {%endwith%}
 </div>
+
+</div>
+<br/>
 {%endblock%}

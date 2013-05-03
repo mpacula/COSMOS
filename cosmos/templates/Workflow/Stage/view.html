@@ -45,12 +45,13 @@
 {% endblock %}
 
 {%block content%}
-    <ul class="breadcrumb">
-      <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
-      <li><a href="{{stage.workflow.url }}">{{stage.workflow}}</a> <span class="divider">/</span></li>
-      <li class="active">{{stage}}</li>
-    </ul>
-
+    <p>
+<ul class="breadcrumb">
+  <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
+  <li><a href="{{stage.workflow.url }}">{{stage.workflow}}</a> <span class="divider">/</span></li>
+  <li class="active">{{stage}}</li>
+</ul>
+</p>
 
 <div class="box-header">
     <h2>
@@ -74,9 +75,7 @@
         {%include "Workflow/Stage/table.html"%}
         {% endwith %}
     </div>
-</div>
 
-<br/>
 
 <div class="box-header">
     <h2><i class="icon-tasks"></i><span class="break"></span>
@@ -120,4 +119,5 @@
     {% include "Workflow/Task/table.html" %}
 </div>
 
+</div>
 {% endblock %}
