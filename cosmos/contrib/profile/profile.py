@@ -47,7 +47,7 @@ class Profile:
         """This main process and all of its descendant's pids"""
         return self.and_descendants(os.getpid())
     
-    def __init__(self,command,poll_interval=10,output_file=None,database_file=':memory:'):
+    def __init__(self,command,poll_interval=1,output_file=None,database_file=':memory:'):
         def add_quotes(arg):
             "quotes get stripped off by the shell when it interprets the command, so this adds them back in"
             if re.search("\s",arg):
