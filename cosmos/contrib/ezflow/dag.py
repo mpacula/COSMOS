@@ -391,32 +391,32 @@ class DAG(object):
                     self.G.add_edge(parent_tool,new_tool)
                 yield new_tool
 
-    def combine_(self,*flowlist):
-        """
-        Applys all `flowfxn`s in ``*flowlist`` to self.active_tools.
-        After completion, self.active_tools will be set to the union of all tools produced by this combine.
+    # def combine_(self,*flowlist):
+    #     """
+    #     Applys all `flowfxn`s in ``*flowlist`` to self.active_tools.
+    #     After completion, self.active_tools will be set to the union of all tools produced by this combine.
+    #
+    #     :param *flowlist: A sequence of flowfxns
+    #     :returns: (DAG) this dag
+    #
+    #     >>> dag.combine_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
+    #     # The next flowfxn will apply to all tools of type ToolA, ToolB, ToolC
+    #     """
+    #     if not isinstance(flowlist,tuple):
+    #         raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
+    #
+    #     original_active_tools = self.active_tools
+    #     combined_result_tools = []
+    #     for flowclass in flowlist:
+    #         fxn_name = flowclass.__class__.__name__
+    #         fxn = getattr(self,fxn_name)
+    #         fxn(*flowclass.args,**flowclass.kwargs)
+    #         combined_result_tools.extend(self.active_tools)
+    #         self.active_tools = original_active_tools
+    #     self.active_tools = combined_result_tools
+    #     return self
 
-        :param *flowlist: A sequence of flowfxns
-        :returns: (DAG) this dag
-
-        >>> dag.combine_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
-        # The next flowfxn will apply to all tools of type ToolA, ToolB, ToolC
-        """
-        if not isinstance(flowlist,tuple):
-            raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
-
-        original_active_tools = self.active_tools
-        combined_active_tools = []
-        for flowclass in flowlist:
-            fxn_name = flowclass.__class__.__name__
-            fxn = getattr(self,fxn_name)
-            fxn(*flowclass.args,**flowclass.kwargs)
-            combined_active_tools.extend(self.active_tools)
-            self.active_tools = original_active_tools
-        self.active_tools = combined_active_tools
-        return self
-
-    def apply_(self,*flowlist):
+    def apply_(self,*flowlist,**kwargs):
         """
         Applies each flowfxn in *flowlist to current dag.active_tools.  This is different from
         :py:meth:`sequence_`, because sequence_ applies the flowfns in flowlist to each other
@@ -427,6 +427,7 @@ class DAG(object):
         by the last flowfxn in *flowlist.
 
         :param *flowlist: A sequence of flowfxns
+        :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
         :returns: (DAG) this dag
 
         >>> dag.apply_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
@@ -437,20 +438,27 @@ class DAG(object):
         if not isinstance(flowlist,tuple):
             raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
 
+        combine = kwargs.get('combine',False)
+
+        combined_result_tools = []
         original_active_tools = self.active_tools
         for flowclass in flowlist:
             fxn_name = flowclass.__class__.__name__
             fxn = getattr(self,fxn_name)
             self.active_tools = original_active_tools
             fxn(*flowclass.args,**flowclass.kwargs)
+            combined_result_tools.extend(self.active_tools)
+        if combine:
+            self.active_tools = combined_result_tools
         return self
 
-    def sequence_(self,*flowlist):
+    def sequence_(self,*flowlist,**kwargs):
         """
         Applies each flowfxn in *flowlist sequentially to each other.  Very similar to python's :py:meth:`reduce`
         function (not to be confused with :py:meth:`reduce_`, initialized with the current active_nodes.
 
         :param *flowlist: A sequence of flowfxns
+        :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
         :returns: (DAG) this dag
 
         >>> dag.sequence_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
@@ -458,13 +466,19 @@ class DAG(object):
         In the above example, ToolA will be applied to Toolx, ToolB to ToolA, and ToolC applied to ToolB.  ToolC
         will be set as dag.active_tools
         """
+        combine = kwargs.get('combine',False)
+
         if not isinstance(flowlist,tuple):
             raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
 
+        combined_result_tools = []
         for flowclass in flowlist:
             fxn_name = flowclass.__class__.__name__
             fxn = getattr(self,fxn_name)
             fxn(*flowclass.args,**flowclass.kwargs)
+            combined_result_tools.extend(self.active_tools)
+        if combine:
+            self.active_tools = combined_result_tools
         return self
 
 
@@ -483,7 +497,7 @@ class reduce_(MethodStore): pass
 class reduce_split_(MethodStore):pass
 class branch_(MethodStore):pass
 
-class combine_(MethodStore):pass
+# class combine_(MethodStore):pass
 class sequence_(MethodStore):pass
 class apply_(MethodStore):pass
 

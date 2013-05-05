@@ -139,8 +139,8 @@ class Workflow(models.Model):
 
         validate_name(self.name)
         #Validate unique name
-        if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
-            raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
+        # if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
+        #     raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
 
         check_and_create_output_dir(self.output_dir)
         self.log, self.log_path = get_workflow_logger(self)
@@ -216,13 +216,13 @@ class Workflow(models.Model):
         restart = kwargs.pop('restart',False)
         prompt_confirm = kwargs.pop('prompt_confirm',True)
 
-        name = re.sub("\s","_",name)
+        #name = re.sub("\s","_",name)
 
         if restart:
             wf = Workflow.__restart(name=name, prompt_confirm=prompt_confirm, **kwargs)
         elif Workflow.objects.filter(name=name).count() > 0:
             wf = Workflow.__reload(name=name, prompt_confirm=prompt_confirm, **kwargs)
-            wf = Workflow.__resume(name=name, **kwargs)
+            #wf = Workflow.__resume(name=name, **kwargs)
         else:
             wf = Workflow.__create(name=name, **kwargs)
 
@@ -254,7 +254,7 @@ class Workflow(models.Model):
         wf.finished_on = None
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
-        wf.output_dir = os.path.join(root_output_dir,wf.name)
+        wf.output_dir = os.path.join(root_output_dir,wf.name.replace(' ','_'))
         if comments:
             wf.comments = comments
 
@@ -330,7 +330,7 @@ class Workflow(models.Model):
         """
         if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
         check_and_create_output_dir(root_output_dir)
-        output_dir = os.path.join(root_output_dir,name)
+        output_dir = os.path.join(root_output_dir,name.replace(' ','_'))
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, **kwargs)
 
@@ -358,9 +358,9 @@ class Workflow(models.Model):
 
         b, created = Stage.objects.get_or_create(workflow=self,name=name)
         if created:
-            self.log.info('Creating {0}.'.format(b))
+            self.log.info('Creating {0}'.format(b))
         else:
-            self.log.info('Loading {0}.'.format(b))
+            self.log.info('Loading {0}'.format(b))
             self.finished_on = None #reloading, so reset this
 
         b.order_in_workflow = order_in_workflow
@@ -858,9 +858,6 @@ class Stage(models.Model):
 
         validate_name(self.name,self.name)
         check_and_create_output_dir(self.output_dir)
-        #validate unique name
-#        if Stage.objects.filter(workflow=self.workflow,name=self.name).exclude(id=self.id).count() > 0:
-#            raise ValidationError("Stage names must be unique within a given Workflow. The name {0} already exists.".format(self.name))
 
     def set_status(self,new_status,save=True):
         "Set Stage status"
@@ -936,7 +933,7 @@ class Stage(models.Model):
     @property
     def output_dir(self):
         "Absolute path to this stage's output_dir"
-        return os.path.join(self.workflow.output_dir,self.name)
+        return os.path.join(self.workflow.output_dir,self.name.replace(' ','_'))
 
     @property
     def tasks(self):

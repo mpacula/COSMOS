@@ -19,7 +19,7 @@ Here is the source code of the :file:`example_workflows/ex1.py` you ran in :ref:
 
 Here's the job dependency graph that was created:
 
-.. figure:: imgs/ex1.svg
+.. figure:: imgs/ex1.png
     :width: 100%
     :align: center
 

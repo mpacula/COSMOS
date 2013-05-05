@@ -134,7 +134,7 @@ def validate_name(txt,field_name=''):
     Validates that txt is alphanumeric and underscores, decimals, or hyphens only
     """ 
     if re.match('^[a-zA-Z0-9_\.\s-]+$',txt) == None:
-        raise ValidationException('Field {0} must be alphanumeric and underscores, periods, spaces, or hyphens only.  Text that failed: {1}'.format(field_name,txt))
+        raise ValidationException('Field {0} must be alphanumeric, periods, spaces, or hyphens only.  Text that failed: {1}'.format(field_name,txt))
     
 def validate_not_null(field):
     if field == None:

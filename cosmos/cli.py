@@ -18,12 +18,14 @@ def shell():
     """
     os.system('cosmos django shell_plus')
 
-def ls(workflow_id):
+def ls(workflow):
     """
-    List all workflows, or all stages in a workflow is a workflow.id is passed
+    List all workflows, or all stages in a workflow is a workflow.id is passed.  `workflow` can be a workflow.id
+    or the name of the workflow.
     """
-    if workflow_id:
-        wf = Workflow.objects.get(pk=workflow_id)
+    if workflow:
+        print workflow
+        wf = Workflow.objects.get(pk=workflow) if representsInt(workflow) else Workflow.objects.get(name=workflow)
         print wf
         print wf.describe()
         for s in wf.stages:
@@ -36,13 +38,13 @@ def rm(workflows,prompt_confirm,stage_number,all_stages_after):
     """
     Deletes a workflow
     """
-    workflows = [  Workflow.objects.get(pk=workflow) if representsInt(workflows) else Workflow.objects.get(name=workflow)
-                   for workflow in workflows.split(',') ]
+    workflows = [  Workflow.objects.get(pk=w) if representsInt(w) else Workflow.objects.get(name=w)
+                   for w in workflows.split(',') ]
     for wf in workflows:
         if stage_number:
             stage = wf.stages.get(order_in_workflow=stage_number)
-            if not prompt_confirm or confirm('Are you sure you want to {0}{1}?'.
-                                             format(stage,' and all stages after it' if all_stages_after else ''),
+            if not prompt_confirm or confirm('Are you sure you want to delete {0}{1}{2}?'.
+                                             format(wf,stage,' and all stages after it' if all_stages_after else ''),
                                              default=False,timeout=60):
                 for s in wf.stages.filter(order_in_workflow__gt=stage.order_in_workflow-1) if all_stages_after else wf.stages.filter(order_in_workflow = stage.order_in_workflow-1):
                     s.delete()
@@ -95,7 +97,7 @@ def main():
 
     sp=subparsers.add_parser('ls',help=ls.__doc__)
     sp.set_defaults(func=ls)
-    sp.add_argument('workflow_id',type=int,help="Workflow id",nargs="?")
+    sp.add_argument('workflow',type=str,help="Workflow id or name",nargs="?")
 
     sp = subparsers.add_parser('rm',help=rm.__doc__)
     sp.set_defaults(func=rm)
