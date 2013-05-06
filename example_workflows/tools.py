@@ -1,6 +1,13 @@
 from cosmos.contrib.ezflow.tool import Tool
 from cosmos.Workflow.models import TaskFile
 
+class Sleep(Tool):
+    inputs = ['*']
+    forward_input = True
+
+    def cmd(self,i,s,p):
+        return 'sleep 10'
+
 class ECHO(Tool):
     outputs = ['txt']
     time_req = 1 #min

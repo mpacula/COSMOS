@@ -68,7 +68,6 @@ class JobManager(JobManagerBase):
         except drmaa.errors.InternalException:
             False
 
-
     def get_jobAttempt_status(self,jobAttempt):
         """
         Queries the DRM for the status of the job
@@ -84,8 +83,6 @@ class JobManager(JobManagerBase):
             else:
                 s = 'not sure' #job doesnt exist in queue anymore but didn't succeed or fail
         return s
-
-
 
     def __drmaa_createJobTemplate(self,jobAttempt):
         """

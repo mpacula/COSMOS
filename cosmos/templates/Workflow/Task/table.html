@@ -30,7 +30,9 @@
     <thead>
     <tr>
         <th>Task</th>
+        {%if False%}
         <th>Parents</th>
+        {%endif%}
         <th>Status</th>
         <th>Wall Time</th>
         <th>Output Dir Size</th>
@@ -47,11 +49,13 @@
                 {%endwith%} 
             <strong><a href="{{task.url}}">{{task}}</a></strong>
             </td>
+            {%if False%}
             <td>
                 {%for parent in task.parents%}
                 <a href="{{parent.url}}">{{parent}}{%if not forloop.last%}<br/>{%endif%}</a>
                 {%empty%}None{%endfor%}
             </td>
+            {%endif%}
             <td>{{task.status}}
             </td>
             <td>

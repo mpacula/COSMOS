@@ -6,6 +6,8 @@ from cosmos.Workflow.models import Task,TaskError
 from decorator import decorator
 from tool import Tool
 import itertools
+import re
+from cosmos.i import TaskFile
 
 class DAGError(Exception): pass
 class StageNameCollision(Exception):pass
@@ -26,7 +28,7 @@ def flowfxn(func,dag,*RHS):
     try:
         stage_name = dag.active_tools[0].stage_name
     except IndexError:
-        raise DAGError,'Tried to DAG.{0}(), but dag.active_tools is not set.  Make sure to |Add| some INPUTs first.'.format(
+        raise DAGError,'Tried to DAG.{0}(), but dag.active_tools is not set.  Make sure to `add_` some INPUTs first.'.format(
             func.__name__
         )
 
@@ -214,9 +216,24 @@ class DAG(object):
         
         ### Bulk add task->output_taskfile relationships
         ThroughModel = Task._output_files.through
-        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=out.id) for n in new_nodes for out in n.output_files ]
+        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=tf.id) for n in new_nodes for tf in n.output_files ]
         ThroughModel.objects.bulk_create(rels)
-        
+
+        ### Bulk add task->input_taskfile relationships
+        ThroughModel = Task._input_files.through
+        rels = [ ThroughModel(task_id=n._task_instance.id,taskfile_id=tf.id) for n in new_nodes for tf in n.input_files ]
+        ThroughModel.objects.bulk_create(rels)
+
+
+        ### Bulk add task->parent_task relationships
+        ThroughModel = Task._parents.through
+        new_edges = filter(lambda e: e[0] in new_nodes or e[1] in new_nodes,self.G.edges())
+        rels = [ ThroughModel(from_task_id=child._task_instance.id,
+                              to_task_id=parent._task_instance.id)
+                 for parent,child in new_edges ]
+        ThroughModel.objects.bulk_create(rels)
+
+
         #bulk save edges
         new_edges = filter(lambda e: e[0] in new_nodes or e[1] in new_nodes,self.G.edges())
         task_edges = [ (parent._task_instance,child._task_instance) for parent,child in new_edges ]
@@ -234,18 +251,23 @@ class DAG(object):
 
     def __new_task(self,stage,tool):
         """
-        Instantiates a task from a tool.
+        Instantiates a task from a tool.  Assumes TaskFiles already have real primary keys.
 
         :param stage: The stage the task should belong to.
         :param tool: The Tool.
         """
+        pcmd = tool.pcmd
+        # for m in re.findall('(#F\[(.+?):(.+?):(.+?)\])',pcmd):
+        #     if m[1] not in [t.id for t in tool.output_files]:
+        #         tool.input_files.append(TaskFile.objects.get(pk=m[1]))
+
         try:
             return Task(
                       stage = stage,
-                      pcmd = tool.pcmd,
+                      pcmd = pcmd,
                       tags = tool.tags,
-                      input_files = tool.input_files,
-                      output_files = tool.output_files,
+                      # input_files = tool.input_files,
+                      # output_files = tool.output_files,
                       memory_requirement = tool.mem_req * self.mem_req_factor,
                       cpu_requirement = tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
                       time_requirement = tool.time_req,
@@ -271,6 +293,8 @@ class DAG(object):
 
         >>> dag() |Add| [tool1,tool2,tool3,tool4]
         """
+        if len(tools) == 0:
+            raise FlowFxnValidationError,'The parameter `tools` must have at least one Tool in it'
         if not isinstance(tools,list):
             raise FlowFxnValidationError, 'The parameter `tools` must be a list'
         for t in tools:
@@ -339,9 +363,9 @@ class DAG(object):
     @flowfxn
     def reduce_(self,keywords,tool_class,stage_name=None,tag={}):
         """
-        Create new tools with a many2one to parent_tools.
+        Create new tools with a many2one relationship to the current active_tools.
 
-        :param keywords: (list of str) Tags to reduce to.  All keywords not listed will not be passed on to the tasks generated.
+        :param keywords: (list of str) Tags to reduce to.  The reduce function will   All keywords not listed will not be passed on to the tasks generated.
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
@@ -353,6 +377,7 @@ class DAG(object):
         if type(keywords) != list:
             raise TypeError('keywords must be a list')
         try:
+        # common_tags = set(itertools.chain(*[t.tags.keys() for t in parent_tools]))
             for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
                 parent_tool_group = list(parent_tool_group)
                 tags.update(tag)
