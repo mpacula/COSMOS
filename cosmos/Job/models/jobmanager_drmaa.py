@@ -156,7 +156,7 @@ class JobManager(JobManagerBase):
 
         extra_jobinfo = extra_jobinfo._asdict()
 
-        successful = extra_jobinfo is not None and extra_jobinfo['exitStatus'] == 0 and extra_jobinfo['wasAborted'] == False
+        successful = extra_jobinfo is not None and extra_jobinfo['exitStatus'] == 0 and extra_jobinfo['wasAborted'] == False and extra_jobinfo['hasExited']
         jobAttempt._hasFinished(successful, extra_jobinfo)
         return jobAttempt
 
