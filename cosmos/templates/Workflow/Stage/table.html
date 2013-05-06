@@ -5,24 +5,26 @@
     <thead>
     <tr><th>Step</th>
         <th>Stage</th>
+        <th>Stage Wall Time</th>
         <th></th>
         <th>Progress</th>
         <th>Tasks</th>
+        <th>Failed Jobs</th>
         {% if cosmos_settings.show_stage_details == "True" %}
             <th>Tags Used</th>
-            <th>Stage Wall Time</th>
             <th>Avg CPU Req</th>
-            <th>Avg % CPU</th>
             <th>Avg Time Req</th>
+            <th>Avg Mem Req</th>
+
+            <th>Avg % CPU</th>
             <th>Avg Wall Time</th>
             <th>Max Wall Time</th>
             <th>Avg Blocked I/O Time</th>
 
-            <th>Avg Mem Req</th>
             <th>Avg Mem Used (RSS)</th>
             <th>Max Mem Used (RSS)</th>
+            <th>Avg Virtual Ram</th>
             {% if details%}
-                <th>Avg Virtual Ram</th>
                 <th>Started</th>
                 <th>Finished</th>
             {% endif %}
@@ -35,6 +37,7 @@
         <tr onclick="window.location.href = '{{stage.url}}';" style="cursor:pointer">
         <td>{{stage.order_in_workflow}}.</td>
         <td><strong><a href="{{stage.url}}">[{{stage.id}}] {{stage.name|underscore2space}}</a></strong></td>
+        <td>{{stage.wall_time.seconds|format_time}}</td>
 
             <td>
                 {%with status=stage.status %}
@@ -45,26 +48,25 @@
                 </td>
             <td><div style="padding:0px;margin:0px" class="progress progress-{% status2csstype stage.status %} progress-striped" rel="tooltip" title="{{stage.percent_done}}% Completed" data-placement="right">
                     <div class="bar" style="opacity:.75;width:{{stage.percent_done}}%"></div>
-                </div></td>
+                </div>
+            </td>
             <td>{{stage.num_tasks_successful}}/{{stage.num_tasks}}</td>
+            <td>{{stage.failed_jobAttempts.count}}</td>
+
            {% if cosmos_settings.show_stage_details %}
                 <td>{{stage.get_all_tag_keys_used|join:', '}}</td>
-                <td>{{stage.wall_time.seconds|format_time}}</td>
+
                 <td>{% get_task_stat stage "cpu_requirement" "Avg"%}</td>
-                <td>{% get_sjob_stat stage "percent_cpu" "Avg" "format_percent"%}</td>
-
                 <td>{% get_task_stat stage "time_requirement" "Avg" "format_time" "minutes"%}</td>
-                <td>{% get_sjob_stat stage "wall_time" "Avg" "format_time"%}</td>
-                <td>{% get_sjob_stat stage "wall_time" "Max" "format_time"%}</td>
-                <td>{% get_sjob_stat stage "block_io_delays" "Avg" "format_time"%}</td>
-
                 <td>{% get_task_stat stage "memory_requirement" "Avg" "format_memory_mb"%}</td>
-                <td>{% get_sjob_stat stage "avg_rss_mem" "Avg" "format_memory_kb"%}</td>
-                <td>{% get_sjob_stat stage "max_rss_mem" "Max" "format_memory_kb"%}</td>
+
+                {% for stat,val in stage.get_stats.items %}
+                    <td>{{val}}</td>
+                {% endfor %}
+
                 {% if details %}
-                <td>{% get_sjob_stat stage "avg_virtual_mem" "Avg" "format_memory_kb"%}</td>
-               <td>{{stage.started_on|date:"SHORT_DATETIME_FORMAT"}}</td>
-               <td>{{stage.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
+                   <td>{{stage.started_on|date:"SHORT_DATETIME_FORMAT"}}</td>
+                   <td>{{stage.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
                {% endif %}
             {% endif %}
             <td>{%if cosmos_settings.show_stage_file_sizes == "True"%}{{stage.file_size}}{%else%}off{%endif%}</td>

@@ -114,7 +114,7 @@ def format_memory_mb(mb):
 
 @register.filter
 def format_time(amount,type="seconds"):
-    if amount == None or amount == '': return '0'
+    if amount == None or amount == '': return ''
     if type == 'minutes':
         amount = amount*60
     return datetime.timedelta(seconds=int(amount))

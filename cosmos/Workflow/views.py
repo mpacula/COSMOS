@@ -75,7 +75,7 @@ def __get_context_for_stage_task_table(request,pid):
         filter_url = 'filter=True&'+'&'.join([ '{0}={1}'.format(k,v) for k,v in all_filters.items() ]) #url to retain this filter
         mark_safe(filter_url)
     else:
-        tasks_list = Task.objects.filter(stage=stage)
+        tasks_list = Task.objects.filter(stage=stage).select_related()
 
     #pagination
     page_size = 20

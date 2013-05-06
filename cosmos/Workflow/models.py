@@ -19,6 +19,8 @@ import hashlib
 import copy
 import pprint
 import signals
+from cosmos.Workflow.templatetags import extras
+from ordereddict import OrderedDict
 
 status_choices=(
                 ('successful','Successful'),
@@ -110,10 +112,10 @@ class TaskFile(models.Model,object):
         if not self.persist:
             self.workflow.log.info('Deleting Intermediate file {0}'.format(self.path))
             self.deleted_because_intermediate = True
-            os.system('rm -rf {0}'.format(self.path))
+            os.system('echo "" > {0}'.format(self.path)) # overwrite with empty file
             self.save()
         else:
-            raise WorkflowError, "This file should not be deleted just because it is an intermediate."
+            raise WorkflowError, "{0} should not be deleted because persist=True".format(self)
 
 class Workflow(models.Model):
     """   
@@ -736,7 +738,7 @@ class Workflow(models.Model):
         return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
 
     def describe(self):
-        return 'output_dir: {0.output_dir}'.format(self)
+        return """output_dir: {0.output_dir}""".format(self)
 
     @models.permalink
     def url(self):
@@ -766,13 +768,15 @@ class WorkflowManager():
         self.dag.node[task.id]['status'] = task.status
 
         if task.status == 'successful' and self.workflow.delete_intermediates:
-            #parents may be ready for intermediate deleting
-            intermediate_ids = [ p_id for p_id in self.dag.predecessors(task.id) if self.is_task_intermediate(p_id) ]
-            tasks = Task.objects.filter(pk__in=intermediate_ids)
-            for t in tasks:
-                for o in t.output_files:
-                    if not o.persist:
-                        o.delete_because_intermediate()
+            # Input files may be ready for intermediate deleting if all
+            # Tasks that depend on them are also successful, and they are not an input file (ie has 0 parents)
+            for infile in task.input_files:
+                if not infile.persist:
+                    if all([ r['successful'] and r['_parents__count']>0
+                              for r in infile.task_input_set.values('successful','id').annotate(models.Count('_parents')) ]
+                    ):
+                        infile.delete_because_intermediate()
+
         return self
 
 
@@ -886,6 +890,38 @@ class Stage(models.Model):
         r = int(100 * float(done) / float(self.num_tasks))
         return r if r > 1 else 1
 
+    def failed_jobAttempts(self):
+        return JobAttempt.objects.filter(task__in=self.tasks,successful=False)
+
+
+    def get_stats(self):
+        """
+        :param: a list of 3-tuples of format (title,field,statistic)
+        :return: (dict) of stats about jobs
+        """
+        stats_to_get = [('avg_percent_cpu','percent_cpu','Avg',extras.format_percent),
+                        ('avg_wall_time','wall_time','Avg',extras.format_time),
+                        ('max_wall_time','wall_time','Max',extras.format_time),
+                        ('avg_block_io_delays','block_io_delays','Avg',extras.format_time),
+                        ('avg_rss_mem','avg_rss_mem','Avg',extras.format_memory_kb),
+                        ('max_rss_mem','max_rss_mem','Max',extras.format_memory_kb),
+                        ('avg_virtual_mem','avg_virtual_mem','Avg',extras.format_memory_kb)
+        ]
+        stat_names = [ s[0] for s in stats_to_get ]
+        aggregate_kwargs = {}
+        for title,field,statistic,formatfxn in stats_to_get:
+            if statistic not in ['Avg','Sum','Max','Min','Count']:
+                raise ValidationError('Statistic {0} not supported'.format(statistic))
+            aggr_fxn = getattr(models, statistic)
+            aggregate_kwargs[title]= aggr_fxn(field)
+        r = self.successful_jobAttempts.aggregate(**aggregate_kwargs)
+        d = OrderedDict()
+        for title,field,stat,formatfxn in stats_to_get:
+            d[title] = formatfxn(r[title])
+        return d
+
+
+    #TODO deprecated
     def get_sjob_stat(self,field,statistic):
         """
         Aggregates a task successful job's field using a statistic.
@@ -900,7 +936,11 @@ class Stage(models.Model):
             raise ValidationError('Statistic {0} not supported'.format(statistic))
         aggr_fxn = getattr(models, statistic)
         aggr_field = '{0}__{1}'.format(field,statistic.lower())
-        return JobAttempt.objects.filter(successful=True,task__in = Task.objects.filter(stage=self)).aggregate(aggr_fxn(field))[aggr_field]
+        return self.successful_jobAttempts.aggregate(aggr_fxn(field))[aggr_field]
+
+    @property
+    def successful_jobAttempts(self):
+        return JobAttempt.objects.filter(successful=True,task__in = Task.objects.filter(stage=self))
 
     def get_task_stat(self,field,statistic):
         """
@@ -1134,6 +1174,8 @@ class Task(models.Model):
     # cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
     # dont_delete_output_files = models.BooleanField(default=False,help_text="If True, prevents output files from being deleted even when this task becomes an intermediate and workflow.delete_intermediates == True.")
 
+    _parents = models.ManyToManyField('Task')
+
     tags = PickledObjectField(null=False,default={})
     #on_success = PickledObjectField(null=False)
     created_on = models.DateTimeField(null=True,default=None)
@@ -1143,7 +1185,7 @@ class Task(models.Model):
     @property
     def output_files(self): return self._output_files.all()
 
-    _input_files = models.ManyToManyField(TaskFile,related_name='task_input_set',null=True)
+    _input_files = models.ManyToManyField(TaskFile,related_name='task_input_set',null=True,default=None)
     @property
     def input_files(self): return self._input_files.all()
 
@@ -1204,7 +1246,8 @@ class Task(models.Model):
     @property
     def parents(self):
         "This task's parents"
-        return map(lambda n: n.parent, TaskEdge.objects.filter(child=self).all())
+        #return map(lambda n: n.parent, TaskEdge.objects.filter(child=self).all())
+        return self._parents.all()
 
     @property
     def task_edges(self):
@@ -1352,5 +1395,5 @@ class Task(models.Model):
         super(Task, self).delete(*args, **kwargs)
 
     def __str__(self):
-        return 'Task[{1}] {2} from {0}'.format(self.stage,self.id,self.tags)
+        return '<Task[{1}] {0} {2}>'.format(self.stage,self.id,self.tags)
 

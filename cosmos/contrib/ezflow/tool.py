@@ -36,6 +36,8 @@ class Tool(object):
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
     :property output_files: (list) This Tool's output TaskFiles.  A tool's output taskfile names should be unique.
+    :property persist: (bool) If True, output_files will be default be created with persist=True.  If delete_interemediates are on,
+        they will not be deleted.
     :property tags: (dict) This Tool's tags.
     """
     #TODO props that cant be overridden should be private
@@ -49,6 +51,7 @@ class Tool(object):
     forward_input = False # If True, input of this tool can be accessed by its output files
     succeed_on_failure = False
     default_params = {}
+    persist=False
 
     settings = {}
     parameters = {}
@@ -70,10 +73,8 @@ class Tool(object):
         self.dag = dag
 
         # Because defining attributes in python creates a reference to a single instance across all class instance
-        # Thus, any TaskFiles in self.outputs must only be used as a template when instantiating a class
+        # any taskfile instances in self.outputs is used as a template for instantiating a new class
         self.outputs = [ copy.copy(o) if isinstance(o,TaskFile) else o for o in self.outputs ]
-
-        
         self.id = get_id()
 
         # Create empty output TaskFiles
@@ -81,7 +82,7 @@ class Tool(object):
             if isinstance(output, TaskFile):
                 self.add_output(output)
             elif isinstance(output,str):
-                tf = TaskFile(fmt=output)
+                tf = TaskFile(fmt=output,persist=self.persist)
                 self.add_output(tf)
             else:
                 raise ToolValidationError, "{0}.outputs must be a list strs or Taskfile instances.".format(self)
@@ -133,7 +134,7 @@ class Tool(object):
         :param error_if_missing: (bool) Raises a GetOutputError if the output cannot be found
         """
 
-        output_files = filter(lambda x: x.name == name,self.output_files)
+        output_files = filter(lambda x: x.name == name, self.output_files)
 
         if len(output_files) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self),name)
 
@@ -164,9 +165,9 @@ class Tool(object):
         
     @property
     def input_files(self):
-        "An alias to :py:meth:map_inputs"
-        return self.map_inputs()
-    
+        "A list of input TaskFiles"
+        return list(itertools.chain(*[ tf for tf in self.map_inputs().values() ]))
+
     @property
     def label(self):
         "Label used for the DAG image"
@@ -181,17 +182,17 @@ class Tool(object):
         if not self.inputs:
             return {}
 
-        elif '*' in self.inputs:
-            return [ o for p in self.parents for o in p.output_files ]
-
         else:
             all_inputs = []
+            if '*' in self.inputs:
+                return {'*':[ o for p in self.parents for o in p.output_files ]}
+
             for name in self.inputs:
                 for p in self.parents:
                     all_inputs += filter(lambda x: x,[ p.get_output(name,error_if_missing=False) ]) #filter out Nones
 
             input_dict = {}
-            for input_file in all_inputs:
+            for input_file in set(all_inputs):
                 input_dict.setdefault(input_file.name,[]).append(input_file)
 
             for k,v in input_dict.items():
@@ -211,7 +212,7 @@ class Tool(object):
         """
         p = self.parameters.copy()
         p.update(self.tags)
-        callargs = getcallargs(self.cmd,i=self.input_files,s=self.settings,p=p)
+        callargs = getcallargs(self.cmd,i=self.map_inputs(),s=self.settings,p=p)
         del callargs['self']
         r = self.cmd(**callargs)
         
@@ -254,7 +255,7 @@ class Tool(object):
         raise NotImplementedError("{0}.cmd is not implemented.".format(self.__class__.__name__))
 
     def __str__(self):
-        return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
+        return '<{0} {1}>'.format(self.__class__.__name__,self.tags)
     
 class INPUT(Tool):
     """
@@ -277,7 +278,7 @@ class INPUT(Tool):
         :param fmt: the format of the input file
         """
         super(INPUT,self).__init__(*args,**kwargs)
-        self.add_output(TaskFile(path=path,name=name,fmt=fmt))
+        self.add_output(TaskFile(path=path,name=name,fmt=fmt,persist=True))
 
     def __str__(self):
         return '[{0}] {1} {2}'.format(self.id,self.__class__.__name__,self.tags)
