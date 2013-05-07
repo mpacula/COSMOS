@@ -274,7 +274,7 @@ class Workflow(models.Model):
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
         #TODO ideally just change the queryset manager to do this automatically
-        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
+        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in '{0}'?".format(name),default=True,timeout=30):
             print "Exiting."
             sys.exit(1)
 
@@ -673,7 +673,7 @@ class Workflow(models.Model):
                 if not self._reattempt_task(task,jobAttempt):
                     task._has_finished(jobAttempt) #job has failed and out of reattempts
                     if terminate_on_fail:
-                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
+                        self.log.warning("{0} of {1} has reached max_reattempts and terminate_on_fail==True so terminating.".format(jobAttempt,task))
                         self.terminate()
 
         if finish: self.finished()
@@ -1340,7 +1340,13 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        if jobAttempt == 'NOOP' or jobAttempt.task.succeed_on_failure or self.jobattempt_set.filter(successful=True).count():
+        an_output_is_empty = any([os.stat(of)[6] == 0 for of in self.output_files])
+
+        if not an_output_is_empty and (
+                        jobAttempt == 'NOOP'
+                        or jobAttempt.task.succeed_on_failure
+                        or self.jobattempt_set.filter(successful=True).count()
+        ):
             self.set_status('successful')
         else:
             self.set_status('failed')

@@ -18,4 +18,4 @@ def jobAttempt_profile_output(request,jobid):
         output = file(output_path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
     else:
         output = 'IOError.  File probably does not exist'
-    return render_to_response('Workflow/TaskFile/view.html', { 'request':request,'output_path':output_path,'output_name':'profile output','output': output, 'jobAttempt':jobAttempt }, context_instance=RequestContext(request))
+    return render_to_response('Workflow/TaskFile/view.html', { 'request': request,'output_path': output_path, 'output_name':'profile output','output': output, 'jobAttempt': jobAttempt }, context_instance=RequestContext(request))
