@@ -2,7 +2,7 @@ from cosmos.utils.helpers import groupby
 import itertools as it
 import networkx as nx
 import pygraphviz as pgv
-from cosmos.Workflow.models import Task,TaskError
+from cosmos.Workflow.models import Task,TaskError,Stage
 from decorator import decorator
 from tool import Tool
 import itertools

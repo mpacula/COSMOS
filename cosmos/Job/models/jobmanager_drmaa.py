@@ -134,7 +134,7 @@ class JobManager(JobManagerBase):
             # There are no jobs to wait on.
             # This should never happen since I check for num_queued_jobs in yield_all_queued_jobs
             enable_stderr()
-            raise Exception('drmaa_session.wait threw invalid job exception.  there are no jobs left.  make sure jobs are queued before calling _check_for_finished_job.')
+            raise DRMAA_Error('drmaa_session.wait threw invalid job exception.  there are no jobs left.  make sure jobs are queued before calling _check_for_finished_job.')
         except drmaa.errors.ExitTimeoutException:
             #jobs are queued, but none are done yet
             enable_stderr()

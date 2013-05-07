@@ -244,16 +244,17 @@ class Workflow(models.Model):
     @staticmethod
     def __resume(name,dry_run, default_queue, delete_intermediates, root_output_dir, comments,**kwargs):
         """
-        Resumes a workflow without deleting any unsuccessful tasks.  Probably won't be called by anything except __reload
+        Resumes a workflow without deleting any unsuccessful tasks.  Provides a way to override workflow
+        properties.
+        Probably won't be called by anything except __reload
 
         see :py:meth:`start` for parameter definitions
         """
 
         if Workflow.objects.filter(name=name).count() == 0:
-            raise ValidationError('Workflow {0} does not exist, cannot resumes it'.format(name))
+            raise ValidationError('Workflow {0} does not exist, cannot resume it'.format(name))
         wf = Workflow.objects.get(name=name)
         wf.dry_run=dry_run
-        wf.finished_on = None
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
         wf.output_dir = os.path.join(root_output_dir,wf.name.replace(' ','_'))
@@ -262,7 +263,6 @@ class Workflow(models.Model):
 
         wf.save()
         wf.log.info('Resuming {0}'.format(wf))
-        Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
         return wf
 
     @staticmethod
@@ -274,15 +274,20 @@ class Workflow(models.Model):
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
         #TODO ideally just change the queryset manager to do this automatically
-        wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
             print "Exiting."
             sys.exit(1)
+
+        wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
+        wf.finished_on = None
+        Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
+
         if delete_unsuccessful_stages:
+            #delete a stage with any unsuccessful tasks
             for s in wf.stages.filter(successful=False):
                 s.delete()
         else:
-            #only delete if ALL tasks are unsuccessful
+            #delete a stage if ALL tasks are unsuccessful
             for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
                 wf.log.info('{0} has no successful tasks.'.format(s))
                 s.delete()
@@ -351,21 +356,21 @@ class Workflow(models.Model):
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
 
-        #determine order in workflow
-        m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
-        if m is None:
-            order_in_workflow = 1
-        else:
-            order_in_workflow = m+1
-
         b, created = Stage.objects.get_or_create(workflow=self,name=name)
         if created:
             self.log.info('Creating {0}'.format(b))
+
+            #determine order in workflow
+            m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
+            if m is None:
+                order_in_workflow = 1
+            else:
+                order_in_workflow = m+1
+            b.order_in_workflow = order_in_workflow
         else:
             self.log.info('Loading {0}'.format(b))
             self.finished_on = None #reloading, so reset this
 
-        b.order_in_workflow = order_in_workflow
         b.save()
         return b
 
@@ -891,7 +896,7 @@ class Stage(models.Model):
         return r if r > 1 else 1
 
     def failed_jobAttempts(self):
-        return JobAttempt.objects.filter(task__in=self.tasks,successful=False)
+        return JobAttempt.objects.filter(task__in=self.tasks,successful=True,queue_status='finished')
 
 
     def get_stats(self):
