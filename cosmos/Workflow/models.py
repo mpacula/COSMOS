@@ -274,7 +274,7 @@ class Workflow(models.Model):
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
         #TODO ideally just change the queryset manager to do this automatically
-        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in {0}?".format(wf),default=True,timeout=30):
+        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in '{0}'?".format(name),default=True,timeout=30):
             print "Exiting."
             sys.exit(1)
 
@@ -359,17 +359,17 @@ class Workflow(models.Model):
         b, created = Stage.objects.get_or_create(workflow=self,name=name)
         if created:
             self.log.info('Creating {0}'.format(b))
-
-            #determine order in workflow
-            m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
-            if m is None:
-                order_in_workflow = 1
-            else:
-                order_in_workflow = m+1
-            b.order_in_workflow = order_in_workflow
         else:
             self.log.info('Loading {0}'.format(b))
             self.finished_on = None #reloading, so reset this
+
+        #determine order in workflow
+        m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
+        if m is None:
+            order_in_workflow = 1
+        else:
+            order_in_workflow = m+1
+        b.order_in_workflow = order_in_workflow
 
         b.save()
         return b
@@ -673,7 +673,7 @@ class Workflow(models.Model):
                 if not self._reattempt_task(task,jobAttempt):
                     task._has_finished(jobAttempt) #job has failed and out of reattempts
                     if terminate_on_fail:
-                        self.log.warning("{0} has reached max_reattempts and terminate_on_fail==True so terminating.".format(task))
+                        self.log.warning("{0} of {1} has reached max_reattempts and terminate_on_fail==True so terminating.".format(jobAttempt,task))
                         self.terminate()
 
         if finish: self.finished()
@@ -785,14 +785,14 @@ class WorkflowManager():
         return self
 
 
-    def is_task_intermediate(self,task_id):
-        """
-        Checks to see if a task_id is an intermediary task.
-        An intermediary task has at least 1 child and 1 parent, and all of its children are all successful.
-        """
-        successors = self.dag.successors(task_id)
-        if len(self.dag.predecessors(task_id)) > 0 and len(successors) > 0:
-            return all( self.dag.node[s]['status'] == 'successful' for s in successors )
+    # def is_task_intermediate(self,task_id):
+    #     """
+    #     Checks to see if a task_id is an intermediary task.
+    #     An intermediary task has at least 1 child and 1 parent, and all of its children are all successful.
+    #     """
+    #     successors = self.dag.successors(task_id)
+    #     if len(self.dag.predecessors(task_id)) > 0 and len(successors) > 0:
+    #         return all( self.dag.node[s]['status'] == 'successful' for s in successors )
 
     def get_ready_tasks(self):
         degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
@@ -1179,7 +1179,7 @@ class Task(models.Model):
     # cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
     # dont_delete_output_files = models.BooleanField(default=False,help_text="If True, prevents output files from being deleted even when this task becomes an intermediate and workflow.delete_intermediates == True.")
 
-    _parents = models.ManyToManyField('Task')
+    _parents = models.ManyToManyField('Task',related_name='_children')
 
     tags = PickledObjectField(null=False,default={})
     #on_success = PickledObjectField(null=False)
@@ -1340,7 +1340,13 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        if jobAttempt == 'NOOP' or jobAttempt.task.succeed_on_failure or self.jobattempt_set.filter(successful=True).count():
+        an_output_is_empty = any([os.pat.exists(of.path) and os.stat(of.path)[6] == 0 for of in self.output_files])
+
+        if not an_output_is_empty and (
+                        jobAttempt == 'NOOP'
+                        or jobAttempt.task.succeed_on_failure
+                        or self.jobattempt_set.filter(successful=True).count()
+        ):
             self.set_status('successful')
         else:
             self.set_status('failed')
