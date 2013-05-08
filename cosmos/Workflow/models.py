@@ -1340,7 +1340,7 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        an_output_is_empty = any([os.stat(of.path)[6] == 0 for of in self.output_files])
+        an_output_is_empty = any([os.pat.exists(of.path) and os.stat(of.path)[6] == 0 for of in self.output_files])
 
         if not an_output_is_empty and (
                         jobAttempt == 'NOOP'
