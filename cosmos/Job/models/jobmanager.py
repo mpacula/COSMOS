@@ -39,7 +39,7 @@ class JobManagerBase(models.Model):
     def __create_command_sh(self,jobAttempt):
         """Create a sh script that will execute a command"""
         with open(jobAttempt.command_script_path,'wb') as f:
-            f.write("#!/bin/sh\n")
+            f.write("#!/bin/bash\n")
             f.write(jobAttempt.command)
         os.system('chmod 700 {0}'.format(jobAttempt.command_script_path))
 
