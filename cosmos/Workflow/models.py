@@ -349,7 +349,8 @@ class Workflow(models.Model):
     def add_stage(self, name):
         """
         Adds a stage to this workflow.  If a stage with this name (in this Workflow) already exists,
-        and it hasn't been added in this session yet, return the existing one.
+        and it hasn't been added in this session yet, return the existing one after removing its
+        finished_on datetimestamp and resetting it's order_in_workflow
 
         :param name: (str) The name of the stage, must be unique within this Workflow. Required.
         """
@@ -361,14 +362,19 @@ class Workflow(models.Model):
             self.log.info('Creating {0}'.format(b))
         else:
             self.log.info('Loading {0}'.format(b))
-            self.finished_on = None #reloading, so reset this
+            self.order_in_workflow=None
+            self.finished_on = None
+            self.save()
 
         #determine order in workflow
-        m = Stage.objects.filter(workflow=self).aggregate(models.Max('order_in_workflow'))['order_in_workflow__max']
-        if m is None:
+        min,max = Stage.objects.filter(workflow=self).aggregate(
+            models.Max('order_in_workflow'),
+            models.Min('order_in_workflow')
+        ).values()
+        if min is None or min > 1:
             order_in_workflow = 1
         else:
-            order_in_workflow = m+1
+            order_in_workflow = max+1
         b.order_in_workflow = order_in_workflow
 
         b.save()
@@ -628,7 +634,7 @@ class Workflow(models.Model):
         if not task.successful: #ReRun jobAttempt
             if numAttempts < self.max_reattempts:
                 self.log.warning("{0} of {1} failed, on attempt # {2}, so deleting failed output files and retrying.\n".format(failed_jobAttempt,task,numAttempts)
-                               + "<COMMAND>\n{0}\n</COMMAND>\n".format(failed_jobAttempt.get_command_shell_script_text())
+                               + "<COMMAND path=\"{1}\">\n{0}\n</COMMAND>\n".format(failed_jobAttempt.get_command_shell_script_text(),failed_jobAttempt.command_script_path)
                                + "<STDERR>{0}\n</STDERR>".format(failed_jobAttempt.STDERR_txt)
                 )
                 os.system('rm -rf {0}/*'.format(task.job_output_dir))
@@ -896,7 +902,7 @@ class Stage(models.Model):
         return r if r > 1 else 1
 
     def failed_jobAttempts(self):
-        return JobAttempt.objects.filter(task__in=self.tasks,successful=True,queue_status='finished')
+        return JobAttempt.objects.filter(task__in=self.tasks,queue_status='finished',successful=False)
 
 
     def get_stats(self):
@@ -1340,7 +1346,10 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        an_output_is_empty = any([os.path.exists(of.path) and os.stat(of.path)[6] == 0 for of in self.output_files])
+        try:
+            an_output_is_empty = any([os.path.exists(of.path) and os.stat(of.path)[6] == 0 for of in self.output_files])
+        except OSError:
+            an_output_is_empty = True
 
         if not an_output_is_empty and (
                         jobAttempt == 'NOOP'
