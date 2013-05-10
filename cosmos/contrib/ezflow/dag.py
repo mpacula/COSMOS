@@ -279,19 +279,19 @@ class DAG(object):
     @flowfxn
     def add_(self,tools,stage_name=None,tag={}):
         """
-        Always the first operator of a workflow.  Simply adds a list of tool instances to the dag, without adding any
-        dependencies.
+        Always the first flowfxn used to describe a DAG.  Simply adds a list of tool instances to the dag,
+        without adding any dependencies.
 
-        .. warning::
+        .. note::
             This operator is different than the others in that its input is a list of
-            instantiated instances of Tools.
+            instantiated instances of Tools, rather than a Tool class.
 
         :param tools: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
-        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (dag) self
+        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn.
+        :return: (DAG) self.
 
-        >>> dag() |Add| [tool1,tool2,tool3,tool4]
+        >>> DAG().add_([tool1,tool2,tool3,tool4])
         """
         if len(tools) == 0:
             raise FlowFxnValidationError,'The parameter `tools` must have at least one Tool in it'
@@ -315,7 +315,7 @@ class DAG(object):
     @flowfxn
     def map_(self,tool_class,stage_name=None,tag={}):
         """
-        Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
+        Creates one2one relationships of the dag's current active_tools with a new tool of
         type `tool_class`.
 
         :param tool_class: (subclass of Tool)
@@ -336,17 +336,17 @@ class DAG(object):
     @flowfxn
     def split_(self,split_by,tool_class,stage_name=None,tag={}):
         """
-        Creates one2many relationships for each tool in the stage last added to the dag, with every possible combination
+        Creates one2many relationships for each tool in the dag's active_tools, with every possible combination
         of keywords in split_by.  New tools will be of class `tool_class` and tagged with one of the possible keyword
         combinations.
 
         :param split_by: (list of (str,list)) Tags to split by.
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
-        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
+        :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn.
         :return: (DAG) self
 
-        >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
+        >>> dag.split_([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
         """
         parent_tools = self.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
@@ -363,15 +363,16 @@ class DAG(object):
     @flowfxn
     def reduce_(self,keywords,tool_class,stage_name=None,tag={}):
         """
-        Create new tools with a many2one relationship to the current active_tools.
+        Create new tools with a many2one relationship to the dag's current active_tools.
 
-        :param keywords: (list of str) Tags to reduce to.  The reduce function will   All keywords not listed will not be passed on to the tasks generated.
+        :param keywords: (list of str) Tags to reduce to.  The reduce function will   All keywords not listed will
+            not be passed on to the tasks generated.
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (DAG) self
 
-        >>> dag() |Reduce| (['shape'],Tool_Class)
+        >>> dag.reduce(['shape'],Tool_Class)
         """
         parent_tools = self.active_tools
         if type(keywords) != list:
@@ -400,7 +401,7 @@ class DAG(object):
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (DAG) self
 
-        >>> dag() |ReduceSplit| (['color','shape'],[(size,['small','large'])],Tool_Class)
+        >>> dag.reduce_split_(['color','shape'],[(size,['small','large'])],Tool_Class)
         """
         parent_tools = self.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
@@ -416,42 +417,18 @@ class DAG(object):
                     self.G.add_edge(parent_tool,new_tool)
                 yield new_tool
 
-    # def combine_(self,*flowlist):
-    #     """
-    #     Applys all `flowfxn`s in ``*flowlist`` to self.active_tools.
-    #     After completion, self.active_tools will be set to the union of all tools produced by this combine.
-    #
-    #     :param *flowlist: A sequence of flowfxns
-    #     :returns: (DAG) this dag
-    #
-    #     >>> dag.combine_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
-    #     # The next flowfxn will apply to all tools of type ToolA, ToolB, ToolC
-    #     """
-    #     if not isinstance(flowlist,tuple):
-    #         raise TypeError, "flowlist must be a tuple, flowlist is a {0}".format(flowlist.__class_)
-    #
-    #     original_active_tools = self.active_tools
-    #     combined_result_tools = []
-    #     for flowclass in flowlist:
-    #         fxn_name = flowclass.__class__.__name__
-    #         fxn = getattr(self,fxn_name)
-    #         fxn(*flowclass.args,**flowclass.kwargs)
-    #         combined_result_tools.extend(self.active_tools)
-    #         self.active_tools = original_active_tools
-    #     self.active_tools = combined_result_tools
-    #     return self
 
     def apply_(self,*flowlist,**kwargs):
         """
-        Applies each flowfxn in *flowlist to current dag.active_tools.  This is different from
-        :py:meth:`sequence_`, because sequence_ applies the flowfns in flowlist to each other
-        sequentially.  With apply_, all functions in *flowlist are applied onto the current
+        Applies each flowfxn in \*flowlist to current dag.active_tools.  This is different from
+        :py:meth:`DAG.sequence\_`, because sequence_ applies the flowfns in flowlist to each other
+        sequentially.  With :py:meth:`apply\_`, all functions in \*flowlist are applied onto the current
         active_tools.
 
         After the apply_, dag.active_tools will be the tools added
-        by the last flowfxn in *flowlist.
+        by the last flowfxn in \*flowlist.
 
-        :param *flowlist: A sequence of flowfxns
+        :param \*flowlist: A sequence of flowfxns
         :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
         :returns: (DAG) this dag
 
@@ -479,10 +456,10 @@ class DAG(object):
 
     def sequence_(self,*flowlist,**kwargs):
         """
-        Applies each flowfxn in *flowlist sequentially to each other.  Very similar to python's :py:meth:`reduce`
-        function (not to be confused with :py:meth:`reduce_`, initialized with the current active_nodes.
+        Applies each flowfxn in \*flowlist sequentially to each other.  Very similar to python's :py:meth:`DAG.reduce_`
+        function (not to be confused with :py:meth:`DAG.reduce_`, initialized with the current active_nodes.
 
-        :param *flowlist: A sequence of flowfxns
+        :param \*flowlist: A sequence of flowfxns
         :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
         :returns: (DAG) this dag
 
@@ -507,9 +484,6 @@ class DAG(object):
         return self
 
 
-
-
-
 class MethodStore(object):
     def __init__(self,*args,**kwargs):
         self.args = args
@@ -522,7 +496,6 @@ class reduce_(MethodStore): pass
 class reduce_split_(MethodStore):pass
 class branch_(MethodStore):pass
 
-# class combine_(MethodStore):pass
 class sequence_(MethodStore):pass
 class apply_(MethodStore):pass
 

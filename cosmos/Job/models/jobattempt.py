@@ -196,7 +196,7 @@ class JobAttempt(models.Model):
         """Function for JobManager to Run when this JobAttempt finishes"""
         self.successful = successful
         self.extra_jobinfo = extra_jobinfo
-        self.queue_status = 'completed'
+        self.queue_status = 'finished'
         self.update_from_profile_output()
         self.finished_on = timezone.now()
         self.save()

@@ -51,10 +51,6 @@ various behaviors.
 
 
 
-Overriding map_inputs
-++++++++++++++++++++++
-Todo
-
 
 Defining Input Files
 --------------------
