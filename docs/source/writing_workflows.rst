@@ -50,8 +50,6 @@ See the :py:class:`Tool API <tool.Tool>` for more properties that can be overrid
 various behaviors.
 
 
-
-
 Defining Input Files
 --------------------
 

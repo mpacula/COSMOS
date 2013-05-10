@@ -760,6 +760,7 @@ class WorkflowManager():
     def __init__(self,workflow):
         self.workflow = workflow
         self.dag = self.createDiGraph()
+        self.workflow.log.info('Using DAG to create Job Queue')
         self.dag_queue = self.dag.copy()
         self.dag_queue.remove_nodes_from(map(lambda x: x['id'],workflow.tasks.filter(successful=True).values('id')))
         self.queued_tasks = []
