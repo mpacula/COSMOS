@@ -45,7 +45,7 @@ class JobManagerBase(models.Model):
 
     def _create_cmd_str(self,jobAttempt):
         "The command to be stored in the command.sh script"
-        return "python {profile} -d {db} -f {profile_out} {command_script_path}".format(
+        return "python {profile} -f {profile_out} {command_script_path}".format(
             profile = os.path.join(session.settings['cosmos_library_path'],'contrib/profile/profile.py'),
             db = jobAttempt.profile_output_path+'.sqlite',
             profile_out = jobAttempt.profile_output_path,

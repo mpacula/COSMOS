@@ -238,7 +238,16 @@ class Tool(object):
         #format() return string with callargs
         callargs['self'] = self
         callargs.update(extra_format_dict)
-        return parse_cmd(cosmos_format(pcmd,callargs))
+        return parse_cmd(cosmos_format(*self.post_cmd(pcmd,callargs)))
+
+    def post_cmd(self,cmd_str,format_dict):
+        """
+        Provides an opportunity to make any last minute changes to the cmd generated.
+        :param cmd_str: (str) the string returned by cmd
+        :param format_dict: (str) the dictionary that cmd was about to be .format()ed with
+        :returns: (str,dict) the post_processed cmd_str and format_dict
+        """
+        return cmd_str,format_dict
 
 
     def cmd(self, i, s, p):

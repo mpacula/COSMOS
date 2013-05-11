@@ -50,8 +50,6 @@ See the :py:class:`Tool API <tool.Tool>` for more properties that can be overrid
 various behaviors.
 
 
-
-
 Defining Input Files
 --------------------
 
@@ -100,53 +98,14 @@ on the right to the last :py:class:`cosmos.Workflow.models.Stage` added to the `
 
 *The 5 infix operators are:*
 
-.. py:method:: |Add|
+.. automethod:: cosmos.contrib.ezflow.dag.DAG.add_
+.. automethod:: cosmos.contrib.ezflow.dag.DAG.map_
+.. automethod:: cosmos.contrib.ezflow.dag.DAG.reduce_
+.. automethod:: cosmos.contrib.ezflow.dag.DAG.split_
+.. automethod:: cosmos.contrib.ezflow.dag.DAG.reduce_split_
 
-    Always the first operator of a workflow.  Simply adds the list of tool instances in `tools` to the dag, without adding
-    any dependencies.  This behavior is significantly different from the other infix operators in that the main parameter
-    is a list of instantiated tools, rather than a :class:`ezflow.tool.Tool` class.
-
-    .. note:: This might be renamed to `Root` in a future release
-
-    :param tools: (list of tools) A list of tool instantiated tool instances to add.
-    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
-    :returns: The modified dag.
-
-    >>> dag() |Add| [tool1,tool2,tool3,tool4]
-    >>> dag() |Add| ([tool1,tool2,tool3,tool4],'My Stage Name')
-
-.. py:method:: |Map|
-
-    Creates a one2one relationships for each tool in the stage last added to the dag, with a new tool of
-    type ``tool_class``.
-
-    :param tool_class: (subclass of Tool)
-    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
-    :returns: The modified dag.
-
-    >>> dag() |Map| Tool_Class
-
-.. py:method:: |Split|
-
-    Creates one2many relationships for each tool in the stage last added to the dag, with every possible combination
-    of keywords in split_by.  New tools will be of class ``tool_class`` and tagged with one of the possible keyword
-    combinations.
-
-    :param tool_class: (subclass of Tool)
-    :param split_by: (list of (str,list)) Tags to split by.
-    :param stage_name: (str) The name of the stage.  Defaults to the tool_class.name.
-    :returns: The modified dag.
-
-    >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
-    >>> dag() |Split| ([('shape',['square','circle']),('color',['red','blue'])],Tool_Class,'My Stage Name')
-
-    The above will generate 4 new tools dependent on each tool in the most recent stage.  The new tools will be tagged
-    with:
 
     .. code-block:: python
-
-        {'shape':'square','color':'red'}, {'shape':'square','color':blue'},
-        {'shape':'circle','color':'red'}, {'shape':'square','circle':blue'}
 
 .. py:method:: |Reduce|
 

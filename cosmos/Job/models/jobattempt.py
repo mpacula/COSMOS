@@ -27,6 +27,7 @@ class JobAttempt(models.Model):
     #job status and input fields
     queue_status = models.CharField(max_length=150, default="not_queued",choices = queue_status_choices)
     successful = models.BooleanField(default=False)
+    status_details = models.CharField(max_length=100,default='',help_text='Extra information about status')
     command = models.TextField(max_length=1000,default='')
     command_script_path = models.TextField(max_length=1000)
     jobName = models.CharField(max_length=150,validators = [RegexValidator(regex='^[A-Z0-9_]*$')])
@@ -194,6 +195,11 @@ class JobAttempt(models.Model):
 
     def _hasFinished(self,successful,extra_jobinfo):
         """Function for JobManager to Run when this JobAttempt finishes"""
+
+        # Make sure output files actually exists
+        if any([ not os.path.exists(o.path) or os.stat(o.path) == 0 for o in self.task.output_files ]):
+                self.status_details = 'Failed due to empty output file'
+
         self.successful = successful
         self.extra_jobinfo = extra_jobinfo
         self.queue_status = 'finished'

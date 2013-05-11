@@ -283,6 +283,7 @@ class DAG(object):
         without adding any dependencies.
 
         .. note::
+
             This operator is different than the others in that its input is a list of
             instantiated instances of Tools, rather than a Tool class.
 
@@ -347,6 +348,15 @@ class DAG(object):
         :return: (DAG) self
 
         >>> dag.split_([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
+
+
+        The above will create 4 new tools dependent on each tool in the most recent stage.  The new tools will be tagged
+        with the tags of their parents plus these:
+
+        .. code-block:: python
+
+            {'shape':'square','color':'red'}, {'shape':'square','color':blue'},
+            {'shape':'circle','color':'red'}, {'shape':'square','circle':blue'}
         """
         parent_tools = self.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
@@ -372,7 +382,11 @@ class DAG(object):
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (DAG) self
 
-        >>> dag.reduce(['shape'],Tool_Class)
+        >>> dag.reduce(['shape','color'],Tool_Class)
+
+        In the above example, the a stage will be created using `Tool_Class`.  The active_nodes will be placed
+        into groups of the possible combinations of `shape` and `color`, and a child will be created based on
+        tool_class, of that `shape` and `color`.
         """
         parent_tools = self.active_tools
         if type(keywords) != list:
@@ -387,7 +401,7 @@ class DAG(object):
                     self.G.add_edge(parent_tool,new_tool)
                 yield new_tool
         except KeyError, e:
-            raise FlowFxnValidationError, "Can't reduce by {0}, at least one parent of stage `{1}` is not tagged with it".format(e.args[0],stage_name)
+            raise FlowFxnValidationError, "Can't reduce by {0}, at least one parent is not tagged with it".format(e.args[0])
 
     @flowfxn
     def reduce_split_(self,keywords,split_by,tool_class,stage_name=None,tag={}):
@@ -401,7 +415,7 @@ class DAG(object):
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
         :return: (DAG) self
 
-        >>> dag.reduce_split_(['color','shape'],[(size,['small','large'])],Tool_Class)
+        >>> dag.reduce_split_(['color','shape'],[('size',['small','large'])],Tool_Class)
         """
         parent_tools = self.active_tools
         splits = [ list(it.product([split[0]],split[1])) for split in split_by ] #splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]

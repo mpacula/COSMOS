@@ -144,7 +144,6 @@ class Workflow(models.Model):
         # if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
         #     raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
 
-        check_and_create_output_dir(self.output_dir)
         self.log, self.log_path = get_workflow_logger(self)
 
     @property
@@ -280,7 +279,7 @@ class Workflow(models.Model):
 
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         wf.finished_on = None
-        Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
+        #Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
 
         if delete_unsuccessful_stages:
             #delete a stage with any unsuccessful tasks
@@ -336,8 +335,9 @@ class Workflow(models.Model):
         :param _wf_id: the ID to use for creating a workflow
         """
         if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
-        check_and_create_output_dir(root_output_dir)
+
         output_dir = os.path.join(root_output_dir,name.replace(' ','_'))
+        check_and_create_output_dir(output_dir)
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, **kwargs)
 
@@ -357,28 +357,21 @@ class Workflow(models.Model):
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
 
-        b, created = Stage.objects.get_or_create(workflow=self,name=name)
-        if created:
-            self.log.info('Creating {0}'.format(b))
-        else:
-            self.log.info('Loading {0}'.format(b))
-            self.order_in_workflow=None
-            self.finished_on = None
-            self.save()
-
-        #determine order in workflow
+        stage, created = Stage.objects.get_or_create(workflow=self,name=name)
         min,max = Stage.objects.filter(workflow=self).aggregate(
             models.Max('order_in_workflow'),
             models.Min('order_in_workflow')
         ).values()
-        if min is None or min > 1:
-            order_in_workflow = 1
+        max = 0 if max is None else max
+        if created:
+            self.log.info('Creating {0}'.format(stage))
+            stage.order_in_workflow = max+1
         else:
-            order_in_workflow = max+1
-        b.order_in_workflow = order_in_workflow
+            self.log.info('Loading {0}'.format(stage))
+            self.finished_on = None
 
-        b.save()
-        return b
+        stage.save()
+        return stage
 
     def _delete_stale_objects(self):
         """
@@ -477,7 +470,7 @@ class Workflow(models.Model):
 
         #create output directories
         for t in tasks:
-            os.mkdir(t.output_dir)
+            os.system('mkdir -p {0}'.format(t.output_dir))
             os.mkdir(t.job_output_dir) #this is not in JobManager because JobMasmanager should be not care about these details
 
         ### Bulk add tags
@@ -541,12 +534,14 @@ class Workflow(models.Model):
         for d in task_output_dirs:
             os.system('rm -rf {0}'.format(d))
 
+    #TODO this probably doesn't have to be a transaction
     @transaction.commit_on_success
     def delete(self, *args, **kwargs):
         """
         Deletes this workflow.
         """
         self.log.info("Deleting {0} and it's output dir {1}...".format(self,self.output_dir))
+        save_str_representation = str(self)
         wf_output_dir = self.output_dir
 
         self.jobManager.delete()
@@ -556,7 +551,7 @@ class Workflow(models.Model):
 
         super(Workflow, self).delete(*args, **kwargs)
 
-        self.log.info('{0} Deleted.'.format(self))
+        self.log.info('{0} Deleted.'.format(save_str_representation))
         x = list(self.log.handlers)
         for h in x:
             self.log.removeHandler(h)
@@ -618,7 +613,6 @@ class Workflow(models.Model):
             self.jobManager.submit_job(jobAttempt)
             self.log.info('Submitted jobAttempt with drmaa jobid {0}.'.format(jobAttempt.drmaa_jobID))
         task.save()
-        #self.jobManager.save()
         return jobAttempt
 
 
@@ -760,6 +754,7 @@ class WorkflowManager():
     def __init__(self,workflow):
         self.workflow = workflow
         self.dag = self.createDiGraph()
+        self.workflow.log.info('Using DAG to create Job Queue')
         self.dag_queue = self.dag.copy()
         self.dag_queue.remove_nodes_from(map(lambda x: x['id'],workflow.tasks.filter(successful=True).values('id')))
         self.queued_tasks = []
@@ -872,7 +867,7 @@ class Stage(models.Model):
         validate_not_null(self.workflow)
 
         validate_name(self.name,self.name)
-        check_and_create_output_dir(self.output_dir)
+        #check_and_create_output_dir(self.output_dir)
 
     def set_status(self,new_status,save=True):
         "Set Stage status"
@@ -1180,6 +1175,7 @@ class Task(models.Model):
     time_requirement = models.IntegerField(help_text="Time required to run in minutes.  If a job runs longer it may be automatically killed.",default=None,null=True)
     successful = models.BooleanField(default=False,help_text="True if the task has been executed successfully, else False")
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
+    status_details = models.CharField(max_length=100,default='',help_text='Extra information about this task\'s status')
     NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
     succeed_on_failure = models.BooleanField(default=False, help_text="If True, Task will succeed and workflow will progress even if its JobAttempts fail.")
     # cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
@@ -1193,6 +1189,7 @@ class Task(models.Model):
     finished_on = models.DateTimeField(null=True,default=None)
 
     _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True,default=None) #dictionary of outputs
+
     @property
     def output_files(self): return self._output_files.all()
 
@@ -1231,7 +1228,6 @@ class Task(models.Model):
         """
         Creates a task.
         """
-        #TODO just pput this in __init__ and run if pk is None
         task = Task(stage=stage, pcmd=pcmd, **kwargs)
 
         if Task.objects.filter(stage=task.stage,tags=task.tags).count() > 0:
@@ -1341,20 +1337,16 @@ class Task(models.Model):
 
     def _has_finished(self,jobAttempt):
         """
-        Executed whenever this task finishes by the workflow.
+        Should be executed whenever this task finishes.
         
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        try:
-            an_output_is_empty = any([os.path.exists(of.path) and os.stat(of.path)[6] == 0 for of in self.output_files])
-        except OSError:
-            an_output_is_empty = True
 
-        if not an_output_is_empty and (
-                        jobAttempt == 'NOOP'
-                        or jobAttempt.task.succeed_on_failure
-                        or self.jobattempt_set.filter(successful=True).count()
+        if (
+            jobAttempt == 'NOOP'
+            or jobAttempt.task.succeed_on_failure
+            or self.jobattempt_set.filter(successful=True).count()
         ):
             self.set_status('successful')
         else:

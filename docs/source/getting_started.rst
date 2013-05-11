@@ -77,7 +77,8 @@ Visit `<http://servername:8080>`_ to access it (or`<http://localhost:8080>`_ if 
 
     If the cosmos webserver is running, but you can't connect, it is likely because there is a firewall
     in front of the server.  You can get around it by using **ssh port forwarding**, for example"
-    `$ ssh -L 8080:servername:8080 user@server`
+    `$ ssh -L 8080:servername:8080 user@server`.  And if that fails, the Cosmos web interface works very well
+    using lynx.
 
 .. warning::
 
@@ -102,7 +103,8 @@ A workflow can be resumed by re-running a script that originally.  The algorithm
 
 .. warning::
     If a task in a stage with the same tags has already been executed successfully, it
-    will not be re-executed or altered, *even if the actual command has already changed because
-    you modified the script*.  In the future Cosmos may emmit a warning when this occurs.  This can be
-    especially tricky when you try to change task that has no tags (when it's the only task
+    will not be re-executed or altered, *even if the actual command has changed because
+    you modified the script*.  In the future Cosmos may emmit a warning when this occurs or automatically
+    re-run these tasks.  This can be
+    especially tricky when you try to change task that has no tags (this can happen when it's the only task
     in it's stage), and has executed successfully.

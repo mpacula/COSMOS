@@ -148,7 +148,8 @@ def check_and_create_output_dir(path):
         if not os.path.isdir(path):
             raise ValidationException('Path is not a directory')
     else:
-        os.mkdir(path)
+        os.system('mkdir -p {0}'.format(path))
+        #os.mkdir(path)
 
 def execute(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -174,18 +175,19 @@ def get_logger(name,path):
     
     log.setLevel(logging.INFO)
     # create file handler which logs even debug messages
-    fh = logging.FileHandler(path)
-    fh.setLevel(logging.INFO)
-    #fh.set_name('cosmos_fh')
-    # create console handler with a higher log level
+    if path:
+        fh = logging.FileHandler(path)
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
+        log.addHandler(fh)
+        #fh.set_name('cosmos_fh')
+
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
-    #ch.set_name('cosmos_fh')
-    # add the handlers to logger
-    fh.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
     ch.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
+    #ch.set_name('cosmos_fh')
+
     log.addHandler(ch)
-    log.addHandler(fh)
     return log
     
 
@@ -195,7 +197,10 @@ def get_workflow_logger(workflow):
     """
     log_dir = os.path.join(workflow.output_dir,'log')
     path = os.path.join(log_dir,'main.log')
-    check_and_create_output_dir(log_dir)
-    return (get_logger(workflow.name,path), path)
-    
+    if os.path.exists(workflow.output_dir):
+        check_and_create_output_dir(log_dir)
+        return (get_logger(workflow.name,path), path)
+    else:
+        return (get_logger(workflow.name,None), None)
+
 

@@ -68,7 +68,7 @@
                 {% for j in task.jobAttempts %}
                         {% with qs=j.queue_status %}
                             {%if j.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
-                            {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
+                            {%if qs == "finished"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
                             {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
                                 {%with ds=j.get_status %}
                                     {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}

@@ -17,7 +17,7 @@
     <h2>
         {% with qs=jobAttempt.queue_status %}
             {%if jobAttempt.successful%}<i class="icon-thumbs-up" rel="tooltip" title="Successful"></i>{%else%}
-            {%if qs == "completed"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
+            {%if qs == "finished"%}<i class="icon-thumbs-down" rel="tooltip" title="Successful"></i>{%endif%}{%endif%}
             {%if qs == 'queued'%}<i class="icon-time" rel="tooltip" title="Job is Queued"></i>
             {%with ds=jobAttempt.get_status %}
             {%if ds == 'job is running'%}<i class="icon-refresh" rel="tooltip" title="Job is running"></i>{%endif%}
@@ -36,7 +36,7 @@
         {%if jobAttempt.successful%}<p class="label label-success">
         <i class="icon-thumbs-up" rel="tooltip" title="Successful"></i> Successful </p>
         {%else%}
-        {%if qs == "completed"%}
+        {%if qs == "finished"%}
         <p class="label label-important">
         <i class="icon-thumbs-down" rel="tooltip" title="Failed"></i> Failed
         </p>
