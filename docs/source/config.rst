@@ -44,7 +44,7 @@ cosmos configuration file.
 .. code-block:: bash
 
    $ cosmos syncdb --noinput
-   $ cosmos collectstatic
+   $ cosmos collectstatic --noinput
 
 If you ever switch to a different database in your :file:`~/.cosmos/config.ini`, be sure to run `cosmos syncdb`
 to recreate your tables.
