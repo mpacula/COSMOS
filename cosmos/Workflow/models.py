@@ -279,7 +279,7 @@ class Workflow(models.Model):
 
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         wf.finished_on = None
-        Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
+        #Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
 
         if delete_unsuccessful_stages:
             #delete a stage with any unsuccessful tasks
@@ -335,11 +335,11 @@ class Workflow(models.Model):
         :param _wf_id: the ID to use for creating a workflow
         """
         if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
-        check_and_create_output_dir(root_output_dir)
+
         output_dir = os.path.join(root_output_dir,name.replace(' ','_'))
+        check_and_create_output_dir(output_dir)
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, **kwargs)
-        check_and_create_output_dir(wf.output_dir)
 
         wf.log.info('Created Workflow {0}.'.format(wf))
 
@@ -357,28 +357,21 @@ class Workflow(models.Model):
         #TODO name can't be "log" or change log dir to .log
         name = re.sub("\s","_",name)
 
-        b, created = Stage.objects.get_or_create(workflow=self,name=name)
-        if created:
-            self.log.info('Creating {0}'.format(b))
-        else:
-            self.log.info('Loading {0}'.format(b))
-            self.order_in_workflow=None
-            self.finished_on = None
-            self.save()
-
-        #determine order in workflow
+        stage, created = Stage.objects.get_or_create(workflow=self,name=name)
         min,max = Stage.objects.filter(workflow=self).aggregate(
             models.Max('order_in_workflow'),
             models.Min('order_in_workflow')
         ).values()
-        if min is None or min > 1:
-            order_in_workflow = 1
+        max = 0 if max is None else max
+        if created:
+            self.log.info('Creating {0}'.format(stage))
+            stage.order_in_workflow = max+1
         else:
-            order_in_workflow = max+1
-        b.order_in_workflow = order_in_workflow
+            self.log.info('Loading {0}'.format(stage))
+            self.finished_on = None
 
-        b.save()
-        return b
+        stage.save()
+        return stage
 
     def _delete_stale_objects(self):
         """
@@ -477,7 +470,7 @@ class Workflow(models.Model):
 
         #create output directories
         for t in tasks:
-            os.mkdir(t.output_dir)
+            os.system('mkdir -p {0}'.format(t.output_dir))
             os.mkdir(t.job_output_dir) #this is not in JobManager because JobMasmanager should be not care about these details
 
         ### Bulk add tags
@@ -541,6 +534,7 @@ class Workflow(models.Model):
         for d in task_output_dirs:
             os.system('rm -rf {0}'.format(d))
 
+    #TODO this probably doesn't have to be a transaction
     @transaction.commit_on_success
     def delete(self, *args, **kwargs):
         """
