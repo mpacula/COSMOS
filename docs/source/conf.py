@@ -18,7 +18,7 @@ import sys, os
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('../../'))
 #print sys.path
-from cosmos import session
+import cosmos.session
 #sys.path.insert(0,'/home/erik/workspace/Cosmos')
 #os.environ['DJANGO_SETTINGS_MODULE'] = 'cosmos.Cosmos.django_settings'
 # -- General configuration -----------------------------------------------------

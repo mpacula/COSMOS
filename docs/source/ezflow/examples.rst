@@ -15,11 +15,11 @@ ___________
 
 Here is the source code of the :file:`example_workflows/ex1.py` you ran in :ref:`getting_started`.
 
-.. literalinclude:: ../../example_workflows/ex1.py
+.. literalinclude:: ../../../example_workflows/ex1.py
 
 Here's the job dependency graph that was created:
 
-.. figure:: imgs/ex1.png
+.. figure:: ../imgs/ex1.png
     :width: 100%
     :align: center
 
@@ -29,7 +29,7 @@ _________________
 You can add more stages to the workflow, without re-running tasks that were already successful.
 An example is in :file:`example_workflows/ex2.py`.
 
-.. literalinclude:: ../../example_workflows/ex2.py
+.. literalinclude:: ../../../example_workflows/ex2.py
 
 Run it with the command:
 
@@ -46,12 +46,12 @@ ___________________
 
 :file:`example_workflows/ex_branch.py`
 
-.. literalinclude:: ../../example_workflows/ex_branch.py
+.. literalinclude:: ../../../example_workflows/ex_branch.py
 
 Command Line Interface and Signals
 __________________________________
 
-:file:`example_workflows/ex_branch.py`
+:file:`example_workflows/ex_signals.py`
 
-.. literalinclude:: ../../example_workflows/ex_signals.py
+.. literalinclude:: ../../../example_workflows/ex_signals.py
 

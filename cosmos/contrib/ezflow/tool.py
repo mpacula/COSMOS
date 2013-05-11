@@ -21,43 +21,39 @@ class GetOutputError(Exception): pass
 class Tool(object):
     """
     A Tool is a class who's instances represent a command that gets executed.  It also contains properties which
-    define the resources that are required
+    define the resources that are required.
 
-    :property inputs: (list of strs) a list of input names. Defaults to [].  Can be overridden.
-    :property outputs: (list of strs) a list of output names. Defaults to []. Can be overridden.
-    :property mem_req: (int) Number of megabytes of memory to request.  Defaults to 1024.  Can be overridden.
-    :property cpu_req: (int) Number of cores to request.  Defaults to 1.  Can be overridden.
-    :property NOOP: (bool) If True, these tasks do not contain commands that are executed.  Used for INPUT.  Default is False. Can be overridden.
-    :property forward_input: (bool) If True, the input files of this tool will also be input files of children of this tool.  Default is False.  Can be overridden.
-    :property succeed_on_failure: (bool) If True, if this tool's tasks' job attempts fail, the task will still be considered successful.  Default is False.  Can be overridden.
-    :property default_params: (dict) A dictionary of default parameters.  Defaults to {}.  Can be overridden.
     :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
     :property dag: (DAG) The dag that is keeping track of this Tool
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
     :property output_files: (list) This Tool's output TaskFiles.  A tool's output taskfile names should be unique.
-    :property persist: (bool) If True, output_files will be default be created with persist=True.  If delete_interemediates are on,
-        they will not be deleted.
+    :property persist:
     :property tags: (dict) This Tool's tags.
     """
     #TODO props that cant be overridden should be private
 
+    #: (list of strs) a list of input names.
     inputs = []
+    #: (list of strs or TaskFiles) a list of output names. Default is [].
     outputs = []
-    mem_req = 1*1024 #(MB)
-    cpu_req = 1 #(cores)
+    #: (int) Number of megabytes of memory to request.  Default is 1024.
+    mem_req = 1*1024
+    #: (int) Number of cores to request.  Default is 1.
+    cpu_req = 1
+    #: (int) Number of minutes to request. Default is 1.
     time_req = None #(mins)
+    #: (bool) If True, these tasks do not contain commands that are executed.  Used for INPUT.  Default is False.
     NOOP = False
-    forward_input = False # If True, input of this tool can be accessed by its output files
+    #: (bool) If True, the input files of this tool will also be input files of children of this tool.  Default is False.
+    forward_input = False
+    #: (bool) If True, if this tool's tasks' job attempts fail, the task will still be considered successful.  Default is False.
     succeed_on_failure = False
+    #: (dict) A dictionary of default parameters.  Default is {}.
     default_params = {}
+    #: (bool) If True, output_files will be default be created with persist=True.  If delete_interemediates is on, they will not be deleted.
     persist=False
 
-    settings = {}
-    parameters = {}
-    tags = {}
-
-    
     def __init__(self,stage_name=None,tags={},dag=None):
         """
         :param stage_name: (str) The name of the stage this tool belongs to. Required.
@@ -68,6 +64,9 @@ class Tool(object):
         #if len(tags)==0: raise ToolValidationError('Empty tag dictionary.  All tools should have at least one tag.')
         if not hasattr(self,'name'): self.name = self.__class__.__name__
         if not hasattr(self,'output_files'): self.output_files = []
+        if not hasattr(self,'settings'): self.settings = {}
+        if not hasattr(self,'parameters'): self.parameters = {}
+
         self.stage_name = stage_name if stage_name else self.name
         self.tags = tags
         self.dag = dag
@@ -208,7 +207,7 @@ class Tool(object):
     
     def process_cmd(self):
         """
-        Stuff that happens in between map_inputs() and cmd()
+        Calls map_inputs() and processes the output of cmd()
         """
         p = self.parameters.copy()
         p.update(self.tags)
@@ -243,6 +242,7 @@ class Tool(object):
     def post_cmd(self,cmd_str,format_dict):
         """
         Provides an opportunity to make any last minute changes to the cmd generated.
+
         :param cmd_str: (str) the string returned by cmd
         :param format_dict: (str) the dictionary that cmd was about to be .format()ed with
         :returns: (str,dict) the post_processed cmd_str and format_dict

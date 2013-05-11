@@ -23,28 +23,9 @@ _______________________________________
     sudo apt-get update -y
     sudo apt-get install python-dev libmysqlclient-dev mysql-server graphviz graphviz-dev
 
-Quick Install
-________________________________________
 
-
-This is generally for advanced users who have worked with python packages before.
-
-.. code-block:: bash
-
-   cd /dir/to/install/Cosmos/to
-   git clone git@github.com:ComputationalBiomedicine/Cosmos.git --depth=1
-   pip install distribute --upgrade
-   cd Cosmos
-   pip install .
-
-.. hint::
-
-    You need root access to install python packages to the system directories.  You may have to run pip install with
-    'sudo pip install ...', or to install to the user level use 'pip install --user'.  99% of users should just
-    use the *Highly Recommended Install Method* described next.
-
-Highly Recommended Install Method
-__________________________________
+Install Method
+_______________
 
 Install Cosmos in a virtual environment using
 `virtualenvwrapper <http://www.doughellmann.com/projects/virtualenvwrapper/>`_.
@@ -55,8 +36,8 @@ This will make sure all python libraries and files related to Cosmos are install
 
     pip install virtualenvwrapper --user
     source $HOME/.local/bin/virtualenvwrapper.sh
-    echo "\nsource $HOME/.local/bin/virtualenvwrapper.sh" >> ~/.bash.rc
-    echo "PATH=$HOME/.local/bin:$PATH" >> ~/.bash.rc
+    echo "\nsource $HOME/.local/bin/virtualenvwrapper.sh" >> ~/.bash_aliases
+    echo "PATH=$HOME/.local/bin:$PATH" >> ~/.bash_aliases
 
     mkvirtualenv cosmos --no-site-packages
     cd /dir/to/install/Cosmos/to

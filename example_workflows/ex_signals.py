@@ -13,13 +13,18 @@ modify this to send SMS texts instead of e-mails.
 # CLI
 ####################
 
-from cosmos.Workflow.cli import CLI
+from cosmos.Workflow import cli
+from cosmos.i import add_,map_
+import argparse
 
-cli = CLI()
-cli.parser.add_argument('-e', '--email', type=str, help='Email address to report messages to.',
+
+parser = argparse.ArgumentParser(description='Cosmos Workflow')
+cli.add_workflow_args(parser)
+parser.add_argument('-e', '--email', type=str, help='Email address to report messages to.',
                         required=True)
-WF = cli.parse_args() # parses command line arguments
-email = cli.parsed_kwargs['email']
+
+WF,kwargs = cli.parse_args(parser)
+email = kwargs['email']
 
 ####################
 # Signals
@@ -63,9 +68,9 @@ def email_on_fail(sender, status, **kwargs):
 from cosmos.contrib.ezflow.dag import DAG, Map, Split, Add
 import tools
 
-dag = ( DAG()
-        |Add| [tools.ECHO(tags={'word': 'hello'}), tools.ECHO(tags={'word': 'world'})]
-        |Map| tools.FAIL # Automatically fail
+dag = ( DAG().
+        add_([tools.ECHO(tags={'word': 'hello'}), tools.ECHO(tags={'word': 'world'})]).
+        map_(tools.FAIL) # Automatically fail
 )
 
 #################

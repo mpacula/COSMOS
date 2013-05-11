@@ -6,12 +6,6 @@ import os,sys
 from cosmos.Workflow.models import Workflow
 from cosmos.utils.helpers import confirm,representsInt
 
-def runweb(port):
-    """
-    Start the webserver
-    """
-    os.system('cosmos django runserver 0.0.0.0:{0}'.format(port))
-
 def shell():
     """
     Open up an ipython shell with Cosmos objects preloaded
@@ -73,6 +67,13 @@ def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"
     django('reset_db -R default'.split(' '))
     django('syncdb --noinput'.split(' '))
+
+
+def runweb(port):
+    """
+    Start the webserver
+    """
+    django('runserver 0.0.0.0:{0}'.format(port).split(' '))
 
 def django(django_args):
     "Django manage.py script"

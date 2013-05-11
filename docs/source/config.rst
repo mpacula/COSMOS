@@ -37,8 +37,8 @@ purpose is for testing and developing workflows, not computing on large datasets
 __________________________________________
 
 Once you've configured Cosmos, setting up the SQL database tables is easy.  The web interface is a
-:term:`Django` app, which requires you to run the collectstatic command.  This moves all the necessary image, css, and
-javascript files to ~/.cosmos/static/ directory.  Run these two commands after you've configured the database in the
+:term:`Django` application, which requires you to run the collectstatic command.  This moves all the necessary image, css, and
+javascript files to the ~/.cosmos/static/ directory.  Run these two commands after you've configured the database in the
 cosmos configuration file.
 
 .. code-block:: bash

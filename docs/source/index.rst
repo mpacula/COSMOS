@@ -21,20 +21,20 @@ Welcome
     * :ref:`API` -- Module API.
 
 .. toctree::
-   :maxdepth: 4
+    :numbered:
+    :maxdepth: 4
 
-   introduction
-   install
-   config
-   getting_started
-   writing_workflows
-   examples
-   cli
-   shell
-   advanced
-   faq
-   API/index
-   glossary
+    introduction
+    install
+    config
+    getting_started
+    ezflow/index
+    cli
+    shell
+    advanced
+    faq
+    API/index
+    glossary
 
 Indices and tables
 ==================

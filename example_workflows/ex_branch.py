@@ -7,7 +7,7 @@ cosmos.contrib.ezflow.dag.DAG.branch() is the key to branching.
 """
 
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Map, Split, Add
+from cosmos.i import DAG
 import tools
 
 ####################
