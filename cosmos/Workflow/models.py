@@ -1175,6 +1175,7 @@ class Task(models.Model):
     time_requirement = models.IntegerField(help_text="Time required to run in minutes.  If a job runs longer it may be automatically killed.",default=None,null=True)
     successful = models.BooleanField(default=False,help_text="True if the task has been executed successfully, else False")
     status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
+    status_details = models.CharField(max_length=100,default='',help_text='Extra information about this task\'s status')
     NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
     succeed_on_failure = models.BooleanField(default=False, help_text="If True, Task will succeed and workflow will progress even if its JobAttempts fail.")
     # cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
@@ -1341,15 +1342,11 @@ class Task(models.Model):
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.
         """
-        try:
-            an_output_is_empty = any([os.path.exists(of.path) and os.stat(of.path)[6] == 0 for of in self.output_files])
-        except OSError:
-            an_output_is_empty = True
 
-        if not an_output_is_empty and (
-                        jobAttempt == 'NOOP'
-                        or jobAttempt.task.succeed_on_failure
-                        or self.jobattempt_set.filter(successful=True).count()
+        if (
+            jobAttempt == 'NOOP'
+            or jobAttempt.task.succeed_on_failure
+            or self.jobattempt_set.filter(successful=True).count()
         ):
             self.set_status('successful')
         else:
