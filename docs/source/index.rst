@@ -7,10 +7,8 @@ Welcome
     and if you do not have permission to access Cosmos then the code and its documentation are all
     off limits and you are politely instructed to stop using Cosmos immediately and delete all files related to Cosmos.
 
-    Thank you,
-    Erik Gafni
-    Harvard Medical School
-    erik_gafni@hms.harvard.edu
+        Thank you,
+        Erik Gafni
 
 .. comment::
 

@@ -144,7 +144,6 @@ class Workflow(models.Model):
         # if Workflow.objects.filter(name=self.name).exclude(pk=self.id).count() >0:
         #     raise ValidationError('Workflow with name {0} already exists.  Please choose a different one or use .__reload()'.format(self.name))
 
-        check_and_create_output_dir(self.output_dir)
         self.log, self.log_path = get_workflow_logger(self)
 
     @property
@@ -340,6 +339,7 @@ class Workflow(models.Model):
         output_dir = os.path.join(root_output_dir,name.replace(' ','_'))
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, **kwargs)
+        check_and_create_output_dir(wf.output_dir)
 
         wf.log.info('Created Workflow {0}.'.format(wf))
 
@@ -547,6 +547,7 @@ class Workflow(models.Model):
         Deletes this workflow.
         """
         self.log.info("Deleting {0} and it's output dir {1}...".format(self,self.output_dir))
+        save_str_representation = str(self)
         wf_output_dir = self.output_dir
 
         self.jobManager.delete()
@@ -556,7 +557,7 @@ class Workflow(models.Model):
 
         super(Workflow, self).delete(*args, **kwargs)
 
-        self.log.info('{0} Deleted.'.format(self))
+        self.log.info('{0} Deleted.'.format(save_str_representation))
         x = list(self.log.handlers)
         for h in x:
             self.log.removeHandler(h)
@@ -618,7 +619,6 @@ class Workflow(models.Model):
             self.jobManager.submit_job(jobAttempt)
             self.log.info('Submitted jobAttempt with drmaa jobid {0}.'.format(jobAttempt.drmaa_jobID))
         task.save()
-        #self.jobManager.save()
         return jobAttempt
 
 
@@ -873,7 +873,7 @@ class Stage(models.Model):
         validate_not_null(self.workflow)
 
         validate_name(self.name,self.name)
-        check_and_create_output_dir(self.output_dir)
+        #check_and_create_output_dir(self.output_dir)
 
     def set_status(self,new_status,save=True):
         "Set Stage status"
@@ -1194,6 +1194,7 @@ class Task(models.Model):
     finished_on = models.DateTimeField(null=True,default=None)
 
     _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True,default=None) #dictionary of outputs
+
     @property
     def output_files(self): return self._output_files.all()
 
@@ -1232,7 +1233,6 @@ class Task(models.Model):
         """
         Creates a task.
         """
-        #TODO just pput this in __init__ and run if pk is None
         task = Task(stage=stage, pcmd=pcmd, **kwargs)
 
         if Task.objects.filter(stage=task.stage,tags=task.tags).count() > 0:
@@ -1342,7 +1342,7 @@ class Task(models.Model):
 
     def _has_finished(self,jobAttempt):
         """
-        Executed whenever this task finishes by the workflow.
+        Should be executed whenever this task finishes.
         
         Sets self.status to 'successful' or 'failed' and self.finished_on to 'current_timezone'
         Will also run self.stage._has_finished() if all tasks in the stage are done.

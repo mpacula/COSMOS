@@ -148,7 +148,8 @@ def check_and_create_output_dir(path):
         if not os.path.isdir(path):
             raise ValidationException('Path is not a directory')
     else:
-        os.mkdir(path)
+        os.system('mkdir -p {0}'.format(path))
+        #os.mkdir(path)
 
 def execute(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -195,7 +196,10 @@ def get_workflow_logger(workflow):
     """
     log_dir = os.path.join(workflow.output_dir,'log')
     path = os.path.join(log_dir,'main.log')
-    check_and_create_output_dir(log_dir)
-    return (get_logger(workflow.name,path), path)
+    if os.path.exists(path):
+        check_and_create_output_dir(log_dir)
+        return (get_logger(workflow.name,path), path)
+    else:
+        return None,None
     
 
