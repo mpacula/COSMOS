@@ -16,8 +16,6 @@ from django.utils import timezone
 import networkx as nx
 import pygraphviz as pgv
 import hashlib
-import copy
-import pprint
 import signals
 from cosmos.Workflow.templatetags import extras
 from ordereddict import OrderedDict

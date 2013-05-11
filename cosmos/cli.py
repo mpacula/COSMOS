@@ -62,11 +62,11 @@ def rm(workflows,prompt_confirm,stage_number,all_stages_after):
 
 def syncdb():
     "Sets up the SQL database"
-    os.system('cosmos django syncdb')
+    os.system('cosmos django syncdb --noinput')
 
 def collectstatic():
     "Collects static files for the web interface"
-    os.system('cosmos django collectstatic')
+    os.system('cosmos django collectstatic --noinput')
     
 def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"

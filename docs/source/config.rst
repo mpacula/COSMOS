@@ -7,7 +7,7 @@ Configuration
 _______________________________
 
 Type `cosmos` at the command line, and generate a default configuration file in :file:`~/.cosmos/config.ini`.
-Edit :file:`~/.cosmos/config.ini`, and configure it to your liking.
+Edit :file:`~/.cosmos/config.ini`, and configure it to your liking; the instructions are in the file.
 
 .. _local:
 
@@ -16,7 +16,7 @@ Local Development and Testing
 
 Setting DRM = local in your config file will cause jobs to be submitted as background
 processes on the local machine using :py:mod:`subprocess`.Popen.  The `DRM = local` setting's
-primary purpose is for testing and developing workflows, not computing on large datasets.
+purpose is for testing and developing workflows, not computing on large datasets.
 
 .. warning::
 
@@ -43,8 +43,8 @@ cosmos configuration file.
 
 .. code-block:: bash
 
-   $ cosmos syncdb --noinput
-   $ cosmos collectstatic --noinput
+   $ cosmos syncdb
+   $ cosmos collectstatic
 
 If you ever switch to a different database in your :file:`~/.cosmos/config.ini`, be sure to run `cosmos syncdb`
 to recreate your tables.
