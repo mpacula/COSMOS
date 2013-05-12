@@ -53,6 +53,12 @@ def navactive(request, name):
 
 
 @register.filter
+def pprint(s):
+    "Returns a '&nbsp' if s is None or blank"
+    import pprint
+    return pprint.pformat(s)
+
+@register.filter
 def b2e(s):
     "Returns a '&nbsp' if s is None or blank"
     return mark_safe('&nbsp;') if s in [None,''] else s

@@ -41,33 +41,28 @@
     None
     {% endfor %}
 
-    <dl class="dl-horizontal">
+    <dl class="dl-horizontal dl-multicolumn" data-colcount="2">
     <dt>Status</dt><dd><em>{{task.status}}</em></dd>
+    <dt>Preformatted<br/>Command</dt><dd><pre class="pre-scrollable">{{task.pcmd}}</pre></dd>
     <dt>Parents</dt><dd>
         {%for parent in task.parents%}
         <a href="{{parent.url}}">{{parent}}{%if not forloop.last%},{%endif%}</a>
         {%empty%}None{%endfor%}
     </dd>
-    <dt>Output Files</dt><dd>
-        {%for of in task.output_files%}
-        <a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
-        {%empty%}None{%endfor%}
-    </dd>
     <dt>CPU Requirement</dt><dd>{{task.cpu_requirement}}</dd>
     <dt>Memory Requirement</dt><dd>{{task.memory_requirement}}MB</dd>
     <dt>Time Requirement</dt><dd>{{task.time_requirement}} min</dd>
-    <dt>File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{task.output_file_size}}{%else%}off{%endif%}</dd>
+    <dt>File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes == "True"%}{{task.output_file_size}}{%else%}off{%endif%}</dd>
     <dt>Wall time</dt><dd>{{task.wall_time|format_time}}</dd>
     <dt>Successful</dt><dd>{{task.successful}}</dd>
     <dt>NOOP</dt><dd>{{task.NOOP}}</dd>
     <dt>Succeed On Failure</dt><dd>{{task.succeed_on_failure}}</dd>
     <dt>Created On</dt><dd>{{task.created_on}}</dd>
     <dt>Finished On</dt><dd>{{task.finished_on}}</dd>
-    <dt>Preformatted<br/>Command</dt><dd><pre class="pre-scrollable">{{task.pcmd}}</pre></dd>
     <dt>Output Directory</dt><dd><code>{{task.output_dir}}</code></dd>
     <dt>Output Files</dt><dd>
         {%for of in task.output_files%}
-            <a href="{{of.url}}">{{of}}{%if not forloop.last%},{%endif%}</a>
+            <a href="{{of.url}}">{{of}}{%if not forloop.last%}<br/>{%endif%}</a>
         {%empty%}None{%endfor%}
     </dd>
 
