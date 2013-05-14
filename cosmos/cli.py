@@ -14,8 +14,11 @@ def shell():
 
 def ls(workflow):
     """
-    List all workflows, or all stages in a workflow is a workflow.id is passed.  `workflow` can be a workflow.id
+    List all workflows, or all stages in a workflow if a workflow.id is passed.  `workflow` can be a workflow.id
     or the name of the workflow.
+
+    $ cosmos ls 1
+    $ cosmos ls 1 3
     """
     if workflow:
         print workflow
@@ -31,6 +34,10 @@ def ls(workflow):
 def rm(workflows,prompt_confirm,stage_number,all_stages_after):
     """
     Deletes a workflow
+
+    $ cosmos rm 1       # deletes workflow 1
+    $ cosmos rm 1,2,3   # deletes workflows 1, 2 and 3
+    $ cosmos rm 1 3 -ay # deletes stage 3 and all stages that come after it, without prompting
     """
     workflows = [  Workflow.objects.get(pk=w) if representsInt(w) else Workflow.objects.get(name=w)
                    for w in workflows.split(',') ]

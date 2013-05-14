@@ -299,7 +299,7 @@ class Workflow(models.Model):
             Stage.objects.filter(workflow=wf,successful=False,task__successful=True).update(
                 successful=False,status='in_progress',finished_on=None
             )
-
+        wf.save()
         return wf
 
     @staticmethod
@@ -773,7 +773,7 @@ class WorkflowManager():
 
         if task.status == 'successful' and self.workflow.delete_intermediates:
             # Input files may be ready for intermediate deleting if all
-            # Tasks that depend on them are also successful, and they are not an input file (ie has 0 parents)
+            # Tasks that depend on them are also successful, and they are not an input file (ie has >0 parents)
             for infile in task.input_files:
                 if not infile.persist:
                     if all([ r['successful'] and r['_parents__count']>0

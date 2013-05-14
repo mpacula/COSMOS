@@ -28,7 +28,6 @@ class Tool(object):
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
     :property output_files: (list) This Tool's output TaskFiles.  A tool's output taskfile names should be unique.
-    :property persist:
     :property tags: (dict) This Tool's tags.
     """
     #TODO props that cant be overridden should be private
@@ -51,7 +50,8 @@ class Tool(object):
     succeed_on_failure = False
     #: (dict) A dictionary of default parameters.  Default is {}.
     default_params = {}
-    #: (bool) If True, output_files will be default be created with persist=True.  If delete_interemediates is on, they will not be deleted.
+    #: (bool) If True, output_files described as a str in outputs will be by default be created with persist=True.
+    #: If delete_interemediates is on, they will not be deleted.
     persist=False
 
     def __init__(self,stage_name=None,tags={},dag=None):

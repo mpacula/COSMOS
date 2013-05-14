@@ -37,7 +37,7 @@
         <tr onclick="window.location.href = '{{stage.url}}';" style="cursor:pointer">
         <td>{{stage.order_in_workflow}}.</td>
         <td><strong><a href="{{stage.url}}">[{{stage.id}}] {{stage.name|underscore2space}}</a></strong></td>
-        <td>{{stage.wall_time.seconds|format_time}}</td>
+        <td>{{stage.wall_time}}</td>
 
             <td>
                 {%with status=stage.status %}

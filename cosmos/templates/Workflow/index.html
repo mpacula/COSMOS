@@ -19,7 +19,7 @@
             <td><a href="{{workflow.url}}"><strong>{{ workflow }}</strong></a></td>
             <td>{{workflow.created_on|date:"SHORT_DATETIME_FORMAT"}}</td>
             <td>{{workflow.finished_on|date:"SHORT_DATETIME_FORMAT"}}</td>
-            <td>{{workflow.wall_time.seconds|format_time}}</td>
+            <td>{{workflow.wall_time}}</td>
         </tr>
         {% endfor %}
         </tbody>
