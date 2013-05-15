@@ -648,7 +648,6 @@ class Workflow(models.Model):
         self.log.info("Generating DAG...")
         wfDAG = WorkflowManager(self)
         self.log.info("Running DAG.")
-
         def run_ready_tasks():
             submitted_tasks = wfDAG.run_ready_tasks()
             for st in submitted_tasks:
@@ -658,24 +657,30 @@ class Workflow(models.Model):
             if submitted_tasks:
                 run_ready_tasks()
 
-        run_ready_tasks()
+        try:
+            run_ready_tasks()
 
-        for jobAttempt in self.jobManager.yield_all_queued_jobs():
-            task = jobAttempt.task
-            #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
-            if jobAttempt.successful or task.succeed_on_failure:
-                task._has_finished(jobAttempt)
-                wfDAG.complete_task(task)
-                run_ready_tasks()
-            else:
-                if not self._reattempt_task(task,jobAttempt):
-                    task._has_finished(jobAttempt) #job has failed and out of reattempts
-                    if terminate_on_fail:
-                        self.log.warning("{0} of {1} has reached max_reattempts and terminate_on_fail==True so terminating.".format(jobAttempt,task))
-                        self.terminate()
+            for jobAttempt in self.jobManager.yield_all_queued_jobs():
+                task = jobAttempt.task
+                #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
+                if jobAttempt.successful or task.succeed_on_failure:
+                    task._has_finished(jobAttempt)
+                    wfDAG.complete_task(task)
+                    run_ready_tasks()
+                else:
+                    if not self._reattempt_task(task,jobAttempt):
+                        task._has_finished(jobAttempt) #job has failed and out of reattempts
+                        if terminate_on_fail:
+                            self.log.warning("{0} of {1} has reached max_reattempts and terminate_on_fail==True so terminating.".format(jobAttempt,task))
+                            self.terminate()
 
-        if finish: self.finished()
-        return
+            if finish:
+                self.finished()
+            return self
+
+        except Exception as e:
+            self.log.error('An exception was raised during workflow execution, terminating workflow and then re-raising exception.')
+            raise e
 
     def finished(self):
         """
