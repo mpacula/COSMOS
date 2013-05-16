@@ -468,8 +468,8 @@ class Workflow(models.Model):
 
         #create output directories
         for t in tasks:
-            os.system('mkdir -p {0}'.format(t.output_dir))
-            os.mkdir(t.job_output_dir) #this is not in JobManager because JobMasmanager should be not care about these details
+            os.system('mkdir -p {0}'.format(t.job_output_dir))
+            #os.mkdir(t.job_output_dir) #this is not in JobManager because JobManager should be not care about these details
 
         ### Bulk add tags
         tasktags = []
