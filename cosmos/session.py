@@ -44,7 +44,7 @@ def default_get_drmaa_native_specification(jobAttempt):
         return s
     elif DRM == 'GE':
         return '-l h_vmem={mem_req}M,num_proc={cpu_req}'.format(
-            mem_req=mem_req*1.5,
+            mem_req=mem_req,
             cpu_req=cpu_req)
     else:
         raise Exception('DRM not supported')
