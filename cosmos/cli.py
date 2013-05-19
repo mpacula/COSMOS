@@ -6,11 +6,6 @@ import os,sys
 from cosmos.Workflow.models import Workflow
 from cosmos.utils.helpers import confirm,representsInt
 
-def shell():
-    """
-    Open up an ipython shell with Cosmos objects preloaded
-    """
-    os.system('cosmos django shell_plus')
 
 def ls(workflow):
     """
@@ -60,29 +55,34 @@ def rm(workflows,prompt_confirm,stage_number,all_stages_after):
 #    """
 #    if confirm('This will overwrite your original configuration, are you sure?',default=False):
 #        os.system('cosmos django syncdb && cosmos django collectstatic')
+def shell():
+    """
+    Open up an ipython shell with Cosmos objects preloaded
+    """
+    django_manage('shell_plus'.split(' '))
 
 def syncdb():
     "Sets up the SQL database"
-    django('syncdb --noinput'.split(' '))
+    django_manage('syncdb --noinput'.split(' '))
 
 
 def collectstatic():
     "Collects static files for the web interface"
-    django('collectstatic --noinput'.split(' '))
+    django_manage('collectstatic --noinput'.split(' '))
     
 def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"
-    django('reset_db -R default'.split(' '))
-    django('syncdb --noinput'.split(' '))
+    django_manage('reset_db -R default'.split(' '))
+    django_manage('syncdb --noinput'.split(' '))
 
 
 def runweb(port):
     """
     Start the webserver
     """
-    django('runserver 0.0.0.0:{0}'.format(port).split(' '))
+    django_manage('runserver 0.0.0.0:{0}'.format(port).split(' '))
 
-def django(django_args):
+def django_manage(django_args):
     "Django manage.py script"
     from django.core.management import execute_from_command_line
     execute_from_command_line([sys.argv[0]]+django_args)
@@ -99,8 +99,8 @@ def main():
     subparsers.add_parser('syncdb',help=syncdb.__doc__).set_defaults(func=syncdb)
     sp=subparsers.add_parser('collectstatic',help=collectstatic.__doc__).set_defaults(func=collectstatic)
 
-    django_sp = subparsers.add_parser('django',help=django.__doc__)
-    django_sp.set_defaults(func=django)
+    django_sp = subparsers.add_parser('django',help=django_manage.__doc__)
+    django_sp.set_defaults(func=django_manage)
     django_sp.add_argument('django_args', nargs=argparse.REMAINDER)
 
     sp=subparsers.add_parser('ls',help=ls.__doc__)
