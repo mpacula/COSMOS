@@ -396,11 +396,11 @@ class Workflow(models.Model):
         task_ids = jobAttempts.values('task')
         tasks = Task.objects.filter(pk__in=task_ids)
 
-        self.log.info("Marking {0} terminated Tasks as failed.".format(len(tasks)))
+        self.log.info("Marking {0} terminated Tasks as failed.".format(tasks.count()))
         tasks.update(status = 'failed',finished_on = timezone.now())
 
         stages = Stage.objects.filter(Q(task__in=tasks)|Q(workflow=self,successful=False))
-        self.log.info("Marking {0} terminated Stages as failed.".format(len(stages)))
+        self.log.info("Marking {0} terminated Stages as failed.".format(stages.count()))
         stages.update(status = 'failed',finished_on = timezone.now())
 
         self.log.info("Marking {0} terminated JobAttempts as failed.".format(len(jobAttempts)))
@@ -626,7 +626,7 @@ class Workflow(models.Model):
         if not task.successful: #ReRun jobAttempt
             self.log.warning("{0} of {1} failed, on attempt # {2}, so deleting failed output files and retrying.\n".format(failed_jobAttempt,task,numAttempts)
                            + "<COMMAND path=\"{1}\">\n{0}\n</COMMAND>\n".format(failed_jobAttempt.get_command_shell_script_text(),failed_jobAttempt.command_script_path)
-                           + "<STDERR>{0}\n</STDERR>".format(failed_jobAttempt.STDERR_txt)
+                           + "<STDERR>\n{0}\n</STDERR>".format(failed_jobAttempt.STDERR_txt)
             )
             if numAttempts < self.max_reattempts:
                 os.system('rm -rf {0}/*'.format(task.job_output_dir))
@@ -680,6 +680,7 @@ class Workflow(models.Model):
 
         except Exception as e:
             self.log.error('An exception was raised during workflow execution, terminating workflow and then re-raising exception.')
+            self.terminate()
             raise e
 
     def finished(self):

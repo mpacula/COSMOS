@@ -168,7 +168,7 @@ class JobAttempt(models.Model):
         "The contents of the STDOUT file, or the string 'File does not exist.'"
         path = self.STDOUT_filepath
         if path is None or not os.path.exists(path):
-            return 'File does not exist.'
+            return 'STDOUT file does not exist: {0}'.format(path)
         else:
             with open(path,'rb') as f:
                 return f.read()
@@ -177,7 +177,7 @@ class JobAttempt(models.Model):
         "The contents of the STDERR file, or the string 'File does not exist.'"
         path = self.STDERR_filepath
         if path is None or not os.path.exists(path):
-            return 'File does not exist.'
+            return 'STDERR file does not exist: {0}'.format(path)
         else:
             with open(path,'rb') as f:
                 return f.read()
