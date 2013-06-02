@@ -193,13 +193,15 @@ class JobAttempt(models.Model):
         with open(self.command_script_path,'rb') as f:
             return f.read()
 
-    def _hasFinished(self,successful,extra_jobinfo):
+    def _hasFinished(self,successful,extra_jobinfo,status_details):
         """Function for JobManager to Run when this JobAttempt finishes"""
 
         # Make sure output files actually exists
-        if any([ not os.path.exists(o.path) or os.stat(o.path) == 0 for o in self.task.output_files ]):
-                self.status_details = 'Failed due to empty output file'
+        if successful and any([ not os.path.exists(o.path) or os.stat(o.path) == 0 for o in self.task.output_files ]):
+            successful = False
+            status_details = 'Failed due to empty output file'
 
+        self.status_details = status_details
         self.successful = successful
         self.extra_jobinfo = extra_jobinfo
         self.queue_status = 'finished'

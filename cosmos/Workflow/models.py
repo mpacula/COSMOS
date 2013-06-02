@@ -110,7 +110,10 @@ class TaskFile(models.Model,object):
         if not self.persist:
             self.workflow.log.info('Deleting Intermediate file {0}'.format(self.path))
             self.deleted_because_intermediate = True
-            os.system('echo "" > {0}'.format(self.path)) # overwrite with empty file
+            if os.path.isdir(self.path):
+                os.system('rm -rf {0}'.format(os.path.join(self.path,'/*')))
+            else:
+                os.system('echo "" > {0}'.format(self.path)) # overwrite with empty file
             self.save()
         else:
             raise WorkflowError, "{0} should not be deleted because persist=True".format(self)
@@ -381,9 +384,10 @@ class Workflow(models.Model):
         TaskTag.objects.filter(task=None).delete()
 
 
-    def terminate(self):
+    def terminate(self,exception=None):
         """
         Terminates this workflow and Exits
+        :param exception: an exception to raise after terminating
         """
         self.log.warning("Terminating {0}...".format(self))
         self.save()
@@ -411,7 +415,10 @@ class Workflow(models.Model):
         self.finished()
 
         self.log.info("Exiting.")
-        sys.exit(1)
+        if exception:
+            raise exception
+        else:
+            sys.exit(1)
 
     def get_all_tag_keys_used(self):
         """Returns a set of all the keyword tags used on any task in this workflow"""
@@ -680,8 +687,7 @@ class Workflow(models.Model):
 
         except Exception as e:
             self.log.error('An exception was raised during workflow execution, terminating workflow and then re-raising exception.')
-            self.terminate()
-            raise e
+            self.terminate(exception=e)
 
     def finished(self):
         """
