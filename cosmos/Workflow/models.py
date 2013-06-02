@@ -111,7 +111,7 @@ class TaskFile(models.Model,object):
             self.workflow.log.info('Deleting Intermediate file {0}'.format(self.path))
             self.deleted_because_intermediate = True
             if os.path.isdir(self.path):
-                os.system('rm -rf {0}'.format(os.path.join(self.path,'/*')))
+                os.system('rm -rf {0}'.format(os.path.join(self.path,'*')))
             else:
                 os.system('echo "" > {0}'.format(self.path)) # overwrite with empty file
             self.save()

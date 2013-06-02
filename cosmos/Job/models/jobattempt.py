@@ -193,7 +193,7 @@ class JobAttempt(models.Model):
         with open(self.command_script_path,'rb') as f:
             return f.read()
 
-    def _hasFinished(self,successful,extra_jobinfo,status_details):
+    def _hasFinished(self,successful,extra_jobinfo,status_details=''):
         """Function for JobManager to Run when this JobAttempt finishes"""
 
         # Make sure output files actually exists
