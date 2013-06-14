@@ -17,7 +17,6 @@ def parse_args(parser):
     """
     Runs the argument parser
 
-    :param margs: arguments to set manually
     :returns: a workflow instance and kwargs parsed by argparse
     """
     parsed_args = parser.parse_args()
@@ -27,6 +26,7 @@ def parse_args(parser):
     wf_kwargs = dict([ (k,kwargs[k]) for k
                        in ['name','default_queue','root_output_dir','restart','delete_intermediates','prompt_confirm','dry_run'] ])
     wf_kwargs['comments'] = '$ ' +' '.join([os.path.basename(sys.argv[0])]+sys.argv[1:])
+
     wf = Workflow.start(**wf_kwargs)
 
     wf.log.info('Args:\n{0}'.format(pprint.pformat(kwargs)))

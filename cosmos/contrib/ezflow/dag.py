@@ -375,8 +375,9 @@ class DAG(object):
         """
         Create new tools with a many2one relationship to the dag's current active_tools.
 
-        :param keywords: (list of str) Tags to reduce to.  The reduce function will   All keywords not listed will
-            not be passed on to the tasks generated.
+        :param keywords: (list of str) Tags to reduce to.  All keywords not listed will
+            not be passed on to the tasks generated.  Tools not tagged with a value in keywords will be a parent
+            of all new tools generated.
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
@@ -391,17 +392,15 @@ class DAG(object):
         parent_tools = self.active_tools
         if type(keywords) != list:
             raise TypeError('keywords must be a list')
-        try:
-        # common_tags = set(itertools.chain(*[t.tags.keys() for t in parent_tools]))
-            for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords])):
-                parent_tool_group = list(parent_tool_group)
-                tags.update(tag)
-                new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
-                for parent_tool in parent_tool_group:
-                    self.G.add_edge(parent_tool,new_tool)
-                yield new_tool
-        except KeyError, e:
-            raise FlowFxnValidationError, "Can't reduce by {0}, at least one parent is not tagged with it".format(e.args[0])
+
+        tools_without_keywords = filter(lambda t: len(set(keywords) & set(t.tags))>0, parent_tools)
+        for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords if k in t.tags])):
+            parent_tool_group = list(parent_tool_group) + tools_without_keywords
+            tags.update(tag)
+            new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
+            for parent_tool in parent_tool_group:
+                self.G.add_edge(parent_tool,new_tool)
+            yield new_tool
 
     @flowfxn
     def reduce_split_(self,keywords,split_by,tool_class,stage_name=None,tag={}):
