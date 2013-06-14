@@ -294,10 +294,10 @@ class DAG(object):
 
         >>> DAG().add_([tool1,tool2,tool3,tool4])
         """
-        if len(tools) == 0:
-            raise FlowFxnValidationError,'The parameter `tools` must have at least one Tool in it'
         if not isinstance(tools,list):
             raise FlowFxnValidationError, 'The parameter `tools` must be a list'
+        if len(tools) == 0:
+            raise FlowFxnValidationError,'The parameter `tools` must have at least one Tool in it'
         for t in tools:
             if len(t.tags) == 0:
                 raise FlowFxnValidationError, '{0} has no tags, at least one tag is required'.format(t)
