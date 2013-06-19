@@ -1,6 +1,5 @@
-from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, Split, Add, Map, Reduce
-from tools import ECHO, CAT, WC, MD5Sum
+from cosmos.lib.ezflow.dag import DAG, Split, Add, Map, Reduce
+from tools import ECHO, MD5Sum
 from cosmos.Workflow.cli import CLI
 
 cli = CLI()

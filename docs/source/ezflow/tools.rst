@@ -10,7 +10,7 @@ A tool is a class that overrides :py:class:`~tool.Tool`, and defines :py:meth:`~
 
 .. code-block:: python
 
-    from cosmos.contrib.ezflow.tool import Tool
+    from cosmos.lib.ezflow.tool import Tool
 
     class WordCount(Tool):
         name = "Word Count"
@@ -50,7 +50,7 @@ Here's an example of how to create an instance of an :py:class:`tool.INPUT` File
 
 .. code-block:: python
 
-    from cosmos.contrib.ezflow import INPUT
+    from cosmos.lib.ezflow import INPUT
 
     input_file = INPUT('/path/to/file.txt',tags={'i':1})
 
@@ -60,7 +60,7 @@ A more fine grained approach to defining input files:
 
 .. code-block:: python
 
-    from cosmos.contrib.ezflow import INPUT
+    from cosmos.lib.ezflow import INPUT
     INPUT(name='favorite_txt',path='/path/to/favorite_txt.txt.gz',fmt='txt.gz',tags={'color':'red'})
 
 
@@ -69,5 +69,5 @@ API
 
 Tool
 *****
-.. automodule:: cosmos.contrib.ezflow.tool
+.. automodule:: cosmos.lib.ezflow.tool
     :members:

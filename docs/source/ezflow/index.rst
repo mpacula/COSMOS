@@ -5,7 +5,7 @@ Writing Workflows with EZFlow
 
 The easiest way to write a workflow is to use the *ezflow* package.
 
-.. py:module:: cosmos.contrib.ezflow
+.. py:module:: cosmos.lib.ezflow
 
 *EZFlow* is a package that contains powerful modules for describing workflows.
 It allows you to define classes that represent

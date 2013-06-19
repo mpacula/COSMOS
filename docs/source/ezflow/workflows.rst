@@ -16,7 +16,7 @@ much more flexibility to modularize workflow logic by using the object represent
 
 .. code-block:: python
 
-    from cosmos.contrib.ezflow.dag import sequence_, apply_, map_, dag_
+    from cosmos.lib.ezflow.dag import sequence_, apply_, map_, dag_
     dag = DAG()
 
     subworkflow1 = map_(ToolA).split_([('color',['red','blue'])],ToolB)
@@ -41,14 +41,14 @@ TheFlowFxn Operators
 Below are the FlowFxn operators.  It is recommended that you take a look at the :ref:`examples` to get an understanding
 of how they work.
 
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.add_
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.map_
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.reduce_
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.split_
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.reduce_split_
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.sequence_
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.apply_
-.. automethod:: cosmos.contrib.ezflow.dag.DAG.branch_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.add_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.map_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.reduce_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.split_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.reduce_split_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.sequence_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.apply_
+.. automethod:: cosmos.lib.ezflow.dag.DAG.branch_
 
 
 API
@@ -57,7 +57,7 @@ API
 DAG
 ****
 
-.. automodule:: cosmos.contrib.ezflow.dag
+.. automodule:: cosmos.lib.ezflow.dag
     :private-members:
     :members:
     :undoc-members:

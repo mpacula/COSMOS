@@ -13,9 +13,9 @@ modify this to send SMS texts instead of e-mails.
 # CLI
 ####################
 
-from cosmos.Workflow import cli
-from cosmos.i import add_,map_
 import argparse
+
+from cosmos.Workflow import cli
 
 
 parser = argparse.ArgumentParser(description='Cosmos Workflow')
@@ -65,7 +65,7 @@ def email_on_fail(sender, status, **kwargs):
 # Workflow
 ####################
 
-from cosmos.contrib.ezflow.dag import DAG, Map, Split, Add
+from cosmos.lib.ezflow.dag import DAG, Map, Split, Add
 import tools
 
 dag = ( DAG().

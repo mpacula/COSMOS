@@ -1,5 +1,5 @@
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, split_,add_,map_,reduce_
+from cosmos.lib.ezflow.dag import DAG, split_,add_,map_,reduce_
 from tools import ECHO, CAT, WC, PASTE, Sleep
 
 ####################

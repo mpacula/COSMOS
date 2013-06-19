@@ -3,11 +3,11 @@ This workflow demonstrates branching for when you need
 something more complicated than a linear step-by-step
 series of stages.
 
-cosmos.contrib.ezflow.dag.DAG.branch() is the key to branching.
+cosmos.lib.ezflow.dag.DAG.branch() is the key to branching.
 """
 
 from cosmos.Workflow.models import Workflow
-from cosmos.i import DAG
+from cosmos.lib.ezflow.dag import DAG
 import tools
 
 ####################

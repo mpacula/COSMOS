@@ -1,6 +1,6 @@
 from cosmos.Workflow.models import Workflow
-from cosmos.contrib.ezflow.dag import DAG, add_,split_,sequence_
-from tools import ECHO, CAT, PASTE, WC
+from cosmos.lib.ezflow.dag import DAG, add_,split_
+from tools import ECHO, CAT
 
 ####################
 # Workflow
