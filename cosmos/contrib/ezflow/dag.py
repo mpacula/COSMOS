@@ -13,6 +13,7 @@ class DAGError(Exception): pass
 class StageNameCollision(Exception):pass
 class FlowFxnValidationError(Exception):pass
 
+
 @decorator
 def flowfxn(func,dag,*RHS):
     """
@@ -38,6 +39,8 @@ def flowfxn(func,dag,*RHS):
 
     if stage_name not in dag.stage_names_used:
         dag.stage_names_used.append(stage_name)
+
+    return dag
 
 
 class DAG(object):
@@ -304,14 +307,16 @@ class DAG(object):
         if len(tools) > 0:
             if not isinstance(tools[0],Tool):
                 raise FlowFxnValidationError, '`tools` must be a list of Tools'
+        if stage_name is None:
+            stage_name = tools[0].stage_name
+        if len(set([ tuple(t.tags.items()) for t in tools])) < len(tools):
+            raise FlowFxnValidationError, 'Duplicate tags detected when trying to add tools to stage "{0}".  Tags within a stage must be unique. Duplicate Tags are {1}'.format(stage_name,t.tags)
 
-            if stage_name is None:
-                stage_name = tools[0].stage_name
-            for tool in tools:
-                tool.stage_name = stage_name
-                tool.tags.update(tag)
-                self.G.add_node(tool)
-                yield tool
+        for tool in tools:
+            tool.stage_name = stage_name
+            tool.tags.update(tag)
+            self.G.add_node(tool)
+            yield tool
 
     @flowfxn
     def map_(self,tool_class,stage_name=None,tag={}):
@@ -393,9 +398,10 @@ class DAG(object):
         if type(keywords) != list:
             raise TypeError('keywords must be a list')
 
-        tools_without_keywords = filter(lambda t: len(set(keywords) & set(t.tags))>0, parent_tools)
-        for tags, parent_tool_group in groupby(parent_tools,lambda t: dict([(k,t.tags[k]) for k in keywords if k in t.tags])):
-            parent_tool_group = list(parent_tool_group) + tools_without_keywords
+        parent_tools_without_all_keywords = filter(lambda t: not all([k in t.tags for k in keywords]), parent_tools)
+        parent_tools_with_all_keywords = filter(lambda t: all(k in t.tags for k in keywords), parent_tools)
+        for tags, parent_tool_group in groupby(parent_tools_with_all_keywords,lambda t: dict((k,t.tags[k]) for k in keywords if k in t.tags)):
+            parent_tool_group = list(parent_tool_group) + parent_tools_without_all_keywords
             tags.update(tag)
             new_tool = tool_class(stage_name=stage_name,dag=self,tags=tags)
             for parent_tool in parent_tool_group:
@@ -437,13 +443,9 @@ class DAG(object):
 
     def apply_(self,*flowlist,**kwargs):
         """
-        Applies each flowfxn in \*flowlist to current dag.active_tools.  This is different from
-        `sequence_`, because `sequence_` applies the flowfns in flowlist to each other
-        sequentially.  With `apply_`, all functions in \*flowlist are applied onto the current
-        active_tools.
+        Applies each flowfxn in \*flowlist to current dag.active_tools.
 
-        After the `apply_`, dag.active_tools will be the tools added
-        by the last flowfxn in \*flowlist.
+        For example, at a high level, apply_(B,C,D) translates to B(active_tools),C(active_tools),D(active_tools).
 
         :param \*flowlist: A sequence of flowfxns
         :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
@@ -473,8 +475,10 @@ class DAG(object):
 
     def sequence_(self,*flowlist,**kwargs):
         """
-        Applies each flowfxn in \*flowlist sequentially to each other.  Very similar to python's :py:meth:`DAG.reduce_`
-        function (not to be confused with :py:meth:`DAG.reduce_`, initialized with the current active_nodes.
+        Applies each flowfxn in \*flowlist sequentially to each other.  Very similar to python's builtin :py:meth:`reduce`
+        function (not to be confused with :py:meth:`DAG.reduce_`), initialized with the current active_nodes.
+
+        For example, at a high level sequence_(B,C,D) translates to D(C(B(active_tools))).
 
         :param \*flowlist: A sequence of flowfxns
         :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
@@ -551,3 +555,5 @@ import types
     # Piped.outputs = tool_classes[-1].outputs
     # Piped.name = 'Pipetest'
     # return Piped
+
+

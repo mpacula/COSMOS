@@ -29,5 +29,5 @@ def parse_args(parser):
 
     wf = Workflow.start(**wf_kwargs)
 
-    wf.log.info('Args:\n{0}'.format(pprint.pformat(kwargs)))
+    wf.log.info('Parsed kwargs:\n{0}'.format(pprint.pformat(kwargs)))
     return wf,kwargs

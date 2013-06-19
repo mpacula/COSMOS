@@ -39,7 +39,7 @@ def rm(workflows,prompt_confirm,stage_number,all_stages_after):
     for wf in workflows:
         if stage_number:
             stage = wf.stages.get(order_in_workflow=stage_number)
-            if not prompt_confirm or confirm('Are you sure you want to delete {0}{1}{2}?'.
+            if not prompt_confirm or confirm('Are you sure you want to delete the stage "{0}/{1}"{2}?'.
                                              format(wf,stage,' and all stages after it' if all_stages_after else ''),
                                              default=False,timeout=60):
                 for s in wf.stages.filter(order_in_workflow__gt=stage.order_in_workflow-1) if all_stages_after else wf.stages.filter(order_in_workflow = stage.order_in_workflow):

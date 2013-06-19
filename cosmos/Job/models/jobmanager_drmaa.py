@@ -44,7 +44,7 @@ decode_drmaa_state = SortedDict([
     (drmaa.JobState.USER_SUSPENDED, 'job is user suspended'),
     (drmaa.JobState.DONE, 'job finished normally'),
     (drmaa.JobState.FAILED, 'job finished, but failed'),
-    ]) #this is a sorted dictionary
+    ])
 
 class JobManager(JobManagerBase):
     """
@@ -103,7 +103,7 @@ class JobManager(JobManagerBase):
         #jt.args = self.command_script_text.split(' ')[1:]
         jt.remoteCommand = cmd.split(' ')[0]
         jt.args = cmd.split(' ')[1:]
-        jt.workingDirectory = os.getcwd()
+        #jt.workingDirectory = os.getcwd()
         jt.jobName = jobAttempt.task.stage.name
         jt.outputPath = ':'+jobAttempt.STDOUT_filepath
         jt.errorPath = ':'+jobAttempt.STDERR_filepath

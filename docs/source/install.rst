@@ -21,7 +21,7 @@ _______________________________________
 .. code-block:: bash
 
     sudo apt-get update -y
-    sudo apt-get install python-dev libmysqlclient-dev mysql-server graphviz graphviz-dev
+    sudo apt-get install python-dev libmysqlclient-dev graphviz graphviz-dev
 
 
 Install Method

@@ -35,14 +35,14 @@ def default_get_drmaa_native_specification(jobAttempt):
     time_req = task.time_requirement
     queue = task.workflow.default_queue
 
-    if DRM == 'LSF':
+    if 'LSF' in DRM:
         s = '-R "rusage[mem={0}] span[hosts=1]" -n {1}'.format(mem_req/cpu_req,cpu_req)
         if time_req:
             s += ' -W 0:{0}'.format(time_req)
         if queue:
             s += ' -q {0}'.format(queue)
         return s
-    elif DRM == 'GE':
+    elif 'GE' in DRM:
         return '-l h_vmem={mem_req}M,num_proc={cpu_req}'.format(
             mem_req=mem_req,
             cpu_req=cpu_req)

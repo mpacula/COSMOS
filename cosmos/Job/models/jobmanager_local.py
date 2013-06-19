@@ -13,7 +13,8 @@ current_processes = {}
 
 def preexec_function():
     # Ignore the SIGINT signal by setting the handler to the standard
-    # signal handler SIG_IGN.
+    # signal handler SIG_IGN.  This allows Cosmos to cleanly
+    # terminate jobs when there is a ctrl+c event
     os.setpgrp()
 
 class JobManager(JobManagerBase):

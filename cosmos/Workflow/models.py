@@ -30,6 +30,7 @@ status_choices=(
 
 class TaskError(Exception): pass
 class TaskValidationError(Exception): pass
+class TaskFileValidationError(Exception): pass
 class WorkflowError(Exception): pass
 
 i = 0
@@ -62,6 +63,8 @@ class TaskFile(models.Model,object):
             file, and workflow.delete_intermediates is turned on.  Defaults to False.
         """
         super(TaskFile,self).__init__(*args,**kwargs)
+
+
         if not self.fmt and self.path:
             try:
                 groups = re.search('\.([^\.]+)$',self.path).groups()
@@ -76,6 +79,10 @@ class TaskFile(models.Model,object):
             self.fmt = self.name
 
         self.tmp_id = get_tmp_id()
+
+        if not re.search("^[\w]+$",self.name):
+            raise TaskFileValidationError, 'The taskfile.name must be alphanumeric. Failed name is "{0}"'.format(self.name)
+
 
     @property
     def workflow(self):
@@ -274,7 +281,7 @@ class Workflow(models.Model):
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
         #TODO ideally just change the queryset manager to do this automatically
-        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete all unsuccessful tasks in '{0}'?".format(name),default=True,timeout=30):
+        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete any unsuccessful tasks in '{0}'?".format(name),default=True,timeout=30):
             print "Exiting."
             sys.exit(1)
 
@@ -384,7 +391,7 @@ class Workflow(models.Model):
         TaskTag.objects.filter(task=None).delete()
 
 
-    def terminate(self,exception=None):
+    def terminate(self,exit=True):
         """
         Terminates this workflow and Exits
         :param exception: an exception to raise after terminating
@@ -415,8 +422,9 @@ class Workflow(models.Model):
         self.finished()
 
         self.log.info("Exiting.")
-        if exception:
-            raise exception
+
+        if not exit:
+            return
         else:
             sys.exit(1)
 
@@ -687,7 +695,8 @@ class Workflow(models.Model):
 
         except Exception as e:
             self.log.error('An exception was raised during workflow execution, terminating workflow and then re-raising exception.')
-            self.terminate(exception=e)
+            self.terminate(exit=False)
+            raise
 
     def finished(self):
         """
@@ -984,7 +993,7 @@ class Stage(models.Model):
     @property
     def wall_time(self):
         """Time between this stage's creation and finished datetimes.  Note, this is a timedelta instance, not seconds"""
-        return self.finished_on - self.started_on if self.finished_on else timezone.now().replace(microsecond=0) - self.started_on
+        return self.finished_on.replace(microsecond=0) - self.started_on.replace(microsecond=0) if self.finished_on else timezone.now().replace(microsecond=0) - self.started_on.replace(microsecond=0)
 
     @property
     def output_dir(self):
