@@ -51,7 +51,7 @@ class JobManager(JobManagerBase):
         try:
             r = all_processes[jobAttempt.drmaa_jobID].returncode
             if r is None:
-                return 'running'
+                return 'job is running'
             if r:
                 return 'finished, exit code {0}'.format(r)
         except KeyError:

@@ -67,6 +67,7 @@ warning = """
 ***********************************************************************************************************************
 """
 printed_warning = False
-if not printed_warning:
-    print >> sys.stderr, warning
-    printed_warning=True
+if settings['license_warning'] != 'False':
+    if not printed_warning:
+        print >> sys.stderr, warning
+        printed_warning=True

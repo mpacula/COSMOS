@@ -8,7 +8,7 @@ from tools import ECHO, CAT
 
 dag = DAG().sequence_(
     add_([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]),
-    split_([('i',[1,2])],CAT)
+    split_([('x',[1,2])],CAT)
 )
 dag.create_dag_img('/tmp/ex.svg')
 
