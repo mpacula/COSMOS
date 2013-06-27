@@ -65,10 +65,10 @@ def email_on_fail(sender, status, **kwargs):
 # Workflow
 ####################
 
-from cosmos.lib.ezflow.dag import DAG, Map, Split, Add
+from cosmos.lib.ezflow.taskGraph import TaskGraph, Map, Split, Add
 import tools
 
-dag = ( DAG().
+dag = ( TaskGraph().
         add_([tools.ECHO(tags={'word': 'hello'}), tools.ECHO(tags={'word': 'world'})]).
         map_(tools.FAIL) # Automatically fail
 )

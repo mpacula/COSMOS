@@ -1,12 +1,12 @@
 from cosmos.Workflow.models import Workflow
-from cosmos.lib.ezflow.dag import DAG, add_,split_
+from cosmos.lib.ezflow.taskGraph import TaskGraph, add_,split_
 from tools import ECHO, CAT
 
 ####################
 # Workflow
 ####################
 
-dag = DAG().sequence_(
+dag = TaskGraph().sequence_(
     add_([ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]),
     split_([('x',[1,2])],CAT)
 )

@@ -656,13 +656,13 @@ class Workflow(models.Model):
 
     def run(self,terminate_on_fail=True,finish=True):
         """
-        Runs a workflow using the DAG of jobs
+        Runs a workflow using the TaskGraph of jobs
 
         :param terminate_on_fail: (bool) If True, the workflow will self terminate of any of the tasks of this stage fail `max_job_attempts` times
         """
-        self.log.info("Generating DAG...")
+        self.log.info("Generating TaskGraph...")
         wfDAG = WorkflowManager(self)
-        self.log.info("Running DAG.")
+        self.log.info("Running TaskGraph.")
         def run_ready_tasks():
             submitted_tasks = wfDAG.run_ready_tasks()
             for st in submitted_tasks:
@@ -773,7 +773,7 @@ class WorkflowManager():
     def __init__(self,workflow):
         self.workflow = workflow
         self.dag = self.createDiGraph()
-        self.workflow.log.info('Using DAG to create Job Queue')
+        self.workflow.log.info('Using TaskGraph to create Job Queue')
         self.dag_queue = self.dag.copy()
         self.dag_queue.remove_nodes_from(map(lambda x: x['id'],workflow.tasks.filter(successful=True).values('id')))
         self.queued_tasks = []

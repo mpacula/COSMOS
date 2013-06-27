@@ -7,14 +7,14 @@ cosmos.lib.ezflow.dag.DAG.branch() is the key to branching.
 """
 
 from cosmos.Workflow.models import Workflow
-from cosmos.lib.ezflow.dag import DAG
+from cosmos.lib.ezflow.taskGraph import TaskGraph
 import tools
 
 ####################
 # Workflow
 ####################
 
-dag = ( DAG()
+dag = ( TaskGraph()
           .add([ tools.ECHO(tags={'word':'hello'}), tools.ECHO(tags={'word':'world'}) ])
           .split([('i',[1,2])],tools.CAT)
           .map(tools.WC)

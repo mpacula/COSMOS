@@ -28,7 +28,7 @@ class Tool(object):
     define the resources that are required.
 
     :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
-    :property dag: (DAG) The dag that is keeping track of this Tool
+    :property dag: (TaskGraph) The dag that is keeping track of this Tool
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
     :property output_files: (list) This Tool's output TaskFiles.  A tool's output taskfile names should be unique.
@@ -171,7 +171,7 @@ class Tool(object):
 
     @property
     def label(self):
-        "Label used for the DAG image"
+        "Label used for the TaskGraph image"
         tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(k,v) for k,v in self.tags.items() ]))
         return "[{3}] {0}{1}\\n{2}".format(self.name,tags,self.pcmd,self.id)
 

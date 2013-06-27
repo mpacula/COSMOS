@@ -24,13 +24,13 @@ def flowfxn(func,dag,*RHS):
     """
 
     if dag == None: raise TypeError,'dag cannot be none'
-    if type(dag) != DAG: raise TypeError, 'The left hand side should be of type dag.DAG'
+    if type(dag) != TaskGraph: raise TypeError, 'The left hand side should be of type dag.TaskGraph'
     dag.active_tools = list(func(dag,*RHS))
 
     try:
         stage_name = dag.active_tools[0].stage_name
     except IndexError:
-        raise DAGError,'Tried to DAG.{0}(), but dag.active_tools is not set.  Make sure to `add_` some INPUTs first.'.format(
+        raise DAGError,'Tried to TaskGraph.{0}(), but dag.active_tools is not set.  Make sure to `add_` some INPUTs first.'.format(
             func.__name__
         )
 
@@ -47,9 +47,9 @@ def flowfxn(func,dag,*RHS):
     return dag
 
 
-class DAG(object):
+class TaskGraph(object):
     """
-    A Representation of a workflow as a :term:`DAG` of jobs.
+    A Representation of a workflow as a :term:`TaskGraph` of jobs.
     """
     
     def __init__(self,cpu_req_override=False,ignore_stage_name_collisions=False,mem_req_factor=1):
@@ -95,7 +95,7 @@ class DAG(object):
         Adds a dependency
         :param parent: (Tool) a parent
         :param child: (Tool) a child
-        :return: (DAG) self
+        :return: (TaskGraph) self
         """
         self.G.add_edge(parent,child)
         return self
@@ -104,7 +104,7 @@ class DAG(object):
         """
         Branches from a list of tools
         :param tools: (list) a list of tools
-        :return: (DAG) self
+        :return: (TaskGraph) self
         """
         self.active_tools = tools
         return self
@@ -124,7 +124,7 @@ class DAG(object):
         
     def create_dag_img(self,path):
         """
-        Writes the :term:`DAG` as an image.
+        Writes the :term:`TaskGraph` as an image.
         gat
         :param path: the path to write to
         """
@@ -287,7 +287,7 @@ class DAG(object):
     @flowfxn
     def add_(self,tools,stage_name=None,tag={}):
         """
-        Always the first flowfxn used to describe a DAG.  Simply adds a list of tool instances to the dag,
+        Always the first flowfxn used to describe a TaskGraph.  Simply adds a list of tool instances to the dag,
         without adding any dependencies.
 
         .. note::
@@ -298,9 +298,9 @@ class DAG(object):
         :param tools: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn.
-        :return: (DAG) self.
+        :return: (TaskGraph) self.
 
-        >>> DAG().add_([tool1,tool2,tool3,tool4])
+        >>> TaskGraph().add_([tool1,tool2,tool3,tool4])
         """
         if not isinstance(tools,list):
             raise FlowFxnValidationError, 'The parameter `tools` must be a list'
@@ -333,7 +333,7 @@ class DAG(object):
         :param tool_class: (subclass of Tool)
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (DAG) self
+        :return: (TaskGraph) self
 
         >>> dag.map_(Tool_Class)
         """
@@ -356,7 +356,7 @@ class DAG(object):
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn.
-        :return: (DAG) self
+        :return: (TaskGraph) self
 
         >>> dag.split_([('shape',['square','circle']),('color',['red','blue'])],Tool_Class)
 
@@ -392,7 +392,7 @@ class DAG(object):
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (DAG) self
+        :return: (TaskGraph) self
 
         >>> dag.reduce(['shape','color'],Tool_Class)
 
@@ -426,7 +426,7 @@ class DAG(object):
         :param tool_class: (list) Tool instances.
         :param stage_name: (str) The name of the stage to add to.  Defaults to the name of the tool class.
         :param tag: (dict) A dictionary of tags to add to the tools produced by this flowfxn
-        :return: (DAG) self
+        :return: (TaskGraph) self
 
         >>> dag.reduce_split_(['color','shape'],[('size',['small','large'])],Tool_Class)
 
@@ -457,7 +457,7 @@ class DAG(object):
 
         :param \*flowlist: A sequence of flowfxns
         :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
-        :returns: (DAG) this dag
+        :returns: (TaskGraph) this dag
 
         >>> dag.sequence_(map_(ToolX), sequence_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
 
@@ -484,13 +484,13 @@ class DAG(object):
     def sequence_(self,*flowlist,**kwargs):
         """
         Applies each flowfxn in \*flowlist sequentially to each other.  Very similar to python's builtin :py:meth:`reduce`
-        function (not to be confused with :py:meth:`DAG.reduce_`), initialized with the current active_nodes.
+        function (not to be confused with :py:meth:`TaskGraph.reduce_`), initialized with the current active_nodes.
 
         For example, at a high level sequence_(B,C,D) translates to D(C(B(active_tools))).
 
         :param \*flowlist: A sequence of flowfxns
         :param combine: Combines all tools produced by flowlist and sets the self.active_tools to the union of them.
-        :returns: (DAG) this dag
+        :returns: (TaskGraph) this dag
 
         >>> dag.sequence_(map_(ToolX), seq_([ reduce_(['a'],ToolA), map_(,ToolB]), split_(['b',['2']],ToolC]) ]))
 
@@ -543,7 +543,7 @@ class add_run(MethodStore):pass
     #
     # class Piped(tool_classes[-1]):
     #     def cmd(self,i,s,p):
-    #         minidag = DAG()
+    #         minidag = TaskGraph()
     #         cmds = []
     #         last_parents = self.parents
     #         for tool_num,tc in enumerate(self.tool_classes):
