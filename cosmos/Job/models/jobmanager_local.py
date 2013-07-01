@@ -38,7 +38,7 @@ class JobManager(JobManagerBase):
         for k,p in current_processes.items():
             if p.poll() is not None:
                 del current_processes[k]
-                ja = JobAttempt.objects.get(drmaa_jobID=p.pid)
+                ja = JobAttempt.objects.get(jobManager=self,drmaa_jobID=p.pid)
                 successful = p.poll() == 0
                 ja._hasFinished(successful,{'exit_code':p.returncode})
                 return ja

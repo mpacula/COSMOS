@@ -105,7 +105,8 @@ class JobManagerBase(models.Model):
 
     def submit_job(self,jobAttempt):
         """Submits and runs a job"""
-        if not jobAttempt.queue_status == 'not_queued': raise JobStatusError, 'JobAttempt has already been submitted'
+        if not jobAttempt.queue_status == 'not_queued':
+            raise JobStatusError, 'JobAttempt has already been submitted'
 
         self._submit_job(jobAttempt)
 

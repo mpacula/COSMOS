@@ -4,7 +4,7 @@ Workflow models
 from cosmos import session
 from cosmos.config import settings
 from django.db import models, transaction
-from django.db.models import Q,Count
+from django.db.models import Q,Count, Sum
 from django.db.utils import IntegrityError
 from cosmos.Job.models import JobAttempt,JobManager
 import os,sys,re,signal
@@ -19,6 +19,7 @@ import hashlib
 import signals
 from cosmos.Workflow.templatetags import extras
 from ordereddict import OrderedDict
+import time
 
 status_choices=(
                 ('successful','Successful'),
@@ -136,6 +137,7 @@ class Workflow(models.Model):
     dry_run = models.BooleanField(default=False,help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255,default=None,null=True)
+    max_cores = models.IntegerField(default=0,help_text="Maximum cores to use at one time during the workflow.  Is based off of the sum of the running tasks' cpu_requirement")
     delete_intermediates = models.BooleanField(default=False,help_text="Delete intermediate files")
     #cmd_executed = models.CharField(max_length=255,default=None,null=True)
     comments = models.TextField(null=True,default=None)
@@ -214,6 +216,7 @@ class Workflow(models.Model):
         :param root_output_dir: (bool) Replaces the directory used in settings as the workflow output directory. If None, will use default_root_output_dir in the config file. Optional.
         :param default_queue: (str) Name of the default queue to submit jobs to. Optional.
         :param delete_intermediates: (str) Deletes intermediate files to save scratch space.
+        :param max_cores: (int) maximum number of cores
         """
 
         kwargs.setdefault('dry_run',False)
@@ -221,6 +224,7 @@ class Workflow(models.Model):
         kwargs.setdefault('default_queue',settings['default_queue'])
         kwargs.setdefault('delete_intermediates', False)
         kwargs.setdefault('comments',None)
+        #kwargs.setdefault('max_cores',0)
 
         restart = kwargs.pop('restart',False)
         prompt_confirm = kwargs.pop('prompt_confirm',True)
@@ -231,7 +235,6 @@ class Workflow(models.Model):
             wf = Workflow.__restart(name=name, prompt_confirm=prompt_confirm, **kwargs)
         elif Workflow.objects.filter(name=name).count() > 0:
             wf = Workflow.__reload(name=name, prompt_confirm=prompt_confirm, **kwargs)
-            #wf = Workflow.__resume(name=name, **kwargs)
         else:
             wf = Workflow.__create(name=name, **kwargs)
 
@@ -249,7 +252,7 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __resume(name,dry_run, default_queue, delete_intermediates, root_output_dir, comments,**kwargs):
+    def __resume(name,dry_run, default_queue, delete_intermediates, root_output_dir, comments, max_cores, **kwargs):
         """
         Resumes a workflow without deleting any unsuccessful tasks.  Provides a way to override workflow
         properties.
@@ -265,6 +268,7 @@ class Workflow(models.Model):
         wf.default_queue=default_queue
         wf.delete_intermediates = delete_intermediates
         wf.output_dir = os.path.join(root_output_dir,wf.name.replace(' ','_'))
+        wf.max_cores = max_cores
         if comments:
             wf.comments = comments
 
@@ -287,7 +291,6 @@ class Workflow(models.Model):
 
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         wf.finished_on = None
-        #Stage.objects.filter(workflow=wf).update(order_in_workflow=None)
 
         if delete_unsuccessful_stages:
             #delete a stage with any unsuccessful tasks
@@ -584,6 +587,7 @@ class Workflow(models.Model):
             return 'NOOP'
 
         #TODO fix this it's slow (do it in bulk when running a workflow?)
+        # Make sure Stag attributes correctly reflect the current state
         if task.stage.status in ['no_attempt','failed']:
             if task.stage.status == 'no_attempt':
                 task.stage.started_on = timezone.now()
@@ -597,7 +601,9 @@ class Workflow(models.Model):
         #set output_file paths to the task's job_output_dir
         for f in task.output_files:
             if not f.path:
-                basename = '{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt) if not f.basename else f.basename
+                #basename = '{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt) if not f.basename else f.basename
+                basename = task.tags_as_query_string().replace('&','__').replace('=','_')+'.'+f.fmt
+
                 f.path = os.path.join(task.job_output_dir,basename)
                 f.save()
             if f.fmt == 'dir':
@@ -648,7 +654,10 @@ class Workflow(models.Model):
                 self._run_task(task)
                 return True
             else:
-                self.log.warning("{0} has failed and reached max_reattempts of {1}.\n<STDERR>\n{2}\n</STDERR>".format(self, self.max_reattempts,failed_jobAttempt.STDERR_txt))
+                self.log.warning("{0} of {1} failed, on attempt # {2}.\n".format(failed_jobAttempt,task,numAttempts)
+                           + "<COMMAND path=\"{1}\">\n{0}\n</COMMAND>\n".format(failed_jobAttempt.get_command_shell_script_text(),failed_jobAttempt.command_script_path)
+                           + "<STDERR>\n{0}\n</STDERR>".format(failed_jobAttempt.STDERR_txt)
+                )
                 self.status = 'failed'
                 self.save()
                 return False
@@ -663,13 +672,30 @@ class Workflow(models.Model):
         self.log.info("Generating TaskGraph...")
         wfDAG = WorkflowManager(self)
         self.log.info("Running TaskGraph.")
+
         def run_ready_tasks():
-            submitted_tasks = wfDAG.run_ready_tasks()
+            submitted_tasks = []
+            ready_tasks = wfDAG.get_ready_tasks()
+
+            cores_used = self.jobManager.jobAttempts.filter(queue_status='queued').aggregate(Sum('task__cpu_requirement')).values()[0] or 0
+
+            for task in ready_tasks:
+                if self.max_cores and cores_used + task.cpu_requirement > self.max_cores:
+                    # At max number of concurrent cores
+                    self.log.info('At maximum concurrency of {0} cores, skipping job submission'.format(self.max_cores))
+                    break
+
+                self._run_task(task)
+                submitted_tasks.append(task)
+                cores_used += task.cpu_requirement
+
             for st in submitted_tasks:
                 if st.NOOP:
                     st._has_finished('NOOP')
                     wfDAG.complete_task(st)
-            if submitted_tasks:
+
+            if submitted_tasks and len(submitted_tasks) == len(ready_tasks):
+                # Keep going through DAG if submitted all tasks
                 run_ready_tasks()
 
         try:
@@ -758,6 +784,12 @@ class Workflow(models.Model):
             raise Exception("No tasks with with tags {0}.".format(tags))
         return tasks[0]
 
+    def iter_as_dict(self):
+        for s in self.stages:
+            for t in s:
+                for o in t.output_files:
+                    yield s, t, o
+
     def __str__(self):
         return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
 
@@ -781,14 +813,19 @@ class WorkflowManager():
     def queue_task(self,task):
         self.queued_tasks.append(task.id)
 
-    def run_ready_tasks(self):
-        ready_tasks = [ n for n in self.get_ready_tasks() ]
-        for n in ready_tasks:
-            self.queue_task(n)
-            self.workflow._run_task(n)
-        return ready_tasks
+    # def run_ready_tasks(self):
+    #     ready_tasks = [ n for n in self.get_ready_tasks() ]
+    #
+    #     for n in ready_tasks:
+    #         self.queue_task(n)
+    #         self.workflow._run_task(n)
+    #
+    #     return ready_tasks
 
     def complete_task(self,task):
+        """
+        Run everytime a task completes so that the dag can stay up to date
+        """
         self.dag_queue.remove_node(task.id)
         self.dag.node[task.id]['status'] = task.status
 
@@ -816,7 +853,7 @@ class WorkflowManager():
 
     def get_ready_tasks(self):
         degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
-        return Task.objects.filter(id__in=filter(lambda x: x not in self.queued_tasks,degree_0_tasks))
+        return Task.objects.filter(id__in=filter(lambda x: x not in self.queued_tasks,degree_0_tasks)).all()
         #return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks)) 
 
     def createDiGraph(self):
@@ -1151,6 +1188,7 @@ class Stage(models.Model):
         super(Stage, self).delete(*args, **kwargs)
         self.log.info('{0} Deleted.'.format(self))
 
+
     @models.permalink
     def url(self):
         "The URL of this stage"
@@ -1301,7 +1339,8 @@ class Task(models.Model):
     @property
     def output_dir(self):
         "Task output dir"
-        return os.path.join(self.stage.output_dir,str(self.id))
+        basedir = self.tags_as_query_string().replace('&','__').replace('=','_')
+        return os.path.join(self.stage.output_dir,basedir)
 
     @property
     def job_output_dir(self):

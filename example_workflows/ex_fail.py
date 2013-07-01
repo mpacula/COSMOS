@@ -1,12 +1,12 @@
 from cosmos.Workflow.models import Workflow
-from cosmos.lib.ezflow.taskGraph import TaskGraph, Split, Add, Map
+from cosmos.lib.ezflow.toolgraph import ToolGraph, Split, Add, Map
 from tools import ECHO, CAT, WC, FAIL
 
 ####################
 # Workflow
 ####################
 
-dag = ( TaskGraph()
+dag = ( ToolGraph()
     |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
     |Split| ([('i',[1,2])],CAT)
     |Map| FAIL

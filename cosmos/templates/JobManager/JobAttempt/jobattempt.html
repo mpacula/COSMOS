@@ -61,6 +61,7 @@
         {% endwith%}
     </dd>
     <dt>Status Details</dt><dd>{{jobAttempt.status_details}}</dd>
+    <dt>Command Script</dt><dd><em>{{jobAttempt.command_script_path}}</em></dd>
     <dt>Shell Script</dt><dd><pre class="linenums">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
     <dt><em>Profile</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
     <dt>Output Directory</dt><dd><code>{{jobAttempt.task.job_output_dir}}</code></dd>

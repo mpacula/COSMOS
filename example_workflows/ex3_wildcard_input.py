@@ -1,4 +1,4 @@
-from cosmos.lib.ezflow.taskGraph import TaskGraph, Split, Add, Map, Reduce
+from cosmos.lib.ezflow.toolgraph import ToolGraph, Split, Add, Map, Reduce
 from tools import ECHO, MD5Sum
 from cosmos.Workflow.cli import CLI
 
@@ -9,7 +9,7 @@ WF = cli.parse_args() # parses command line arguments
 # Workflow
 ####################
 
-dag = ( TaskGraph()
+dag = ( ToolGraph()
     |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
     |Reduce| ([],MD5Sum)
 )

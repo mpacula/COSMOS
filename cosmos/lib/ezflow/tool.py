@@ -1,5 +1,5 @@
 import re, sys, pprint
-import itertools
+import itertools as it
 import copy
 from inspect import getargspec
 
@@ -28,7 +28,7 @@ class Tool(object):
     define the resources that are required.
 
     :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
-    :property dag: (TaskGraph) The dag that is keeping track of this Tool
+    :property dag: (ToolGraph) The dag that is keeping track of this Tool
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
     :property output_files: (list) This Tool's output TaskFiles.  A tool's output taskfile names should be unique.
@@ -55,6 +55,8 @@ class Tool(object):
     #: (bool) If True, output_files described as a str in outputs will be by default be created with persist=True.
     #: If delete_interemediates is on, they will not be deleted.
     persist=False
+    #: forwards this tool's input to get_output() calls
+    forward_input = False
 
     def __init__(self,stage_name=None,tags={},dag=None):
         """
@@ -127,34 +129,49 @@ class Tool(object):
         else:
             return ps[0]
     
+    # def get_output(self,name,error_if_missing=True):
+    #     """
+    #     Returns the output TaskFiles who's name == name.  This should always be one element.
+    #
+    #     :param name: the name of the output file.
+    #     :param error_if_missing: (bool) Raises a GetOutputError if the output cannot be found
+    #     """
+    #
+    #     output_files = filter(lambda x: x.name == name, self.output_files)
+    #
+    #     if len(output_files) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self),name)
+    #
+    #     if len(output_files) == 0:# and self.forward_input:
+    #         try:
+    #             output_files +=  [ p.get_output(name) for p in self.parents ]
+    #         except GetOutputError as e:
+    #             pass
+    #
+    #     if len(output_files) == 0:
+    #         if error_if_missing:
+    #             raise GetOutputError('No output file in {0} with name {1}.'.format(self,name),name)
+    #         else:
+    #             return None
+    #     else:
+    #         return output_files[0]
+
     def get_output(self,name,error_if_missing=True):
-        """
-        Returns the output TaskFiles who's name == name.  This should always be one element.
-        
-        :param name: the name of the output file.
-        :param error_if_missing: (bool) Raises a GetOutputError if the output cannot be found
-        """
+        for o in self.output_files:
+            if o.name == name:
+                return o
 
-        output_files = filter(lambda x: x.name == name, self.output_files)
+        if self.forward_input:
+            outs = filter(lambda x:x,[ p.get_output(name,error_if_missing=False) for p in self.parents ])
+            if error_if_missing and len(outs) > 1:
+                raise ExpectedError,'Too many inputs were forwarded, only one parent should have the input being forwarded'
+            if len(outs) > 0:
+                return outs[0]
 
-        if len(output_files) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self),name)
-
-        if len(output_files) == 0:# and self.forward_input:
-            try:
-                output_files +=  [ p.get_output(name) for p in self.parents ]
-            except GetOutputError as e:
-                pass
-
-        if len(output_files) == 0:
-            if error_if_missing:
-                raise GetOutputError('No output file in {0} with name {1}.'.format(self,name),name)
-            else:
-                return None
-        else:
-            return output_files[0]
+        if error_if_missing:
+            raise ToolError, 'Output named `{0}` does not exist in {1}'.format(name,self)
     
-    def get_output_file_names(self):
-        return set(map(lambda x: x.name, self.output_files))
+    # def get_output_file_names(self):
+    #     return set(map(lambda x: x.name, self.output_files))
         
     def add_output(self,taskfile):
         """
@@ -167,11 +184,11 @@ class Tool(object):
     @property
     def input_files(self):
         "A list of input TaskFiles"
-        return list(itertools.chain(*[ tf for tf in self.map_inputs().values() ]))
+        return list(it.chain(*[ tf for tf in self.map_inputs().values() ]))
 
     @property
     def label(self):
-        "Label used for the TaskGraph image"
+        "Label used for the ToolGraph image"
         tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(k,v) for k,v in self.tags.items() ]))
         return "[{3}] {0}{1}\\n{2}".format(self.name,tags,self.pcmd,self.id)
 
@@ -188,13 +205,9 @@ class Tool(object):
             if '*' in self.inputs:
                 return {'*':[ o for p in self.parents for o in p.output_files ]}
 
-            for name in self.inputs:
-                for p in self.parents:
-                    all_inputs += filter(lambda x: x,[ p.get_output(name,error_if_missing=False) ]) #filter out Nones
+            all_inputs = filter(lambda x: x is not None,[ p.get_output(name,error_if_missing=False) for p in self.parents for name in self.inputs ])
 
-            input_dict = {}
-            for input_file in set(all_inputs):
-                input_dict.setdefault(input_file.name,[]).append(input_file)
+            input_dict = dict((name,list(input_files)) for name,input_files in it.groupby(all_inputs,lambda i: i.name))
 
             for k in self.inputs:
                 if k not in input_dict or len(input_dict[k]) == 0:
