@@ -413,7 +413,7 @@ class Workflow(models.Model):
         self.log.info("Marking {0} terminated Tasks as failed.".format(tasks.count()))
         tasks.update(status = 'failed',finished_on = timezone.now())
 
-        stages = Stage.objects.filter(Q(task__in=tasks)|Q(workflow=self,successful=False))
+        stages = Stage.objects.filter(Q(workflow=self,task__in=tasks)|Q(workflow=self,successful=False))
         self.log.info("Marking {0} terminated Stages as failed.".format(stages.count()))
         stages.update(status = 'failed',finished_on = timezone.now())
 
@@ -625,12 +625,13 @@ class Workflow(models.Model):
             jobName=""
         )
 
-        task.jobattempt_set.add(jobAttempt)
+        #task.jobattempt_set.add(jobAttempt)
         if self.dry_run:
             self.log.info('Dry Run: skipping submission of job {0}.'.format(jobAttempt))
         else:
             self.jobManager.submit_job(jobAttempt)
             self.log.info('Submitted jobAttempt with drmaa jobid {0}.'.format(jobAttempt.drmaa_jobID))
+
         task.save()
         return jobAttempt
 
@@ -680,13 +681,14 @@ class Workflow(models.Model):
             cores_used = self.jobManager.jobAttempts.filter(queue_status='queued').aggregate(Sum('task__cpu_requirement')).values()[0] or 0
 
             for task in ready_tasks:
-                if self.max_cores and cores_used + task.cpu_requirement > self.max_cores:
+                if self.max_cores > 0 and cores_used + task.cpu_requirement > self.max_cores:
                     # At max number of concurrent cores
-                    self.log.info('At maximum concurrency of {0} cores, skipping job submission'.format(self.max_cores))
-                    break
+                    self.log.info('Using {0}/{1} cores and next task requires {2} core(s), waiting.'.format(cores_used,self.max_cores,task.cpu_requirement))
+                    return submitted_tasks
 
                 self._run_task(task)
                 submitted_tasks.append(task)
+                wfDAG.queue_task(task)
                 cores_used += task.cpu_requirement
 
             for st in submitted_tasks:
@@ -695,25 +697,31 @@ class Workflow(models.Model):
                     wfDAG.complete_task(st)
 
             if submitted_tasks and len(submitted_tasks) == len(ready_tasks):
-                # Keep going through DAG if submitted all tasks
+                # Keep going through DAG j case NOOPs were submitted
                 run_ready_tasks()
+
+            return submitted_tasks
 
         try:
             run_ready_tasks()
-
             for jobAttempt in self.jobManager.yield_all_queued_jobs():
                 task = jobAttempt.task
                 #self.log.info('Finished {0} for {1} of {2}'.format(jobAttempt,task,task.stage))
                 if jobAttempt.successful or task.succeed_on_failure:
                     task._has_finished(jobAttempt)
                     wfDAG.complete_task(task)
-                    run_ready_tasks()
                 else:
                     if not self._reattempt_task(task,jobAttempt):
                         task._has_finished(jobAttempt) #job has failed and out of reattempts
                         if terminate_on_fail:
                             self.log.warning("{0} of {1} has reached max_reattempts and terminate_on_fail==True so terminating.".format(jobAttempt,task))
                             self.terminate()
+
+                run_ready_tasks()
+
+                if wfDAG.queue_is_empty():
+                    self.log.info('No tasks left in the TaskGraph.')
+                    break
 
             if finish:
                 self.finished()
@@ -813,6 +821,9 @@ class WorkflowManager():
     def queue_task(self,task):
         self.queued_tasks.append(task.id)
 
+    def queue_is_empty(self):
+        return len(self.dag_queue.nodes()) == 0
+
     # def run_ready_tasks(self):
     #     ready_tasks = [ n for n in self.get_ready_tasks() ]
     #
@@ -853,7 +864,7 @@ class WorkflowManager():
 
     def get_ready_tasks(self):
         degree_0_tasks = map(lambda x:x[0],filter(lambda x: x[1] == 0,self.dag_queue.in_degree().items()))
-        return Task.objects.filter(id__in=filter(lambda x: x not in self.queued_tasks,degree_0_tasks)).all()
+        return list(Task.objects.filter(id__in=filter(lambda x: x not in self.queued_tasks,degree_0_tasks)))
         #return map(lambda n_id: Task.objects.get(pk=n_id),filter(lambda x: x not in self.queued_tasks,degree_0_tasks)) 
 
     def createDiGraph(self):
