@@ -199,7 +199,7 @@ class JobAttempt(models.Model):
         # Make sure output files actually exists
         if successful and any([ not os.path.exists(o.path) or os.stat(o.path) == 0 for o in self.task.output_files ]):
             successful = False
-            status_details = 'Failed due to empty output file'
+            status_details = 'Job was done, but output path/files are missing or empty'
 
         self.status_details = status_details
         self.successful = successful
