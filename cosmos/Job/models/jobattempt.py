@@ -1,3 +1,4 @@
+import glob
 from cosmos import session
 from django.db import models
 import os,re,json
@@ -196,11 +197,14 @@ class JobAttempt(models.Model):
     def _hasFinished(self,successful,extra_jobinfo,status_details=''):
         """Function for JobManager to Run when this JobAttempt finishes"""
 
-        # Make sure output files actually exists
-        if successful and any([ not os.path.exists(o.path) or os.stat(o.path) == 0 for o in self.task.output_files ]):
-            successful = False
-            status_details = 'Job was done, but output path/files are missing or empty'
-
+        # Make sure output files actually exist: in picard.collectmultiplemetrics, output is a basename, not an exact name
+        if successful:
+            for o in self.task.output_files:
+                if (not os.path.exists(o.path) or os.stat(o.path) == 0) and (not glob.glob(o.path+'*')):
+                    successful = False
+                    status_details = 'Job was done, but file {0} is missing or empty'.format(o.path)
+                    break
+                
         self.status_details = status_details
         self.successful = successful
         self.extra_jobinfo = extra_jobinfo
