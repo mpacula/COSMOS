@@ -80,7 +80,7 @@ class TaskFile(models.Model,object):
 
         self.tmp_id = get_tmp_id()
 
-        if not re.search("^[\w]+$",self.name):
+        if not re.search("^[\w\.]+$",self.name):
             raise TaskFileValidationError, 'The taskfile.name must be alphanumeric. Failed name is "{0}"'.format(self.name)
 
 
