@@ -52,8 +52,10 @@ class JobManager(JobManagerBase):
             r = all_processes[jobAttempt.drmaa_jobID].returncode
             if r is None:
                 return 'job is running'
-            if r:
-                return 'finished, exit code {0}'.format(r)
+            elif r == 0:
+                return 'job finished normally'
+            else:
+                'job finished, but failed'
         except KeyError:
             return 'has not been queued'
 

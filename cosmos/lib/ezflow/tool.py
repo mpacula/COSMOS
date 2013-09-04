@@ -27,7 +27,7 @@ class Tool(object):
     A Tool is a class who's instances represent a command that gets executed.  It also contains properties which
     define the resources that are required.
 
-    :property stage_name: (str) The name of this Tool's stage.  Defaults to the name of the class.
+    :property stage: (str) The Tool's Stage
     :property dag: (ToolGraph) The dag that is keeping track of this Tool
     :property id: (int) A unique identifier.  Useful for debugging.
     :property input_files: (list) This Tool's input TaskFiles
@@ -37,9 +37,9 @@ class Tool(object):
     #TODO props that cant be overridden should be private
 
     #: (list of strs) a list of input names.
-    inputs = []
+    inputs = None
     #: (list of strs or TaskFiles) a list of output names. Default is [].
-    outputs = []
+    outputs = None
     #: (int) Number of megabytes of memory to request.  Default is 1024.
     mem_req = 1*1024
     #: (int) Number of cores to request.  Default is 1.
@@ -51,16 +51,16 @@ class Tool(object):
     #: (bool) If True, if this tool's tasks' job attempts fail, the task will still be considered successful.  Default is False.
     succeed_on_failure = False
     #: (dict) A dictionary of default parameters.  Default is {}.
-    default_params = {}
+    default_params = None
     #: (bool) If True, output_files described as a str in outputs will be by default be created with persist=True.
     #: If delete_interemediates is on, they will not be deleted.
     persist=False
     #: forwards this tool's input to get_output() calls
     forward_input = False
 
-    def __init__(self,stage_name=None,tags={},dag=None):
+    def __init__(self,tags,stage=None,dag=None):
         """
-        :param stage_name: (str) The name of the stage this tool belongs to. Required.
+        :param stage: (str) The stage this tool belongs to. Required.
         :param tags: (dict) A dictionary of tags.
         :param dag: The dag this task belongs to.
         :param parents: A list of tool instances which this tool is dependent on
@@ -70,8 +70,11 @@ class Tool(object):
         if not hasattr(self,'output_files'): self.output_files = []
         if not hasattr(self,'settings'): self.settings = {}
         if not hasattr(self,'parameters'): self.parameters = {}
+        if self.inputs is None: self.inputs = []
+        if self.outputs is None: self.outputs = []
+        if self.default_params is None: self.default_params = {}
 
-        self.stage_name = stage_name if stage_name else self.name
+        self.stage = stage
         self.tags = tags
         self.dag = dag
 
@@ -190,7 +193,7 @@ class Tool(object):
     def label(self):
         "Label used for the ToolGraph image"
         tags = '' if len(self.tags) == 0 else "\\n {0}".format("\\n".join(["{0}: {1}".format(k,v) for k,v in self.tags.items() ]))
-        return "[{3}] {0}{1}\\n{2}".format(self.name,tags,self.pcmd,self.id)
+        return "[{3}] {0}{1}".format(self.name,tags,self.pcmd,self.id)
 
     def map_inputs(self):
         """
@@ -310,13 +313,13 @@ class INPUT(Tool):
     mem_req = 0
     cpu_req = 0
     
-    def __init__(self,path,name=None,fmt=None,*args,**kwargs):
+    def __init__(self,path,tags,name=None,fmt=None,*args,**kwargs):
         """
         :param path: the path to the input file
         :param name: the name or keyword for the input file
         :param fmt: the format of the input file
         """
-        super(INPUT,self).__init__(*args,**kwargs)
+        super(INPUT,self).__init__(tags=tags,*args,**kwargs)
         self.add_output(TaskFile(path=path,name=name,fmt=fmt,persist=True))
 
     def __str__(self):

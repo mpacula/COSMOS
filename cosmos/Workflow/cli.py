@@ -8,7 +8,7 @@ def add_workflow_args(parser):
     parser.add_argument('-n','--name',help="A unique name for this workflow. All spaces are converted to underscores.",required=True)
     parser.add_argument('-q','--default_queue',type=str,help="Deletes unsuccessful tasks in the workflow.  Defaults to the value in cosmos.session.settings.")
     parser.add_argument('-o','--root_output_dir',type=str,default=settings['default_root_output_dir'],help="The root output directory.  Output will be stored in root_output_dir/{workflow.name}.  Defaults to the value in cosmos.session.settings.")
-    parser.add_argument('-c','--max_cores',type=int,help="Maximum number (based on the sum of cpu_requirement) of cores to use at once.")
+    parser.add_argument('-c','--max_cores',type=int,help="Maximum number (based on the sum of cpu_requirement) of cores to use at once.",default=0)
     parser.add_argument('-r','--restart',action='store_true',help="Complete restart the workflow by deleting it and creating a new one.")
     parser.add_argument('-di','--delete_intermediates',action='store_true',help="Deletes intermediate files to save scratch space.")
     parser.add_argument('-y','--prompt_confirm',action='store_false',help="Do not use confirmation prompts before restarting or deleting, and assume answer is always yes.")

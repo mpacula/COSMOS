@@ -140,13 +140,17 @@ def view_log(request,pid):
     workflow = Workflow.objects.get(pk=pid)
     return render_to_response('Workflow/view_log.html', { 'request':request,'workflow': workflow }, context_instance=RequestContext(request))
 
-def visualize(request,pid):
+def visualize(request,pid,resolution):
     workflow = Workflow.objects.get(pk=pid)
-    return render_to_response('Workflow/visualize.html', { 'request':request,'workflowDAG': WorkflowManager(workflow) }, context_instance=RequestContext(request))
+    other_resolution = 'tool' if resolution =='stage' else 'stage'
+    return render_to_response('Workflow/visualize.html', { 'request':request,'workflowDAG': WorkflowManager(workflow), 'resolution':resolution, 'other_resolution':other_resolution }, context_instance=RequestContext(request))
 
-def visualize_as_img(request,pid):
+def visualize_as_img(request,pid,resolution):
     workflow = Workflow.objects.get(pk=pid)
-    image_data = WorkflowManager(workflow).as_img()
+    if resolution=='stage':
+        image_data = workflow.stage_graph
+    else:
+        image_data = WorkflowManager(workflow).as_img()
     return HttpResponse(image_data, mimetype="image/svg+xml")
 
 

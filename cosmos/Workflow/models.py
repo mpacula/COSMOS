@@ -141,6 +141,7 @@ class Workflow(models.Model):
     delete_intermediates = models.BooleanField(default=False,help_text="Delete intermediate files")
     #cmd_executed = models.CharField(max_length=255,default=None,null=True)
     comments = models.TextField(null=True,default=None)
+    stage_graph = models.TextField(null=True,default=None)
 
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
@@ -224,7 +225,6 @@ class Workflow(models.Model):
         kwargs.setdefault('default_queue',settings['default_queue'])
         kwargs.setdefault('delete_intermediates', False)
         kwargs.setdefault('comments',None)
-        #kwargs.setdefault('max_cores',0)
 
         restart = kwargs.pop('restart',False)
         prompt_confirm = kwargs.pop('prompt_confirm',True)
@@ -307,11 +307,6 @@ class Workflow(models.Model):
         num_utasks = len(utasks)
         if num_utasks > 0:
             wf.bulk_delete_tasks(utasks)
-
-            # Update stages that are resuming
-            Stage.objects.filter(workflow=wf,successful=False,task__successful=True).update(
-                successful=False,status='in_progress',finished_on=None
-            )
         wf.save()
         return wf
 
@@ -531,7 +526,15 @@ class Workflow(models.Model):
 
     @transaction.commit_on_success
     def bulk_delete_tasks(self,tasks):
-        """Bulk deletes tasks and their related objects"""
+        """
+        Bulk deletes tasks and their related objects to this Workflow.  Does NOT delete empty stages
+
+        :param tasks: either a list of tasks or a queryset of tasks
+        """
+
+        if isinstance(tasks,list):
+            tasks = Task.objects.filter(pk__in=[t.id for t in tasks])
+
         task_output_dirs = map(lambda t: t.output_dir,tasks)
 
         self.log.info("Bulk deleting {0} tasks".format(len(tasks)))
@@ -549,6 +552,12 @@ class Workflow(models.Model):
         self.log.info('Deleting Task output directories')
         for d in task_output_dirs:
             os.system('rm -rf {0}'.format(d))
+
+        # Update stages that are not longer successful
+        Stage.objects.filter(workflow=self, successful=True, task__successful=False).update(
+                successful=False, status='in_progress', finished_on=None
+        )
+
 
     #TODO this probably doesn't have to be a transaction
     @transaction.commit_on_success
@@ -877,12 +886,17 @@ class WorkflowManager():
         return dag
 
     def createAGraph(self):
-        dag = pgv.AGraph(strict=False,directed=True,fontname="Courier",fontsize=11)
+        dag = pgv.AGraph(strict=False, directed=True, fontname="Courier")
         dag.node_attr['fontname']="Courier"
+        dag.node_attr['fontcolor']='#586e75'
         dag.node_attr['fontsize']=8
+        dag.graph_attr['fontsize']=8
+        dag.edge_attr['fontcolor']='#586e75'
+        dag.graph_attr['bgcolor']='#fdf6e3'
+
         dag.add_edges_from(self.dag.edges())
         for stage,tasks in helpers.groupby(self.dag.nodes(data=True),lambda x:x[1]['stage']):
-            sg = dag.add_subgraph(name="cluster_{0}".format(stage),label=str(stage),color='lightgrey')
+            sg = dag.add_subgraph(name="cluster_{0}".format(stage),label=str(stage),color='#b58900')
             for n,attrs in tasks:
                 def truncate_val(kv):
                     v = "{0}".format(kv[1])

@@ -37,7 +37,7 @@ def flowfxn(func,dag,*RHS):
 
     if not dag.ignore_stage_name_collisions and stage_name in dag.stage_names_used:
         raise StageNameCollision, 'Duplicate stage_names detected "{0}".  If you want to have flowfxns add tools to '.format(stage_name) + \
-                                  'existing stages, set dag.ignore_stage_name_collusions=True.'
+                                  'existing stages, set toolgraph.ignore_stage_name_collusions=True.'
 
     if stage_name not in dag.stage_names_used:
         dag.stage_names_used.append(stage_name)

@@ -204,3 +204,24 @@ def get_workflow_logger(workflow):
         return (get_logger(workflow.name,None), None)
 
 
+### Networkx
+from networkx.algorithms.traversal import depth_first_search
+import networkx as nx
+
+def get_all_dependencies(G,nodes,include_source=False):
+    """
+    :param G: a networkx digraph
+    :param nodes: a list of source nodes
+    :param include_source: include the source node in the list that's returned
+    :return: a list of nodes that are decendent from any node in `nodes`
+    """
+    g2 = nx.DiGraph()
+    g2.add_nodes_from(G.nodes())
+    g2.add_edges_from(G.edges())
+    removed = []
+    for node in nodes:
+        if node not in removed:
+            dependents = list(depth_first_search.dfs_preorder_nodes(g2,node))
+            removed += dependents if include_source else dependents[1:]
+            g2.remove_nodes_from(dependents)
+    return removed
