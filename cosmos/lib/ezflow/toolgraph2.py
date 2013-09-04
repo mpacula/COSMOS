@@ -219,6 +219,12 @@ class ToolGraph(object):
         # Get the tasks associated with the tools that already successful
         stasks = list(workflow.tasks.select_related('_output_files','stage'))
 
+
+        ### Validation
+        should_be_unique = [ (tool.stage, tuple(tool.tags.items())) for tool in self.G.nodes() ]
+        assert len(should_be_unique) == len(set(should_be_unique)), 'A stage has tools with duplicate tags'
+
+
         # Delete tasks who's dependencies have changed
         successful_already = intersect_tool_task_graphs(self.G.nodes(), stasks)
         for tool, task in successful_already:
@@ -235,7 +241,7 @@ class ToolGraph(object):
         for tool in [ tool for tool, task in successful_already if task not in changed_dependencies ]:
             tool.output_files = tool._successful_task.output_files
             tool._task_instance = tool._successful_task
-        
+
         #bulk save tasks
         new_nodes = filter(lambda n: not hasattr(n,'_task_instance'), nx.topological_sort(self.G))
         workflow.log.info('Total tasks: {0}, New tasks being added: {1}'.format(len(self.G.nodes()),len(new_nodes)))

@@ -12,9 +12,10 @@ from cosmos.config import settings
 from cosmos import django_settings
 from django.conf import settings as django_conf_settings, global_settings
 
-#custom template context processor for web interface
 django_conf_settings.configure(
+    #custom template context processor for web interface
     TEMPLATE_CONTEXT_PROCESSORS=global_settings.TEMPLATE_CONTEXT_PROCESSORS + ('cosmos.utils.context_processor.contproc',),
+    #load django settings
     **django_settings.__dict__)
 
 # User can override this to specify the drmaa_native_specification method called at job submission

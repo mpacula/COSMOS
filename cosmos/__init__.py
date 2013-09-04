@@ -1,6 +1,6 @@
 from cosmos.Workflow.models import Workflow, Stage, Task
 from cosmos.Job.models import JobAttempt
-from cosmos.lib.ezflow.toolgraph import ToolGraph, sequence_, map_,split_, reduce_, add_, apply_, split_, branch_, apply_and_seq_
+from cosmos.lib.ezflow.toolgraph2 import ToolGraph, one2one, one2many, many2one
 from cosmos.lib.ezflow.tool import Tool, INPUT
 from cosmos.Workflow import cli
 
