@@ -50,6 +50,7 @@ class TaskFile(models.Model,object):
     basename = models.CharField(max_length=50,null=True)
     persist = models.BooleanField(default=False)
     deleted_because_intermediate = models.BooleanField(default=False)
+    must_exist = models.BooleanField(default=True)
 
 
     def __init__(self,*args,**kwargs):
@@ -81,8 +82,8 @@ class TaskFile(models.Model,object):
 
         self.tmp_id = get_tmp_id()
 
-        if not re.search("^[\w]+$",self.name):
-            raise TaskFileValidationError, 'The taskfile.name must be alphanumeric. Failed name is "{0}"'.format(self.name)
+        if not re.search("^[\w\.]+$",self.name):
+            raise TaskFileValidationError, 'The taskfile.name can only contain letters, numbers, and periods. Failed name is "{0}"'.format(self.name)
 
 
     @property
@@ -611,7 +612,7 @@ class Workflow(models.Model):
         for f in task.output_files:
             if not f.path:
                 #basename = '{0}.{1}'.format('out' if f.name == f.fmt else f.name,f.fmt) if not f.basename else f.basename
-                basename = task.tags_as_query_string().replace('&','__').replace('=','_')+'.'+f.fmt
+                basename = task.tags_as_query_string().replace('&','__').replace('=','_')+'.'+f.fmt if not f.basename else f.basename
 
                 f.path = os.path.join(task.job_output_dir,basename)
                 f.save()

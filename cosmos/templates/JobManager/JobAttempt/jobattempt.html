@@ -20,16 +20,6 @@
 </div>
 <div class="box-content">
 
-
-<ul class="breadcrumb">
-  <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.task.stage.workflow.url }}">{{jobAttempt.task.stage.workflow}}</a> <span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.task.stage.url }}">{{jobAttempt.task.stage}}</a><span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task}}</a><span class="divider">/</span></li>
-  <li class="active">{{jobAttempt}}</li>
-</ul>
-
-
     <dl class="dl-horizontal dl-multicolumn" data-colcount="2">
     <dt>Status</dt><dd>
         {% with qs=jobAttempt.queue_status %}

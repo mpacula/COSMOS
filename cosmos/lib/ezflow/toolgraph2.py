@@ -5,7 +5,7 @@ from collections import namedtuple
 import networkx as nx
 import pygraphviz as pgv
 
-from cosmos.utils.helpers import groupby, get_all_dependencies
+from cosmos.utils.helpers import groupby, get_all_dependencies, validate_is_type_or_list
 from cosmos.Workflow.models import Task, TaskError
 from cosmos.lib.ezflow.tool import Tool, INPUT
 
@@ -13,15 +13,8 @@ from cosmos.lib.ezflow.tool import Tool, INPUT
 class DAGError(Exception): pass
 class StageNameCollision(Exception):pass
 class FlowFxnValidationError(Exception):pass
-class ShardError(Exception):pass
+class RelationshipError(Exception):pass
 
-def list_optional(variable, klass):
-    if isinstance(variable,list) and isinstance(variable[0],klass):
-        return variable
-    elif isinstance(variable,klass):
-        return [variable]
-    else:
-        raise TypeError, 'variable must be a list of {0} or a {0}'.format(klass)
 
 class ToolGraph(object):
     """
@@ -39,11 +32,27 @@ class ToolGraph(object):
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
 
-    def stage(self, tool=None, parents=None, shard=None, name=None, extra_tags=None):
+    def input(self,inputs,name):
+        assert isinstance(inputs,list), 'inputs must be a list'
+        assert isinstance(inputs[0], INPUT), '`inputs` must be a list of `INPUT`s'
+        tags = [ tuple(t.tags.items()) for t in inputs]
+        assert len(tags) == len(set(tags)), 'Duplicate inputs tags detected for {0}.  Tags within a stage must be unique.'.format(INPUT)
+        
+        stage = Stage(tool=INPUT, tools=inputs, parents=[], rel=None, name=name)
+
+        for input in inputs:
+            input.stage = stage
+
+        self.Stage_G.add_node(stage)
+
+        return stage
+
+
+    def stage(self, tool=None, parents=None, rel=None, name=None, extra_tags=None):
         """
         Creates a Stage in this TaskGraph
         """
-        stage = Stage(tool, parents, shard, name, extra_tags)
+        stage = Stage(tool, parents, rel, name, extra_tags)
         assert stage.name not in [n.name for n in self.Stage_G.nodes()], 'Duplicate stage names detected: {0}'.format(stage.name)
 
         self.Stage_G.add_node(stage)
@@ -92,7 +101,7 @@ class ToolGraph(object):
                 for tool in stage.tools:
                     self.add_tool_to_G(tool)
 
-            elif isinstance(stage.shard,one2one):
+            elif isinstance(stage.rel,one2one):
                 for parent_tool in it.chain(*[ s.tools for s in stage.parents ]):
                     tags2 = parent_tool.tags.copy()
                     tags2.update(stage.extra_tags)
@@ -100,8 +109,8 @@ class ToolGraph(object):
                     stage.tools.append(new_tool)
                     self.add_tool_to_G(new_tool,[parent_tool])
 
-            elif isinstance(stage.shard, many2one):
-                keywords = stage.shard.keywords
+            elif isinstance(stage.rel, many2one):
+                keywords = stage.rel.keywords
                 if type(keywords) != list:
                     raise TypeError('keywords must be a list')
                 if any(k == '' for k in keywords):
@@ -111,7 +120,7 @@ class ToolGraph(object):
                 parent_tools_without_all_keywords = filter(lambda t: not all([k in t.tags for k in keywords]), parent_tools)
                 parent_tools_with_all_keywords = filter(lambda t: all(k in t.tags for k in keywords), parent_tools)
 
-                if len(parent_tools_with_all_keywords) == 0: raise ShardError, 'Parent stages must have at least one tool with all many2one keywords of {0}'.format(keywords)
+                if len(parent_tools_with_all_keywords) == 0: raise RelationshipError, 'Parent stages must have at least one tool with all many2one keywords of {0}'.format(keywords)
 
                 for tags, parent_tool_group in groupby(parent_tools_with_all_keywords, lambda t: dict((k,t.tags[k]) for k in keywords if k in t.tags)):
                     parent_tool_group = list(parent_tool_group) + parent_tools_without_all_keywords
@@ -120,10 +129,10 @@ class ToolGraph(object):
                     stage.tools.append(new_tool)
                     self.add_tool_to_G(new_tool,parent_tool_group)
 
-            elif isinstance(stage.shard, one2many):
+            elif isinstance(stage.rel, one2many):
                 parent_tools = list(it.chain(*[ s.tools for s in stage.parents ]))
                 #: splits = [[(key1,val1),(key1,val2),(key1,val3)],[(key2,val1),(key2,val2),(key2,val3)],[...]]
-                splits = [ list(it.product([split[0]],split[1])) for split in stage.shard.split_by ]
+                splits = [ list(it.product([split[0]],split[1])) for split in stage.rel.split_by ]
                 for parent_tool in parent_tools:
                     for new_tags in it.product(*splits):
                         tags = dict(parent_tool.tags).copy()
@@ -155,12 +164,12 @@ class ToolGraph(object):
         if resolution=='stage':
             dag.add_nodes_from([ n.label for n in self.Stage_G.nodes() ])
             for u,v,attr in self.Stage_G.edges(data=True):
-                if isinstance(v.shard,many2one):
-                    dag.add_edge(u.label,v.label,label=v.shard,style='dotted',arrowhead='odiamond')
-                elif isinstance(v.shard,one2many):
-                    dag.add_edge(u.label,v.label,label=v.shard,style='dashed',arrowhead='crow')
+                if isinstance(v.rel,many2one):
+                    dag.add_edge(u.label,v.label,label=v.rel,style='dotted',arrowhead='odiamond')
+                elif isinstance(v.rel,one2many):
+                    dag.add_edge(u.label,v.label,label=v.rel,style='dashed',arrowhead='crow')
                 else:
-                    dag.add_edge(u.label,v.label,label=v.shard,arrowhead='vee')
+                    dag.add_edge(u.label,v.label,label=v.rel,arrowhead='vee')
         elif resolution=='tool':
             dag.add_nodes_from(self.G.nodes())
             dag.add_edges_from(self.G.edges())
@@ -227,6 +236,7 @@ class ToolGraph(object):
 
         # Delete tasks who's dependencies have changed
         successful_already = intersect_tool_task_graphs(self.G.nodes(), stasks)
+        
         for tool, task in successful_already:
             tool._successful_task = task
 
@@ -295,11 +305,11 @@ class ToolGraph(object):
         workflow.run(finish=finish)
 
 
-    def __new_task(self,stage,tool):
+    def __new_task(self,django_stage,tool):
         """
         Instantiates a task from a tool.  Assumes TaskFiles already have real primary keys.
 
-        :param stage: The stage the task should belong to.
+        :param django_stage: The Stage (of the django model type) that the task should belong to.
         :param tool: The Tool.
         """
         pcmd = tool.pcmd
@@ -309,7 +319,7 @@ class ToolGraph(object):
 
         try:
             return Task(
-                      stage = stage,
+                      stage = django_stage,
                       pcmd = pcmd,
                       tags = tool.tags,
                       memory_requirement = tool.mem_req * self.mem_req_factor,
@@ -322,8 +332,8 @@ class ToolGraph(object):
 
 
 
-class Shard(object):
-    """Abstract Class for the various shard strategies"""
+class Relationship(object):
+    """Abstract Class for the various rel strategies"""
     def __init__(self,*args,**kwargs):
         self.args = args
         self.kwargs = kwargs
@@ -331,15 +341,15 @@ class Shard(object):
         m = re.search("^(\w).+2(\w).+$",type(self).__name__)
         return '{0}2{1}'.format(m.group(1),m.group(2))
 
-class one2one(Shard):
+class one2one(Relationship):
     pass
 
-class many2one(Shard):
+class many2one(Relationship):
     def __init__(self,keywords,*args,**kwargs):
         assert isinstance(keywords, list), '`keywords` must be a list'
         self.keywords = keywords
-        super(Shard,self).__init__(*args,**kwargs)
-class one2many(Shard):
+        super(Relationship,self).__init__(*args,**kwargs)
+class one2many(Relationship):
     def __init__(self,split_by,*args,**kwargs):
         assert isinstance(split_by, list), '`split_by` must be a list'
         if len(split_by) > 0:
@@ -348,44 +358,34 @@ class one2many(Shard):
             assert isinstance(split_by[0][1],list), 'the second element of the tuples in the `split_by` list must also be a list'
 
         self.split_by = split_by
-        super(Shard,self).__init__(*args,**kwargs)
+        super(Relationship,self).__init__(*args,**kwargs)
 
 class Stage():
-    def __init__(self, tool=None, parents=None, shard=None, name=None, extra_tags=None):
+    def __init__(self, tool=None, parents=None, rel=None, name=None, extra_tags=None, tools=None, ):
         if parents is None:
             parents = []
+        if tools is None:
+            tools = []
+        if tools and tool and not issubclass(tool,INPUT):
+            raise TypeError, 'cannot initialize with both a `tool` and `tools` set unless is an INPUT'
         if extra_tags is None:
             extra_tags = {}
-        if shard == one2one or shard is None:
-            shard = one2one()
+        if rel == one2one or rel is None:
+            rel = one2one()
 
-        if isinstance(tool,type):
-            # Stage initialized normally
-            assert issubclass(tool, Tool), '`tool` must be a subclass of `Tool`'
-            assert isinstance(shard,Shard), '`shard` must be of type `Shard`'
+        assert issubclass(tool, Tool), '`tool` must be a subclass of `Tool`'
+        assert isinstance(rel,Relationship), '`rel` must be of type `Relationship`'
 
-            self.tool = tool
-            self.tools = []
-            self.parents = list_optional(parents, Stage)
-            self.shard = shard
-
-        elif isinstance(tool,list):
-            # Stage initialized from a set of INPUTs
-            assert isinstance(tool[0], INPUT), '`tools` must be a list of `INPUT`s'
-            tags = [ tuple(t.tags.items()) for t in tool]
-            assert len(tags) == len(set(tags)), 'Duplicate tool tags detected for {0}.  Tags within a stage must be unique.'.format(INPUT)
-            self.tool = INPUT
-            self.tools = tool
-            self.parents = []
-            self.shard = None
-
-            for tool in self.tools:
-                tool.stage = self
-        else:
-            raise TypeError, 'Incorrect parameter types'
+        self.tool = tool
+        self.tools = tools
+        self.parents = validate_is_type_or_list(parents, Stage)
+        self.rel = rel
 
         self.extra_tags = extra_tags
         self.name = name or self.tool.__name__
+
+        if not re.search(r"^\w+$",self.name):
+            raise ValueError, 'Stage name `{0}` must be alphanumeric'.format(self.name)
 
 
     @property

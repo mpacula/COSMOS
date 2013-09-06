@@ -243,7 +243,11 @@ class Tool(object):
 
         if 'i' in p.keys():
             raise ToolValidationError, "i is a reserved name for inputs, and cannot be used as a keyword tag name"
-        callargs = getcallargs(self.cmd,i=self.map_inputs(),s=self.settings,**p)
+
+        try:
+            callargs = getcallargs(self.cmd,i=self.map_inputs(),s=self.settings,**p)
+        except TypeError:
+            raise TypeError, 'Invalid parameters for {0}.cmd()'.format(self)
 
         del callargs['self']
         r = self.cmd(**callargs)
@@ -308,10 +312,11 @@ class INPUT(Tool):
     >>> INPUT('/path/to/file.ext',tags={'key':'val'})
     >>> INPUT(path='/path/to/file.ext.gz',name='ext',fmt='ext.gz',tags={'key':'val'})
     """
-    name = "Load Input Files"
+    name = "Load_Input_Files"
     NOOP = True
     mem_req = 0
     cpu_req = 0
+    persist=True
     
     def __init__(self,path,tags,name=None,fmt=None,*args,**kwargs):
         """

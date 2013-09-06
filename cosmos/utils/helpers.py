@@ -139,7 +139,16 @@ def validate_name(txt,field_name=''):
 def validate_not_null(field):
     if field == None:
         raise ValidationException('Required field left blank')
-    
+
+def validate_is_type_or_list(variable, klass):
+    if isinstance(variable,list) and (len(variable) == 0 or isinstance(variable[0],klass)):
+        return variable
+    elif isinstance(variable,klass):
+        return [variable]
+    else:
+        raise TypeError, '{0} must be a list of {1} or a {1}'.format(variable,klass)
+
+
 def check_and_create_output_dir(path):
     """
     checks if a path exists and whether its valid.  If it does not exist, create it
@@ -202,6 +211,8 @@ def get_workflow_logger(workflow):
         return (get_logger(workflow.name,path), path)
     else:
         return (get_logger(workflow.name,None), None)
+
+
 
 
 ### Networkx

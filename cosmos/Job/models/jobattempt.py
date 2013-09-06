@@ -197,7 +197,7 @@ class JobAttempt(models.Model):
         """Function for JobManager to Run when this JobAttempt finishes"""
 
         # Make sure output files actually exists
-        if successful and any([ not os.path.exists(o.path) or os.stat(o.path) == 0 for o in self.task.output_files ]):
+        if successful and any([ o.must_exist and (not os.path.exists(o.path) or os.stat(o.path) == 0) for o in self.task.output_files ]):
             successful = False
             status_details = 'Failed due to empty output file'
 
