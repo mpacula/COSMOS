@@ -1,10 +1,9 @@
-import re, sys, pprint
 import itertools as it
 import copy
 from inspect import getargspec
 
-from cosmos.lib.ezflow.helpers import getcallargs,cosmos_format
-from cosmos.Workflow.models import TaskFile
+from cosmos.flow.helpers import getcallargs,cosmos_format
+from cosmos.models import TaskFile
 from cosmos.utils.helpers import parse_cmd
 
 
@@ -91,7 +90,7 @@ class Tool(object):
                 tf = TaskFile(fmt=output,persist=self.persist)
                 self.add_output(tf)
             else:
-                raise ToolValidationError, "{0}.outputs must be a list strs or Taskfile instances.".format(self)
+                raise ToolValidationError, "{0}.outputs must be a list of strs or Taskfile instances.".format(self)
 
         #validate inputs are strs
         if any([ not isinstance(i,str) for i in self.inputs]):
@@ -106,7 +105,7 @@ class Tool(object):
 
     @property
     def children(self):
-        return self.dag.G.successors(self)
+        return self.dag.tool_G.successors(self)
 
     @property
     def child(self):
@@ -120,7 +119,7 @@ class Tool(object):
 
     @property
     def parents(self):
-        return self.dag.G.predecessors(self)
+        return self.dag.tool_G.predecessors(self)
     
     @property
     def parent(self):
@@ -131,32 +130,6 @@ class Tool(object):
             raise ToolError('{0} has no parents'.format(self))
         else:
             return ps[0]
-    
-    # def get_output(self,name,error_if_missing=True):
-    #     """
-    #     Returns the output TaskFiles who's name == name.  This should always be one element.
-    #
-    #     :param name: the name of the output file.
-    #     :param error_if_missing: (bool) Raises a GetOutputError if the output cannot be found
-    #     """
-    #
-    #     output_files = filter(lambda x: x.name == name, self.output_files)
-    #
-    #     if len(output_files) > 1: raise GetOutputError('More than one output with name {0} in {1}'.format(name,self),name)
-    #
-    #     if len(output_files) == 0:# and self.forward_input:
-    #         try:
-    #             output_files +=  [ p.get_output(name) for p in self.parents ]
-    #         except GetOutputError as e:
-    #             pass
-    #
-    #     if len(output_files) == 0:
-    #         if error_if_missing:
-    #             raise GetOutputError('No output file in {0} with name {1}.'.format(self,name),name)
-    #         else:
-    #             return None
-    #     else:
-    #         return output_files[0]
 
     def get_output(self,name,error_if_missing=True):
         for o in self.output_files:
@@ -172,10 +145,7 @@ class Tool(object):
 
         if error_if_missing:
             raise ToolError, 'Output named `{0}` does not exist in {1}'.format(name,self)
-    
-    # def get_output_file_names(self):
-    #     return set(map(lambda x: x.name, self.output_files))
-        
+
     def add_output(self,taskfile):
         """
         Adds an taskfile to self.output_files
@@ -204,7 +174,6 @@ class Tool(object):
             return {}
 
         else:
-            all_inputs = []
             if '*' in self.inputs:
                 return {'*':[ o for p in self.parents for o in p.output_files ]}
 
@@ -241,11 +210,12 @@ class Tool(object):
             if argspec.keywords or k in tool_parameter_names:
                 p[k] = v
 
-        if 'i' in p.keys():
-            raise ToolValidationError, "i is a reserved name for inputs, and cannot be used as a keyword tag name"
+        for l in ['i','o','s']:
+            if l in p.keys():
+                raise ToolValidationError, "{0} is a reserved name, and cannot be used as a tag keyword".format(l)
 
         try:
-            callargs = getcallargs(self.cmd,i=self.map_inputs(),s=self.settings,**p)
+            callargs = getcallargs(self.cmd,i=self.map_inputs(),o={ o.name:o for o in self.output_files}, s=self.settings,**p)
         except TypeError:
             raise TypeError, 'Invalid parameters for {0}.cmd()'.format(self)
 
@@ -256,20 +226,20 @@ class Tool(object):
         extra_format_dict = r[1] if len(r) == 2 and r else {}
         pcmd = r[0] if len(r) == 2 else r
 
-        #replace $OUT with a string representation of a taskfile
-        out_names = re.findall('\$OUT\.([\.\w]+)',pcmd)
-        for out_name in out_names:
-            try:
-                pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
-            except GetOutputError as e:
-                raise ToolValidationError('Invalid key in $OUT.key ({0}), available output_file keys in {1} are {2}'.format(out_name,self,self.get_output_file_names()))
-
-        #Validate all output_files have an $OUT
-        for tf in self.output_files:
-            if tf.name not in out_names:
-                raise ToolValidationError,\
-                    'An output taskfile with name {1} is in {0}.output_files but not referenced with $OUT in the tool\'s command.'.\
-                        format(self,tf.name)
+        # #replace $OUT with a string representation of a taskfile
+        # out_names = re.findall('\$OUT\.([\.\w]+)',pcmd)
+        # for out_name in out_names:
+        #     try:
+        #         pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
+        #     except GetOutputError as e:
+        #         raise ToolValidationError('Invalid key in $OUT.key ({0}), available output_file keys in {1} are {2}'.format(out_name,self,self.get_output_file_names()))
+        #
+        # #Validate all output_files have an $OUT
+        # for tf in self.output_files:
+        #     if tf.name not in out_names:
+        #         raise ToolValidationError,\
+        #             'An output taskfile with name {1} is in {0}.output_files but not referenced with $OUT in the tool\'s command.'.\
+        #                 format(self,tf.name)
                 
         #format() return string with callargs
         callargs['self'] = self

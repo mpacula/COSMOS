@@ -3,6 +3,6 @@ from cosmos import main
 
 if __name__ == '__main__':
     try:
-        main.main()
+        main.parse_args()
     except KeyboardInterrupt:
         print "Interrupted, exiting."

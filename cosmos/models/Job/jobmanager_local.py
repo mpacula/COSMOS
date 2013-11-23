@@ -1,9 +1,9 @@
-from cosmos import session
-from jobattempt import JobAttempt
-from jobmanager import JobManagerBase
 from subprocess import Popen
-import signal
 import os
+
+from cosmos.models.Job.jobattempt import JobAttempt
+from cosmos.models.Job.jobmanager import JobManagerBase
+
 
 class JobStatusError(Exception):
     pass

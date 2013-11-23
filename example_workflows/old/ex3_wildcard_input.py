@@ -1,6 +1,9 @@
-from cosmos.Workflow.models import Workflow
-from cosmos.lib.ezflow.toolgraph import ToolGraph, Split, Add, Map
-from tools import ECHO, CAT, WC, FAIL
+from cosmos.flow.toolgraph import ToolGraph, Split, Add, Map, Reduce
+from tools import ECHO, MD5Sum
+from cosmos.Workflow.cli import CLI
+
+cli = CLI()
+WF = cli.parse_args() # parses command line arguments
 
 ####################
 # Workflow
@@ -8,17 +11,14 @@ from tools import ECHO, CAT, WC, FAIL
 
 dag = ( ToolGraph()
     |Add| [ ECHO(tags={'word':'hello'}), ECHO(tags={'word':'world'}) ]
-    |Split| ([('i',[1,2])],CAT)
-    |Map| FAIL
-    |Map| WC
-
+    |Reduce| ([],MD5Sum)
 )
+
 dag.create_dag_img('/tmp/ex.svg')
 
 #################
 # Run Workflow
 #################
 
-WF = Workflow.start('Example Fail')
 dag.add_to_workflow(WF)
 WF.run()

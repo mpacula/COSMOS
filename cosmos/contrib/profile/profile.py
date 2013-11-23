@@ -39,12 +39,12 @@ class Profile:
                                ['num_threads'] #/proc/stat
                      }
     
-    proc = None #the main subprocess object
+    proc = None #the parse_args subprocess object
     poll_number = 0 #number of polls so far
     
     @property
     def all_pids(self):
-        """This main process and all of its descendant's pids"""
+        """This parse_args process and all of its descendant's pids"""
         return self.and_descendants(os.getpid())
     
     def __init__(self,command,poll_interval=1,output_file=None,database_file=':memory:'):
@@ -126,14 +126,14 @@ class Profile:
                 #Inserts
                 inserts = [ (name,self.parseVal(val)) for name,val in all_stats if name in self.fields_to_get['INSERT'] ] + [('pid',pid),('poll_number',self.poll_number)]
                 keys,vals = zip(*inserts) #unzip
-                q = "INSERT INTO record ({keys}) values({s})".format(s = ','.join(['?']*len(vals)),
+                q = "INSERT INTO record ({keys}) values({s})".format(s = ', '.join(['?']*len(vals)),
                                                                      keys = ', '.join(keys))
                 self.c.execute(q,vals)
                 #Updates
                 proc_name = filter(lambda x: x[0]=='Name' ,all_stats)[0][1]
                 updates = [ (name,self.parseVal(val)) for name,val in all_stats if name in self.fields_to_get['UPDATE'] ] + [('pid',pid),('Name',proc_name),('poll_number',self.poll_number)]
                 keys,vals = zip(*updates) #unzip
-                q = "INSERT OR REPLACE INTO process ({keys}) values({s})".format(s = ','.join(['?']*len(vals)),
+                q = "INSERT OR REPLACE INTO process ({keys}) values({s})".format(s = ', '.join(['?']*len(vals)),
                                                                      keys = ', '.join(keys))
                 self.c.execute(q,vals)
                 
@@ -250,7 +250,6 @@ class Profile:
 
 
 if __name__ == '__main__':
-    #Argparse
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-f', '--file', type=argparse.FileType('w'), help='File to store output of profile to.')
     parser.add_argument('-i', '--interval', type=int, default=1, help='How often to poll the resource usage information in /proc, in seconds.')

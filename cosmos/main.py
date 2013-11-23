@@ -2,9 +2,9 @@
 Cosmos command line interface
 """
 import argparse
-import os,sys
-from cosmos.Workflow.models import Workflow
-from cosmos.utils.helpers import confirm,representsInt
+import sys
+from cosmos.models import Workflow
+from cosmos.utils.helpers import confirm, representsInt
 
 
 def ls(workflow):
@@ -26,7 +26,8 @@ def ls(workflow):
         for w in Workflow.objects.all():
             print w
 
-def rm(workflows,prompt_confirm,stage_number,all_stages_after):
+
+def rm(workflows, prompt_confirm, stage_number, all_stages_after):
     """
     Deletes a workflow
 
@@ -34,18 +35,21 @@ def rm(workflows,prompt_confirm,stage_number,all_stages_after):
     $ cosmos rm 1,2,3   # deletes workflows 1, 2 and 3
     $ cosmos rm 1 3 -ay # deletes stage 3 and all stages that come after it, without prompting
     """
-    workflows = [  Workflow.objects.get(pk=w) if representsInt(w) else Workflow.objects.get(name=w)
-                   for w in workflows.split(',') ]
+    workflows = [Workflow.objects.get(pk=w) if representsInt(w) else Workflow.objects.get(name=w)
+                 for w in workflows.split(',')]
     for wf in workflows:
         if stage_number:
             stage = wf.stages.get(order_in_workflow=stage_number)
             if not prompt_confirm or confirm('Are you sure you want to delete the stage "{0}/{1}"{2}?'.
-                                             format(wf,stage,' and all stages after it' if all_stages_after else ''),
-                                             default=False,timeout=60):
-                for s in wf.stages.filter(order_in_workflow__gt=stage.order_in_workflow-1) if all_stages_after else wf.stages.filter(order_in_workflow = stage.order_in_workflow):
+                                             format(wf, stage, ' and all stages after it' if all_stages_after else ''),
+                                             default=False, timeout=60):
+                for s in wf.stages.filter(
+                        order_in_workflow__gt=stage.order_in_workflow - 1) if all_stages_after else wf.stages.filter(
+                        order_in_workflow=stage.order_in_workflow):
                     s.delete()
         else:
-            if not prompt_confirm or confirm('Are you sure you want to delete {0}?'.format(wf),default=False,timeout=60):
+            if not prompt_confirm or confirm('Are you sure you want to delete {0}?'.format(wf), default=False,
+                                             timeout=60):
                 wf.delete()
 
 #
@@ -61,6 +65,7 @@ def shell():
     """
     django_manage('shell_plus'.split(' '))
 
+
 def syncdb():
     "Sets up the SQL database"
     django_manage('syncdb --noinput'.split(' '))
@@ -69,7 +74,8 @@ def syncdb():
 def collectstatic():
     "Collects static files for the web interface"
     django_manage('collectstatic --noinput'.split(' '))
-    
+
+
 def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"
     django_manage('reset_db -R default'.split(' '))
@@ -82,41 +88,45 @@ def runweb(port):
     """
     django_manage('runserver 0.0.0.0:{0}'.format(port).split(' '))
 
+
 def django_manage(django_args):
     "Django manage.py script"
     from django.core.management import execute_from_command_line
-    execute_from_command_line([sys.argv[0]]+django_args)
 
-def main():
-    parser = argparse.ArgumentParser(description='Cosmos CLI')
+    execute_from_command_line([sys.argv[0]] + django_args)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(title="Commands", metavar="<command>")
 
-    subparsers.add_parser('resetdb',help=resetdb.__doc__).set_defaults(func=resetdb)
+    subparsers.add_parser('resetdb', help=resetdb.__doc__).set_defaults(func=resetdb)
 
-    subparsers.add_parser('shell',help=shell.__doc__).set_defaults(func=shell)
-#    subparsers.add_parser('init',help=init.__doc__).set_defaults(func=init)
+    subparsers.add_parser('shell', help=shell.__doc__).set_defaults(func=shell)
+    #    subparsers.add_parser('init',help=init.__doc__).set_defaults(func=init)
 
-    subparsers.add_parser('syncdb',help=syncdb.__doc__).set_defaults(func=syncdb)
-    sp=subparsers.add_parser('collectstatic',help=collectstatic.__doc__).set_defaults(func=collectstatic)
+    subparsers.add_parser('syncdb', help=syncdb.__doc__).set_defaults(func=syncdb)
+    sp = subparsers.add_parser('collectstatic', help=collectstatic.__doc__).set_defaults(func=collectstatic)
 
-    django_sp = subparsers.add_parser('django',help=django_manage.__doc__)
+    django_sp = subparsers.add_parser('django', help=django_manage.__doc__)
     django_sp.set_defaults(func=django_manage)
     django_sp.add_argument('django_args', nargs=argparse.REMAINDER)
 
-    sp=subparsers.add_parser('ls',help=ls.__doc__)
+    sp = subparsers.add_parser('ls', help=ls.__doc__)
     sp.set_defaults(func=ls)
-    sp.add_argument('workflow',type=str,help="Workflow id or name",nargs="?")
+    sp.add_argument('workflow', type=str, help="Workflow id or name", nargs="?")
 
-    sp = subparsers.add_parser('rm',help=rm.__doc__)
+    sp = subparsers.add_parser('rm', help=rm.__doc__)
     sp.set_defaults(func=rm)
-    sp.add_argument('workflows',type=str,help="Workflow id or workflow name, can be comma separated")
-    sp.add_argument('stage_number',type=int,help="Delete this stage",nargs="?")
-    sp.add_argument('-a','--all_stages_after',action='store_true',help="If a stage_number is specified, delete all stages that come after that stage as well")
-    sp.add_argument('-y','--prompt_confirm',action='store_false',default=True)
+    sp.add_argument('workflows', type=str, help="Workflow id or workflow name, can be comma separated")
+    sp.add_argument('stage_number', type=int, help="Delete this stage", nargs="?")
+    sp.add_argument('-a', '--all_stages_after', action='store_true',
+                    help="If a stage_number is specified, delete all stages that come after that stage as well")
+    sp.add_argument('-y', '--prompt_confirm', action='store_false', default=True)
 
-    runweb_sp = subparsers.add_parser('runweb',help=runweb.__doc__)
+    runweb_sp = subparsers.add_parser('runweb', help=runweb.__doc__)
     runweb_sp.set_defaults(func=runweb)
-    runweb_sp.add_argument('-p','--port',help='port to serve on',default='8080')
+    runweb_sp.add_argument('-p', '--port', help='port to serve on', default='8080')
 
     a = parser.parse_args()
     kwargs = dict(a._get_kwargs())

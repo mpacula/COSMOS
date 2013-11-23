@@ -1,8 +1,7 @@
-from cosmos import session
 from django.db import models
 from django.utils import timezone
 import os,sys
-from . import JobAttempt
+from .jobattempt import JobAttempt
 from cosmos.utils.helpers import check_and_create_output_dir
 from cosmos.utils.helpers import spinning_cursor
 import time
@@ -44,6 +43,7 @@ class JobManagerBase(models.Model):
         os.system('chmod 700 {0}'.format(jobAttempt.command_script_path))
 
     def _create_cmd_str(self,jobAttempt):
+        from cosmos import session
         "The command to be stored in the command.sh script"
         return "python {profile} -f {profile_out} {command_script_path}".format(
             profile = os.path.join(session.settings['cosmos_library_path'],'contrib/profile/profile.py'),

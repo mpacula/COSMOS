@@ -29,4 +29,4 @@ Glossary
         Directed Acyclic Graph.  A DAG is used byCosmos to describe a workflow's jobs and their dependencies on each other.
 
     Django
-        A Python web framework that much of Cosmos is built on.
+        A Python runweb framework that much of Cosmos is built on.

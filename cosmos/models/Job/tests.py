@@ -1,9 +1,12 @@
-from django.test import TestCase
-import random, string
+import random
+import string
 import os
-from models import JobManager,JobAttempt
-from models import JobStatusError
 import tempfile
+
+from django.test import TestCase
+from cosmos.models import JobManager
+from cosmos.models import JobStatusError
+
 
 def slow(f):
     def decorated(self):

@@ -75,38 +75,34 @@
 
 <br/>
 
-<div class="row-fluid">
-    <div class="box span6">
-        <div class="box-header">
-            <h2><i class="icon-volume-up"></i><span class="break"></span>
-                STDOUT
-            </h2>
-        </div>
-        <div class="box-content">
-            <p class="filepath">{{jobAttempt.STDOUT_filepath}}</p>
-            <pre class="pre-scrollable alert alert-info">{{jobAttempt.STDOUT_txt}}</pre>
-        </div>
-    </div>
-
-    <div class="box span6">
-        <div class="box-header">
-            <h2><i class="icon-volume-off"></i><span class="break"></span>
-                STDERR
-            </h2>
-        </div>
-        <div class="box-content">
-            <p class="filepath">{{jobAttempt.STDERR_filepath}}</p>
-            <pre class="pre-scrollable alert alert-error">{{jobAttempt.STDERR_txt}}</pre>
-        </div>
-    </div>
+<div class="box-header">
+    <h2><i class="icon-volume-up"></i><span class="break"></span>
+        STDOUT
+    </h2>
 </div>
+<div class="box-content">
+    <p class="filepath">{{jobAttempt.STDOUT_filepath}}</p>
+    <pre class="pre-scrollable alert alert-info">{{jobAttempt.STDOUT_txt}}</pre>
+</div>
+
+<br/>
+
+<div class="box-header">
+    <h2><i class="icon-volume-off"></i><span class="break"></span>
+        STDERR
+    </h2>
+</div>
+<div class="box-content">
+    <p class="filepath">{{jobAttempt.STDERR_filepath}}</p>
+    <pre class="pre-scrollable alert alert-error">{{jobAttempt.STDERR_txt}}</pre>
+</div>
+
 <br/>
 
 <div class="box-header">
     <h2><i class="icon-wrench"></i><span class="break"></span>
         Resource Usage
     </h2>
-
 </div>
 <div class="box-content">
     <table class="table table-condensed tab">

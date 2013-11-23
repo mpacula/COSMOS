@@ -1,4 +1,3 @@
-from cosmos import session
 from django.db import models
 import os,re,json
 from picklefield.fields import PickledObjectField

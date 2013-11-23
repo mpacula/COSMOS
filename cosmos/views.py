@@ -1,15 +1,17 @@
+import os
+import math
+
 from django.shortcuts import render_to_response,render
 from django.template import RequestContext
 from django.http import HttpResponse
-from cosmos.Workflow.models import Workflow, Stage, Task, TaskTag, WorkflowManager, TaskFile
+from cosmos.models import Workflow, Stage, Task, TaskTag, WorkflowManager, TaskFile, JobAttempt
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from cosmos.utils.helpers import groupby
-from models import status_choices
+from cosmos.models.Workflow.models import status_choices
 from django.utils.datastructures import SortedDict
-import os
 from django.views.decorators.cache import never_cache
 from django.utils.safestring import mark_safe
-import math
+
 
 @never_cache
 def _get_stages_dict(workflow):
@@ -70,7 +72,7 @@ def __get_context_for_stage_task_table(request,pid):
         fs = request.GET.get('f_status')
         if fs != None and fs != '':
             tasks_list = tasks_list.filter(status=request.GET['f_status'])
-        
+
         filter_url = 'filter=True&'+'&'.join([ '{0}={1}'.format(k,v) for k,v in all_filters.items() ]) #url to retain this filter
         mark_safe(filter_url)
     else:
@@ -90,8 +92,8 @@ def __get_context_for_stage_task_table(request,pid):
         # If page is out of range (e.g. 9999), deliver last page of results.
         tasks = paginator.page(paginator.num_pages)
     page_slice = "{0}:{1}".format(page,int(page)+19)
-    
-    
+
+
     return { 'request':request,'stage': stage,'page_size':page_size,'paged_tasks':tasks, 'page_slice':page_slice, 'current_filters':all_filters, 'filter_url':filter_url }
 
 @never_cache
@@ -105,8 +107,8 @@ def stage_view(request,wf_id,stage_name):
     filter_choices = __get_filter_choices(stage)
     task_table_context = __get_context_for_stage_task_table(request,stage.id)
     this_context = {'request':request, 'stage': stage, 'filter_choices':filter_choices}
-    for k,v in task_table_context.items(): this_context[k] = v 
-    
+    for k,v in task_table_context.items(): this_context[k] = v
+
     return render_to_response('Workflow/Stage/view.html', this_context, context_instance=RequestContext(request))
 
 @never_cache
@@ -179,4 +181,23 @@ def analysis(request,pid):
     return render_to_response('Workflow/analysis.html', { 'request':request,'plot_url':plot_url,'resource_usage_url':ru_url}, context_instance=RequestContext(request))
 
 
+####
+# Job
+####
+
+
+@never_cache
+def jobAttempt(request,jobid):
+    jobAttempt = JobAttempt.objects.get(pk=jobid)
+    return render_to_response('JobManager/JobAttempt/view.html', { 'request':request,'jobAttempt': jobAttempt }, context_instance=RequestContext(request))
+
+@never_cache
+def jobAttempt_profile_output(request,jobid):
+    jobAttempt = JobAttempt.objects.get(pk=jobid)
+    output_path = jobAttempt.profile_output_path
+    if os.path.exist(output_path):
+        output = file(output_path,'rb').read(int(math.pow(2,10)*100)) #read at most 100kb
+    else:
+        output = 'IOError.  File probably does not exist'
+    return render_to_response('Workflow/TaskFile/view.html', { 'request': request,'output_path': output_path, 'output_name':'profile output','output': output, 'jobAttempt': jobAttempt }, context_instance=RequestContext(request))
 

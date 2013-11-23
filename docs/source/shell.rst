@@ -44,7 +44,7 @@ You can even run a workflow:
 Filtering
 ++++++++++
 
-pk is a shortcut for primary key, so you can use this to quickly get objects you're seeing in the web interface,
+pk is a shortcut for primary key, so you can use this to quickly get objects you're seeing in the runweb interface,
 which is always displayed.  For example, if you see "Stage[200] Stage Name", you can query for it like so
 
 .. code-block:: python

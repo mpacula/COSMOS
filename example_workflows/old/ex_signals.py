@@ -65,7 +65,7 @@ def email_on_fail(sender, status, **kwargs):
 # Workflow
 ####################
 
-from cosmos.lib.ezflow.toolgraph import ToolGraph, Map, Split, Add
+from cosmos.flow.toolgraph import ToolGraph, Map, Split, Add
 import tools
 
 dag = ( ToolGraph().

@@ -6,8 +6,8 @@ series of stages.
 cosmos.lib.ezflow.dag.DAG.branch() is the key to branching.
 """
 
-from cosmos.Workflow.models import Workflow
-from cosmos.lib.ezflow.toolgraph import ToolGraph
+from cosmos.models.Workflow.models import Workflow
+from cosmos.flow.toolgraph import ToolGraph
 import tools
 
 ####################

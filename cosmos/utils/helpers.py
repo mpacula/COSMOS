@@ -205,7 +205,7 @@ def get_workflow_logger(workflow):
     Returns a logger configured for a Workflow
     """
     log_dir = os.path.join(workflow.output_dir,'log')
-    path = os.path.join(log_dir,'main.log')
+    path = os.path.join(log_dir,'parse_args.log')
     if os.path.exists(workflow.output_dir):
         check_and_create_output_dir(log_dir)
         return (get_logger(workflow.name,path), path)
@@ -233,6 +233,7 @@ def get_all_dependencies(G,nodes,include_source=False):
     for node in nodes:
         if node not in removed:
             dependents = list(depth_first_search.dfs_preorder_nodes(g2,node))
-            removed += dependents if include_source else dependents[1:]
+            dependents = dependents if include_source else dependents[1:]
+            removed += dependents
             g2.remove_nodes_from(dependents)
     return removed

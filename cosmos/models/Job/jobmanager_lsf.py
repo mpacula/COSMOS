@@ -1,8 +1,10 @@
-from jobattempt import JobAttempt
-from jobmanager import JobManagerBase
 from subprocess import Popen, PIPE
 import os
 import re
+
+from cosmos.models.Job.jobattempt import JobAttempt
+from cosmos.models.Job.jobmanager import JobManagerBase
+
 
 class JobStatusError(Exception):
     pass

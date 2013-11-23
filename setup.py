@@ -30,19 +30,16 @@ setup(name='cosmos',
     install_requires=[
         'distribute>=0.6.28',
         'Django==1.4.3',
-        'MySQL-python==1.2.4',
-        'argparse==1.2.1',
         'configobj==4.7.2',
         'decorator==3.4.0',
         'django-extensions==1.0.3',
         'django-picklefield==0.3.0',
-        'docutils==0.10',
         'drmaa==0.5',
-        'ipython==0.13.1',
-        'networkx==1.7',
-        'pygraphviz==1.1',
-        'six==1.2.0',
-        'wsgiref==0.1.2',
+        'ipython',
+        'networkx',
+        'pygraphviz',
         'ordereddict'
+        'pyparsing==1.5.7',
+        'pydot'
     ]
 )

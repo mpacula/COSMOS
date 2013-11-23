@@ -3,7 +3,7 @@
 Getting Started
 ===============
 
-We'll start by running a simple test workflow, exploring it via the web interface, and terminating it.  Then
+We'll start by running a simple test workflow, exploring it via the runweb interface, and terminating it.  Then
 you'll be ready to start learning how to write your own.
 
 Execute an Example Workflow
@@ -55,7 +55,7 @@ features of Cosmos.  The number beside each object inside brackets, `[#]`, is th
 Launch the Web Interface
 ________________________
 
-You can use the web interface to explore the history and debug all workflows.  To start it, run:
+You can use the runweb interface to explore the history and debug all workflows.  To start it, run:
 
 .. code-block:: bash
 
@@ -63,7 +63,7 @@ You can use the web interface to explore the history and debug all workflows.  T
   
 .. note::
 
-    Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the
+    Currently the system you're running the runweb interface on must be the same (or have :term:`DRMAA` access to) as the
     system you're running the workflow on.
    
 Visit `<http://servername:8080>`_ to access it (or`<http://localhost:8080>`_ if you're running cosmos locally.
@@ -77,13 +77,13 @@ Visit `<http://servername:8080>`_ to access it (or`<http://localhost:8080>`_ if 
 
     If the cosmos webserver is running, but you can't connect, it is likely because there is a firewall
     in front of the server.  You can get around it by using **ssh port forwarding**, for example"
-    `$ ssh -L 8080:servername:8080 user@server`.  And if that fails, the Cosmos web interface works very well
+    `$ ssh -L 8080:servername:8080 user@server`.  And if that fails, the Cosmos runweb interface works very well
     using lynx.
 
 .. warning::
 
     The webserver is **NOT** secure.  If you need it secured, you'll have to set it up in a production
-    Django web server environment (for example, using **mod_wsgi** with **Apache2**).
+    Django runweb server environment (for example, using **mod_wsgi** with **Apache2**).
 
 Terminating a Workflow
 ______________________

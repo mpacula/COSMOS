@@ -1,13 +1,18 @@
 """
 Workflow models
 """
+import os
+import sys
+import re
+import signal
+import hashlib
+import shutil
+
 from cosmos import session
-from cosmos.config import settings
 from django.db import models, transaction
 from django.db.models import Q,Count, Sum
 from django.db.utils import IntegrityError
-from cosmos.Job.models import JobAttempt,JobManager
-import os,sys,re,signal
+from cosmos.models import JobAttempt,JobManager
 from cosmos.utils.helpers import validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from cosmos.utils import helpers
 from django.core.exceptions import ValidationError
@@ -15,12 +20,11 @@ from picklefield.fields import PickledObjectField, dbsafe_decode
 from django.utils import timezone
 import networkx as nx
 import pygraphviz as pgv
-import hashlib
 import signals
-from cosmos.Workflow.templatetags import extras
+from cosmos.templatetags import extras
 from ordereddict import OrderedDict
-import time
 
+settings = session.settings
 status_choices=(
                 ('successful','Successful'),
                 ('no_attempt','No Attempt'),
@@ -247,7 +251,7 @@ class Workflow(models.Model):
                 wf.terminate()
         try:
             signal.signal(signal.SIGINT, ctrl_c)
-        except ValueError: #signal only works in main thread and django complains
+        except ValueError: #signal only works in parse_args thread and django complains
             pass
 
         return wf
@@ -278,36 +282,32 @@ class Workflow(models.Model):
         return wf
 
     @staticmethod
-    def __reload(name, dry_run, default_queue, delete_intermediates,delete_unsuccessful_stages=False, prompt_confirm=True,**kwargs):
+    def __reload(name, dry_run, default_queue, delete_intermediates, prompt_confirm=True,**kwargs):
         """
         Resumes a workflow, keeping successful tasks and deleting unsuccessful ones.
 
         see :py:meth:`start` for parameter definitions
         """
         #TODO create a delete_stages(stages) method, that works faster than deleting individual stages
-        #TODO ideally just change the queryset manager to do this automatically
-        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete any unsuccessful tasks in '{0}'?".format(name),default=True,timeout=30):
+        #TODO ideally just change the queryset manager to do this automatically when a stages.delete() is called
+        if prompt_confirm and not helpers.confirm("Reloading the workflow, are you sure you want to delete any unsuccessful tasks in '{0}'?".format(name),default=True,timeout=120):
             print "Exiting."
             sys.exit(1)
 
         wf = Workflow.__resume(name,dry_run,default_queue,delete_intermediates,**kwargs)
         wf.finished_on = None
 
-        if delete_unsuccessful_stages:
-            #delete a stage with any unsuccessful tasks
-            for s in wf.stages.filter(successful=False):
-                s.delete()
-        else:
-            #delete a stage if ALL tasks are unsuccessful
-            for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
-                wf.log.info('{0} has no successful tasks.'.format(s))
-                s.delete()
+        #delete a stage if ALL tasks are unsuccessful
+        for s in Stage.objects.filter(workflow=wf).exclude(task__successful=True):
+            wf.log.info('{0} has no successful tasks.'.format(s))
+            s.delete()
 
         #Delete unsuccessful tasks
         utasks = wf.tasks.filter(successful=False)
         num_utasks = len(utasks)
         if num_utasks > 0:
             wf.bulk_delete_tasks(utasks)
+
         wf.save()
         return wf
 
@@ -322,7 +322,7 @@ class Workflow(models.Model):
         """
         wf_id = None
         if Workflow.objects.filter(name=name).count():
-            if prompt_confirm and not helpers.confirm("Are you sure you want to restart Workflow '{0}'?  All files will be deleted.".format(name),default=True,timeout=30):
+            if prompt_confirm and not helpers.confirm("Are you sure you want to restart Workflow '{0}'?  All files will be deleted.".format(name),default=True,timeout=120):
                 print "Exiting."
                 sys.exit(1)
             old_wf = Workflow.objects.get(name=name)
@@ -661,7 +661,9 @@ class Workflow(models.Model):
                            + "<STDERR>\n{0}\n</STDERR>".format(failed_jobAttempt.STDERR_txt)
             )
             if numAttempts < self.max_reattempts:
-                os.system('rm -rf {0}/*'.format(task.job_output_dir))
+                for f in os.listdir(task.job_output_dir):
+                    if f != 'jobinfo':
+                        shutil.rmtree(os.path.join(task.job_output_dir,f))
                 self._run_task(task)
                 return True
             else:
@@ -1281,7 +1283,7 @@ class Task(models.Model):
     def input_files(self): return self._input_files.all()
 
 #TODO a fix for the below should be implemented, or at least a validation that tags and stage are in fact unique
-#   Django has a bug that prevents indexing of BLOBs which is what tags is stored as
+#   Django has a bug that prevents indexing of BLOBs which is what tags are stored as
 #    class Meta:
 #        unique_together = (('tags','stage'))
 
@@ -1371,7 +1373,7 @@ class Task(models.Model):
     @property
     def job_output_dir(self):
         """Where the job output goes"""
-        return os.path.join(self.output_dir,'out')
+        return os.path.join(self.output_dir)
 
     # @property
     # def output_paths(self):
