@@ -1,4 +1,4 @@
-from cosmos.models.Workflow.models import Workflow
+from cosmos.models.workflow.models import Workflow
 from cosmos.flow.toolgraph import ToolGraph, Split, Add, Map
 from tools import ECHO, CAT, WC, FAIL
 

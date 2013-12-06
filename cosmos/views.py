@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from cosmos.models import Workflow, Stage, Task, TaskTag, WorkflowManager, TaskFile, JobAttempt
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from cosmos.utils.helpers import groupby
-from cosmos.models.Workflow.models import status_choices
+from cosmos.models.workflow import status_choices
 from django.utils.datastructures import SortedDict
 from django.views.decorators.cache import never_cache
 from django.utils.safestring import mark_safe

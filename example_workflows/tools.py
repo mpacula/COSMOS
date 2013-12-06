@@ -1,5 +1,5 @@
 from cosmos.flow.tool import Tool
-from cosmos.models.Workflow.models import TaskFile
+from cosmos.models import TaskFile
 
 class Sleep(Tool):
     inputs = ['*']

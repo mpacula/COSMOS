@@ -16,9 +16,9 @@ def ls(workflow):
     $ cosmos ls 1 3
     """
     if workflow:
-        print workflow
         wf = Workflow.objects.get(pk=workflow) if representsInt(workflow) else Workflow.objects.get(name=workflow)
         print wf
+        print 'comments: ' +  wf.comments
         print wf.describe()
         for s in wf.stages:
             print "\t{0.order_in_workflow}) {0}".format(s)

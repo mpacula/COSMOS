@@ -116,6 +116,7 @@ def gen_config(library_path, DATABASES):
         INSTALLED_APPS = (
             'django_extensions',
             'cosmos',
+            'south',
             #'django_pdb',
             #'gunicorn',
             #'south',

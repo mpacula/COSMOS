@@ -1,15 +1,23 @@
 from cosmos import session
 import django.db.models
-
-from Job.jobattempt import JobAttempt
+from job.JobAttempt import JobAttempt
 if session.settings['DRM'] == 'local':
-    from Job.jobmanager_local import JobManager
+    from job.jobmanager_local import JobManager
 elif session.settings['DRM'] == 'Native_LSF':
-    from Job.jobmanager_lsf import JobManager
+    from job.jobmanager_lsf import JobManager
 else:
-    from Job.jobmanager_drmaa import JobManager
+    from job.jobmanager_drmaa import JobManager
 
-from .Workflow.models import TaskFile, Workflow, WorkflowManager, Stage, TaskTag, TaskEdge, Task, TaskError, TaskValidationError, TaskFileValidationError, WorkflowError
 
-__all__ = ['JobAttempt', 'JobManager', 'TaskFile', 'Workflow', 'WorkflowManager', 'Stage', 'TaskTag', 'TaskEdge', 'Task',
+from .workflow.Workflow import Workflow
+from .workflow import TaskValidationError, WorkflowError, TaskError
+from .workflow.Stage import Stage
+from .workflow.TaskTag import TaskTag
+from .workflow.TaskFile import TaskFile, TaskFileValidationError
+from .workflow.WorkflowManager import WorkflowManager
+from .workflow.Task import Task
+
+
+__all__ = ['JobAttempt', 'JobManager', 'TaskFile', 'Workflow', 'Stage', 'TaskTag', 'Task',
            'TaskError', 'TaskValidationError', 'TaskFileValidationError', 'WorkflowError']
+

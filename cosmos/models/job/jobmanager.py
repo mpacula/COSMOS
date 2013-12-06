@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
 import os,sys
-from .jobattempt import JobAttempt
+from .JobAttempt import JobAttempt
 from cosmos.utils.helpers import check_and_create_output_dir
 from cosmos.utils.helpers import spinning_cursor
 import time
@@ -15,6 +15,8 @@ class JobManagerBase(models.Model):
     """
     class Meta:
         abstract = True
+        app_label = 'cosmos'
+        db_table = 'cosmos_jobmanager'
 
     created_on = models.DateTimeField(null=True,default=None)
     def __init__(self,*args,**kwargs):

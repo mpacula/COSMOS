@@ -5,8 +5,8 @@ from cosmos import session
 from django.utils.datastructures import SortedDict
 from cosmos.utils.helpers import enable_stderr,disable_stderr
 from cosmos.config import settings
-from cosmos.models.Job.jobattempt import JobAttempt
-from cosmos.models.Job.jobmanager import JobManagerBase
+from cosmos.models.job.JobAttempt import JobAttempt
+from cosmos.models.job.jobmanager import JobManagerBase
 
 
 class JobStatusError(Exception):
@@ -51,6 +51,9 @@ class JobManager(object):
     """
     Note there can only be one of these instantiated at a time
     """
+    class Meta:
+        app_label = 'cosmos'
+        db_table = 'cosmos_jobmanager'
 
     def get_jobAttempt_status(self,jobAttempt):
         """

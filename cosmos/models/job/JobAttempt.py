@@ -1,16 +1,18 @@
 from django.db import models
-import os,re,json
+import os,json
 from picklefield.fields import PickledObjectField
 from django.core.validators import RegexValidator
 from django.utils import timezone
+from .. import session
+opj = os.path.join
 
 class JobAttempt(models.Model):
     """
     An attempt at running a task.
     """
     class Meta:
-        app_label = 'Job'
-        db_table = 'Job_jobattempt'
+        app_label = 'cosmos'
+        db_table = 'cosmos_jobattempt'
 
     queue_status_choices = (
         ('not_queued','JobAttempt has not been submitted to the JobAttempt Queue yet'),
@@ -20,8 +22,8 @@ class JobAttempt(models.Model):
     created_on = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
 
-    jobManager = models.ForeignKey('Job.JobManager')
-    task = models.ForeignKey('Workflow.Task')
+    jobManager = models.ForeignKey('cosmos.JobManager')
+    task = models.ForeignKey('cosmos.Task')
 
     #job status and input fields
     queue_status = models.CharField(max_length=150, default="not_queued",choices = queue_status_choices)
@@ -111,7 +113,10 @@ class JobAttempt(models.Model):
 
     @property
     def jobinfo_output_dir(self):
-        return os.path.join(self.task.output_dir,'jobinfo')
+        if hasattr(session, 'jobinfo_output_dir'):
+            return session.jobinfo_output_dir(self)
+        else:
+            return opj(self.task.output_dir, 'jobinfo')
 
     @staticmethod
     def profile_fields_as_list():
@@ -121,7 +126,7 @@ class JobAttempt(models.Model):
     @property
     def workflow(self):
         "This jobattempt's workflow"
-        self.task.workflow
+        return self.task.workflow
 
     @property
     def resource_usage(self):
@@ -196,9 +201,9 @@ class JobAttempt(models.Model):
         """Function for JobManager to Run when this JobAttempt finishes"""
 
         # Make sure output files actually exists
-        if successful and any([ o.must_exist and (not os.path.exists(o.path) or os.stat(o.path) == 0) for o in self.task.output_files ]):
-            successful = False
-            status_details = 'Failed due to empty output file'
+        # if successful and any([ o.must_exist and (not os.path.exists(o.path) or os.stat(o.path) == 0) for o in self.task.output_files ]):
+        #     successful = False
+        #     status_details = 'Failed due to empty output file'
 
         self.status_details = status_details
         self.successful = successful

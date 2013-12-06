@@ -2,7 +2,6 @@ import itertools as it
 import re
 
 import networkx as nx
-import pygraphviz as pgv
 
 from cosmos.utils.helpers import groupby, get_all_dependencies, validate_is_type_or_list
 from cosmos.models import Task, TaskError
@@ -61,11 +60,11 @@ class ToolGraph(object):
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
 
-    def input(self, inputs, name):
+    def input(self, inputs, name=None):
         assert isinstance(inputs[0], INPUT)
-        for i in enumerate(inputs):
-            if len(inputs.tags)==0:
-                inputs.tags['i'] = i
+        for i,inp in enumerate(inputs):
+            if len(inp.tags)==0:
+                inp.tags['input'] = i
 
         return self.source(inputs, name)
 
@@ -185,6 +184,8 @@ class ToolGraph(object):
         gat
         :param path: the path to write to
         """
+        import pygraphviz as pgv
+
         dag = pgv.AGraph(strict=False, directed=True, fontname="Courier", fontsize=11)
         dag.node_attr['fontname'] = "Courier"
         dag.node_attr['fontsize'] = 8
@@ -295,6 +296,7 @@ class ToolGraph(object):
         for tool in tools_successful_already:
             tool.output_files = tool._task_instance.output_files
 
+
         ### Save new tools to DB
 
         #bulk save tasks
@@ -334,11 +336,6 @@ class ToolGraph(object):
                 for parent, child in new_edges]
         ThroughModel.objects.bulk_create(rels)
 
-
-        #bulk save edges
-        new_edges = filter(lambda e: e[0] in new_nodes or e[1] in new_nodes, self.tool_G.edges())
-        task_edges = [(parent._task_instance, child._task_instance) for parent, child in new_edges]
-        workflow.bulk_save_task_edges(task_edges)
         workflow.stage_graph = self.as_image(resolution='stage')
         workflow.save()
 

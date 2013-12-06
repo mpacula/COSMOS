@@ -6,6 +6,7 @@ import itertools
 import pprint
 import sys
 import signal
+opj=os.path.join
 
 class ValidationException(Exception): pass
 
@@ -174,43 +175,46 @@ def folder_size(folder,human_readable=True):
 def get_logger(name,path):
     """
     Gets a logger of name `name` that prints to stderr and to path
+
+    :returns: (logger, True if the logger was initialized, else False)
     """
     log = logging.getLogger(name)
     #logging.basicConfig(level=logging.DEBUG)
     
     #check if we've already configured logger
-    if len(log.handlers) > 1:
-        return log
+    if len(log.handlers) > 0:
+        return log, False
     
     log.setLevel(logging.INFO)
-    # create file handler which logs even debug messages
+    # create file handler which logs debug messages
     if path:
         fh = logging.FileHandler(path)
-        fh.setLevel(logging.INFO)
+        fh.setLevel(logging.DEBUG)
         fh.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
         log.addHandler(fh)
-        #fh.set_name('cosmos_fh')
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
-    #ch.set_name('cosmos_fh')
-
     log.addHandler(ch)
-    return log
+
+    return log, True
     
 
 def get_workflow_logger(workflow):
     """
     Returns a logger configured for a Workflow
     """
-    log_dir = os.path.join(workflow.output_dir,'log')
-    path = os.path.join(log_dir,'parse_args.log')
-    if os.path.exists(workflow.output_dir):
-        check_and_create_output_dir(log_dir)
-        return (get_logger(workflow.name,path), path)
-    else:
-        return (get_logger(workflow.name,None), None)
+    log_dir = opj(workflow.output_dir,'log')
+    path = opj(log_dir,'cosmos.log')
+    check_and_create_output_dir(log_dir)
+    log, initialized = get_logger(str(workflow),path)
+    if initialized:
+        log.info('Logger initialized.  Storing output in {0}'.format(path))
+    return log, path
+    # if os.path.exists(workflow.output_dir):
+    # else:
+    #     return (get_logger(workflow.id,None), None)
 
 
 

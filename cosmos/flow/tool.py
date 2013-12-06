@@ -198,26 +198,26 @@ class Tool(object):
         """
         p = self.parameters.copy()
         argspec = getargspec(self.cmd)
-        tool_parameter_names = argspec.args
+
+        for k,v in self.tags.items():
+            if k in argspec.args:
+                p[k] = v
 
         # Helpful error message
         if not argspec.keywords: #keywords is the **kwargs name or None if not specified
             for k in p.keys():
-                if k not in tool_parameter_names:
+                if k not in argspec.args:
                     raise ToolValidationError, '{0} received the parameter "{1}" which is not defined in it\'s signature.  Parameters are {2}.  Accept the parameter **kwargs in cmd() to generalize the parameters accepted.'.format(self,k,tool_parameter_names)
-
-        for k,v in self.tags.items():
-            if argspec.keywords or k in tool_parameter_names:
-                p[k] = v
 
         for l in ['i','o','s']:
             if l in p.keys():
                 raise ToolValidationError, "{0} is a reserved name, and cannot be used as a tag keyword".format(l)
 
         try:
-            callargs = getcallargs(self.cmd,i=self.map_inputs(),o={ o.name:o for o in self.output_files}, s=self.settings,**p)
+            kwargs = dict(i=self.map_inputs(),o={ o.name:o for o in self.output_files}, s=self.settings,**p)
+            callargs = getcallargs(self.cmd,**kwargs)
         except TypeError:
-            raise TypeError, 'Invalid parameters for {0}.cmd()'.format(self)
+            raise TypeError, 'Invalid parameters for {0}.cmd(): {1}'.format(self, kwargs.keys())
 
         del callargs['self']
         r = self.cmd(**callargs)

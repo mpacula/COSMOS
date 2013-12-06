@@ -2,8 +2,8 @@ from subprocess import Popen, PIPE
 import os
 import re
 
-from cosmos.models.Job.jobattempt import JobAttempt
-from cosmos.models.Job.jobmanager import JobManagerBase
+from cosmos.models.job.JobAttempt import JobAttempt
+from cosmos.models.job.jobmanager import JobManagerBase
 
 
 class JobStatusError(Exception):
@@ -50,8 +50,8 @@ class JobManager(JobManagerBase):
     """
     
     class Meta:
-        app_label = 'Job'
-        db_table = 'Job_jobmanager'
+        app_label = 'cosmos'
+        db_table = 'cosmos_jobmanager'
 
     def _submit_job(self,jobAttempt):
         bsub = 'bsub -o {stdout} -e {stderr} {ns}'.format(

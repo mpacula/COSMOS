@@ -7,6 +7,7 @@ import config
 import os
 import shutil
 from cosmos.utils.helpers import confirm
+opj = os.path.join
 
 if config.settings is None:
     if os.path.exists(config.config_path):

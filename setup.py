@@ -29,17 +29,17 @@ setup(name='cosmos',
     data_files=[(examples_installation_dir,example_workflows)],
     install_requires=[
         'distribute>=0.6.28',
-        'Django==1.4.3',
+        'Django==1.6',
         'configobj==4.7.2',
         'decorator==3.4.0',
-        'django-extensions==1.0.3',
-        'django-picklefield==0.3.0',
+        'django-extensions',
+        'django-picklefield==0.3.1',
         'drmaa==0.5',
         'ipython',
         'networkx',
         'pygraphviz',
-        'ordereddict'
-        'pyparsing==1.5.7',
+        'ordereddict',
+        'pyparsing',
         'pydot'
     ]
 )
