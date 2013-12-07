@@ -10,7 +10,7 @@ A tool is a class that overrides :py:class:`~tool.Tool`, and defines :py:meth:`~
 
 .. code-block:: python
 
-    from cosmos.lib.ezflow.tool import Tool
+    from cosmos.flow.tool import Tool
 
     class WordCount(Tool):
         name = "Word Count"
@@ -19,13 +19,12 @@ A tool is a class that overrides :py:class:`~tool.Tool`, and defines :py:meth:`~
         mem_req = 1*1024
         cpu_req = 1
 
-        def cmd(self,i,s,p):
+        def cmd(self,i, o, s):
             return r"""
-                wc {i[txt][0]} > $OUT.txt
+                wc {i[txt][0]} > {o[txt]}
                 """
 
 This tool will read a txt file, count the number of words, and write it to another text file.
-
 
 See the :py:class:`Tool API <tool.Tool>` for more class attributes that can be overridden to obtain
 various behaviors.
@@ -35,7 +34,7 @@ Defining Input Files
 --------------------
 
 An Input file is an instantiation of :py:class:`tool.INPUT`, which is just a Tool with
-:py:attr:`tool.INPUT.NOOP` set to True, and a way to initialize it with a single output file from an existing
+:py:attr:`tool.INPUT.NOOP` set to True, initialized with a single file from an existing
 path on the filesystem.
 
 An INPUT has one outputfile, which is an instance of :py:class:`Workflow.models.TaskFile`.  It has 3 important
@@ -50,7 +49,7 @@ Here's an example of how to create an instance of an :py:class:`tool.INPUT` File
 
 .. code-block:: python
 
-    from cosmos.lib.ezflow import INPUT
+    from cosmos.flow import INPUT
 
     input_file = INPUT('/path/to/file.txt',tags={'i':1})
 
@@ -60,7 +59,7 @@ A more fine grained approach to defining input files:
 
 .. code-block:: python
 
-    from cosmos.lib.ezflow import INPUT
+    from cosmos.flow import INPUT
     INPUT(name='favorite_txt',path='/path/to/favorite_txt.txt.gz',fmt='txt.gz',tags={'color':'red'})
 
 
@@ -69,5 +68,5 @@ API
 
 Tool
 *****
-.. automodule:: cosmos.lib.ezflow.tool
+.. automodule:: cosmos.flow.tool
     :members:

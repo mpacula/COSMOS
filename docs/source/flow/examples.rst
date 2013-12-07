@@ -4,7 +4,7 @@ Workflow Code Examples
 ======================
 
 The easiest way to learn is often by example.  When you're learning to write your own workflows,
-make liberal use of the :py:meth:`~cosmos.lib.ezflow.dag.DAG.create_dag_img` and the `visualize` button
+make liberal use of the :py:meth:`~cosmos.flow.dag.DAG.create_dag_img` and the `visualize` button
 in the runweb interface.
 
 Basic Workflows
