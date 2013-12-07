@@ -46,7 +46,7 @@ class one2many(Relationship):
 
 class ToolGraph(object):
     """
-    A Representation of a workflow as a :term:`ToolGraph` of jobs.
+    A Representation of a workflow as a :class:`ToolGraph` of jobs.
     """
 
     def __init__(self, cpu_req_override=False, mem_req_factor=1):
@@ -76,7 +76,7 @@ class ToolGraph(object):
         assert len(tags) == len(
             set(tags)), 'Duplicate inputs tags detected for {0}.  Tags within a stage must be unique.'.format(INPUT)
 
-        stage = Stage(tool=type(tools[0]), tools=tools, parents=[], rel=None, name=name, is_source=True)
+        stage = ToolStage(tool=type(tools[0]), tools=tools, parents=[], rel=None, name=name, is_source=True)
         for tool in stage.tools:
             tool.stage = stage
 
@@ -89,7 +89,7 @@ class ToolGraph(object):
         """
         Creates a Stage in this TaskGraph
         """
-        stage = Stage(tool, parents, rel, name, extra_tags)
+        stage = ToolStage(tool, parents, rel, name, extra_tags)
         assert stage.name not in [n.name for n in self.stage_G.nodes()], 'Duplicate stage names detected: {0}'.format(
             stage.name)
 
@@ -180,7 +180,7 @@ class ToolGraph(object):
 
     def as_image(self, resolution='stage', save_to=None):
         """
-        Writes the :term:`ToolGraph` as an image.
+        Writes the :class:`ToolGraph` as an image.
         gat
         :param path: the path to write to
         """
@@ -371,7 +371,7 @@ class ToolGraph(object):
             raise TaskError('{0}. Task is {1}.'.format(e, tool))
 
 
-class Stage():
+class ToolStage():
     def __init__(self, tool=None, parents=None, rel=None, name=None, extra_tags=None, tools=None, is_source=False):
         if parents is None:
             parents = []
@@ -389,7 +389,7 @@ class Stage():
 
         self.tool = tool
         self.tools = tools
-        self.parents = validate_is_type_or_list(parents, Stage)
+        self.parents = validate_is_type_or_list(parents, ToolStage)
         self.rel = rel
         self.is_source = is_source
 

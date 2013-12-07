@@ -23,35 +23,10 @@ Here's the job dependency graph that was created:
     :width: 100%
     :align: center
 
-Reload a Workflow
-_________________
-
-You can add more stages to the workflow, without re-running tasks that were already successful.
-An example is in :file:`example_workflows/ex2.py`.
-
-.. literalinclude:: ../../../example_workflows/ex2.py
-
-Run it with the command:
-
-.. code-block:: bash
-
-   $ python ex1_b.py
-
-
-Advanced Workflows
-++++++++++++++++++
-
-Branching Workflows
-___________________
-
-:file:`example_workflows/ex_branch.py`
-
-.. literalinclude:: ../../../example_workflows/ex_branch.py
-
-Command Line Interface and Signals
+Command Line Interface
 __________________________________
 
 :file:`example_workflows/ex_signals.py`
 
-.. literalinclude:: ../../../example_workflows/ex_signals.py
+.. literalinclude:: ../../../example_workflows/ex_cli.py
 

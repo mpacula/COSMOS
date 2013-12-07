@@ -16,6 +16,7 @@ from .TaskTag import TaskTag
 from .TaskFile import TaskFile
 from . import status_choices
 from .. import session
+from ...utils.helpers import validate_not_null
 
 class Stage(models.Model):
     """
@@ -37,15 +38,21 @@ class Stage(models.Model):
     started_on = models.DateTimeField(null=True, default=None)
     created_on = models.DateTimeField(null=True, default=None)
     finished_on = models.DateTimeField(null=True, default=None)
+    output_dir = models.CharField(max_length=255, default=None, null=True)
 
 
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
         super(Stage, self).__init__(*args, **kwargs)
 
-        #validate_not_null(self.workflow)
-
+        validate_not_null(self.workflow)
         validate_name(self.name, 'name')
+
+        if hasattr(session, 'stage_output_dir'):
+            self.output_dir = session.stage_output_dir(self)
+        else:
+            self.output_dir = os.path.join(self.workflow.output_dir, self.name.replace(' ', '_'))
+
         check_and_create_output_dir(self.output_dir)
 
     def set_status(self, new_status, save=True):
@@ -156,15 +163,6 @@ class Stage(models.Model):
         return self.finished_on.replace(microsecond=0) - self.started_on.replace(
             microsecond=0) if self.finished_on else timezone.now().replace(microsecond=0) - self.started_on.replace(
             microsecond=0)
-
-    @property
-    def output_dir(self):
-        "Absolute path to this stage's output_dir"
-        "Task output dir"
-        if hasattr(session, 'stage_output_dir'):
-            return session.task_output_dir(self)
-        else:
-            return os.path.join(self.workflow.output_dir, self.name.replace(' ', '_'))
 
     @property
     def tasks(self):

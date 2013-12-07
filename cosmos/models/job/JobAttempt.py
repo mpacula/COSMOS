@@ -24,6 +24,7 @@ class JobAttempt(models.Model):
 
     jobManager = models.ForeignKey('cosmos.JobManager')
     task = models.ForeignKey('cosmos.Task')
+    jobinfo_output_dir = models.CharField(max_length=255, default=None, null=True)
 
     #job status and input fields
     queue_status = models.CharField(max_length=150, default="not_queued",choices = queue_status_choices)
@@ -111,12 +112,17 @@ class JobAttempt(models.Model):
         kwargs['created_on'] = timezone.now()
         super(JobAttempt,self).__init__(*args,**kwargs)
 
-    @property
-    def jobinfo_output_dir(self):
-        if hasattr(session, 'jobinfo_output_dir'):
-            return session.jobinfo_output_dir(self)
-        else:
-            return opj(self.task.output_dir, 'jobinfo')
+        #TODO this might be really slow
+        if self.jobinfo_output_dir is None:
+            if hasattr(session, 'jobinfo_output_dir'):
+                self.jobinfo_output_dir = session.jobinfo_output_dir(self)
+            else:
+                self.jobinfo_output_dir = opj(self.task.output_dir, 'jobinfo')
+
+
+    # @property
+    # def jobinfo_output_dir(self):
+    #
 
     @staticmethod
     def profile_fields_as_list():

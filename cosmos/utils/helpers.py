@@ -209,8 +209,8 @@ def get_workflow_logger(workflow):
     path = opj(log_dir,'cosmos.log')
     check_and_create_output_dir(log_dir)
     log, initialized = get_logger(str(workflow),path)
-    if initialized:
-        log.info('Logger initialized.  Storing output in {0}'.format(path))
+    # if initialized:
+    #     log.info('Logger initialized.  Storing output in {0}'.format(path))
     return log, path
     # if os.path.exists(workflow.output_dir):
     # else:

@@ -4,7 +4,7 @@ import os
 import sys
 from subprocess import Popen,PIPE
 
-__version__ = "0.4.3"
+from cosmos import __version__
 
 README = open('README.rst').read()
 
@@ -41,5 +41,6 @@ setup(name='cosmos',
         'ordereddict',
         'pyparsing',
         'pydot'
+        'sphinx-rtd-theme'
     ]
 )

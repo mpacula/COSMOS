@@ -1,6 +1,7 @@
 import itertools as it
 import copy
 from inspect import getargspec
+import os
 
 from cosmos.flow.helpers import getcallargs,cosmos_format
 from cosmos.models import TaskFile
@@ -294,6 +295,7 @@ class INPUT(Tool):
         :param name: the name or keyword for the input file
         :param fmt: the format of the input file
         """
+        path = os.path.abspath(path)
         super(INPUT,self).__init__(tags=tags,*args,**kwargs)
         self.add_output(TaskFile(path=path,name=name,fmt=fmt,persist=True))
 

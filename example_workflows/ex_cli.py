@@ -1,7 +1,8 @@
-from cosmos import session, Workflow, ToolGraph, INPUT, cli
+from cosmos import cli
+from cosmos.flow import ToolGraph, INPUT
 
 
-def main(workflow, input_file, **kwargs):
+def main(input_file, **kwargs):
     g = ToolGraph()
     g.source([INPUT(input_file, tags={'i': 1}, fmt='dir')])
 

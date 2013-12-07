@@ -27,11 +27,13 @@ settings = session.settings
 
 opj = os.path.join
 
+
 class Workflow(models.Model):
     """
     This is the master object.  It contains a list of :class:`Stage` which represent a pool of jobs that have no dependencies on each other
     and can be executed at the same time.
     """
+
     class Meta:
         app_label = 'cosmos'
         db_table = 'cosmos_workflow'
@@ -42,10 +44,11 @@ class Workflow(models.Model):
     dry_run = models.BooleanField(default=False, help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255, default=None, null=True)
-    max_cores = models.IntegerField(default=0,
-                                    help_text="Maximum cores to use at one time during the workflow.  Is based off of the sum of the running tasks' cpu_requirement")
+    max_cores = models.IntegerField(default=0, help_text="Maximum cores to use at one time during the workflow.  "
+                                                         "Based off of the sum of the running tasks' cpu_requirement")
     delete_intermediates = models.BooleanField(default=False, help_text="Delete intermediate files")
-    #cmd_executed = models.CharField(max_length=255,default=None,null=True)
+    last_cmd_executed = models.CharField(max_length=255, default=None, null=True)
+    description = models.CharField(max_length=255, default=None, null=True)
     comments = models.TextField(null=True, default=None)
     stage_graph = models.TextField(null=True, default=None)
 
@@ -58,7 +61,8 @@ class Workflow(models.Model):
 
         # set default output_dir
         if self.output_dir is None:
-            self.output_dir = opj(session.settings['default_root_output_dir'], '{1}'.format(self, self.name.replace(' ', '_')))
+            self.output_dir = opj(session.settings['default_root_output_dir'],
+                                  '{1}'.format(self, self.name.replace(' ', '_')))
 
         validate_name(self.name)
 
@@ -250,6 +254,9 @@ class Workflow(models.Model):
         """
         if Workflow.objects.filter(id=_wf_id).count():
             raise ValidationError('Workflow with this _wf_id already exists')
+        output_dir = kwargs.setdefault('output_dir', None)
+        if output_dir and os.path.exists(output_dir):
+            raise ValidationError('output directory {0} already exists'.format(output_dir))
 
         wf = Workflow.objects.create(id=_wf_id, name=name, jobManager=JobManager.objects.create(), **kwargs)
         wf.save()
@@ -665,7 +672,7 @@ class Workflow(models.Model):
         self.log.info("Finished {0}, last stage's output dir: {1}".format(self,
                                                                           self.stages.order_by('-order_in_workflow')[
                                                                               0].output_dir))
-
+    @property
     def successful(self):
         return self.stages.filter(successful=False).count() == 0
 

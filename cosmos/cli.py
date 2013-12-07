@@ -11,7 +11,7 @@ def add_workflow_args(parser):
                         help="A name for this workflow", required=True)
     parser.add_argument('-q', '--default_queue', type=str,
                         help="Default queue.  Defaults to the value in cosmos.session.settings.")
-    parser.add_argument('-o', '--root_output_dir', type=str, default=settings['default_root_output_dir'],
+    parser.add_argument('-o', '--output_dir', type=str, default=None,
                         help="The root output directory.  Output will be stored in root_output_dir/{workflow.name}.  "
                              "Defaults to the value in cosmos.session.settings.")
     parser.add_argument('-c', '--max_cores', type=int,
@@ -39,10 +39,10 @@ def parse_args(parser):
     #extract wf_kwargs from kwargs
     wf_kwargs = dict([(k, kwargs[k]) for k
                       in
-                      ['name', 'default_queue', 'root_output_dir', 'restart', 'delete_intermediates', 'prompt_confirm',
+                      ['name', 'default_queue', 'output_dir', 'restart', 'delete_intermediates', 'prompt_confirm',
                        'dry_run', 'max_cores']])
     cmd_args = [a if ' ' not in a else "'" + a + "'" for a in sys.argv[1:]]
-    wf_kwargs['comments'] = '$ ' + ' '.join([os.path.basename(sys.argv[0])] + cmd_args)
+    wf_kwargs['last_cmd_executed'] = '$ ' + ' '.join([os.path.basename(sys.argv[0])] + cmd_args)
 
     wf = Workflow.start(**wf_kwargs)
 

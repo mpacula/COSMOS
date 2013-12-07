@@ -9,7 +9,7 @@ from .TaskFile import TaskFile
 from .TaskTag import TaskTag
 from . import status_choices
 from .. import session
-
+opj=os.path.join
 
 class Task(models.Model):
     """
@@ -22,7 +22,7 @@ class Task(models.Model):
         db_table = 'cosmos_task'
         unique_together = (('tags','stage'))
 
-
+    output_dir = models.CharField(max_length=255, default=None, null=True)
     pcmd = models.TextField(
         help_text='Preformatted command.  almost always will contain special strings for TaskFiles which will later be replaced by their proper system path at execution')
     exec_command = models.TextField(help_text='The actual command that is executed', null=True)
@@ -83,6 +83,14 @@ class Task(models.Model):
         kwargs['created_on'] = timezone.now()
         super(Task, self).__init__(*args, **kwargs)
 
+        if self.output_dir is None:
+            if hasattr(session, 'task_output_dir'):
+                self.output_dir = session.task_output_dir(self)
+            else:
+                basedir = self.tags_as_query_string().replace('&', '__').replace('=', '_')
+                self.output_dir = opj(self.stage.output_dir, basedir)
+
+
         # if len(self.tags) == 0:
         #     raise TaskValidationError, '{0} has no tags, at least one tag is required'.format(self)
 
@@ -136,15 +144,6 @@ class Task(models.Model):
     def output_file_size(self, human_readable=True):
         "Task filesize"
         return folder_size(self.job_output_dir, human_readable=human_readable)
-
-    @property
-    def output_dir(self):
-        "Task output dir"
-        if hasattr(session, 'task_output_dir'):
-            return session.task_output_dir(self)
-        else:
-            basedir = self.tags_as_query_string().replace('&', '__').replace('=', '_')
-            return os.path.join(self.stage.output_dir, basedir)
 
     @property
     def job_output_dir(self):

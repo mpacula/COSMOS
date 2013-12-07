@@ -66,20 +66,20 @@ def default_get_drmaa_native_specification(jobAttempt):
 get_drmaa_native_specification = default_get_drmaa_native_specification
 
 ### print license info
-warning = """
-***********************************************************************************************************************
-    Cosmos is currently NOT part of the public domain.  It is owned by and copywrite Harvard Medical School
-    and if you do not have permission to access Cosmos then the code and its documentation are all
-    off limits and you are politely instructed to stop using Cosmos immediately and delete all files related to Cosmos.
-
-    Thank you,
-    Erik Gafni
-    Harvard Medical School
-    erik_gafni@hms.harvard.edu
-***********************************************************************************************************************
-"""
-printed_warning = False
-if config.settings['license_warning'] != 'False':
-    if not printed_warning:
-        print >> sys.stderr, warning
-        printed_warning=True
+# warning = """
+# ***********************************************************************************************************************
+#     Cosmos is currently NOT part of the public domain.  It is owned by and copywrite Harvard Medical School
+#     and if you do not have permission to access Cosmos then the code and its documentation are all
+#     off limits and you are politely instructed to stop using Cosmos immediately and delete all files related to Cosmos.
+#
+#     Thank you,
+#     Erik Gafni
+#     Harvard Medical School
+#     erik_gafni@hms.harvard.edu
+# ***********************************************************************************************************************
+# """
+# printed_warning = False
+# if config.settings['license_warning'] != 'False':
+#     if not printed_warning:
+#         print >> sys.stderr, warning
+#         printed_warning=True

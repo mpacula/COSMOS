@@ -5,10 +5,13 @@ from tools import ECHO, CAT
 import os
 opj = os.path.join
 
+
 session.jobinfo_output_dir = lambda jobAttempt: opj(jobAttempt.workflow.output_dir, 'log',
-                                                jobAttempt.task.stage.name.replace(' ', '_'),
-                                                jobAttempt.task.tags_as_query_string().replace('&', '__').replace('=', '_'))
+                                               jobAttempt.task.stage.name.replace(' ', '_'),
+                                               jobAttempt.task.tags_as_query_string().replace('&', '__').replace('=', '_'))
+
 session.task_output_dir = lambda task: task.workflow.output_dir
+
 session.stage_output_dir = lambda stage: stage.workflow.output_dir
 
 
