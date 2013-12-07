@@ -6,6 +6,7 @@ import itertools
 import pprint
 import sys
 import signal
+opj=os.path.join
 
 class ValidationException(Exception): pass
 
@@ -139,7 +140,16 @@ def validate_name(txt,field_name=''):
 def validate_not_null(field):
     if field == None:
         raise ValidationException('Required field left blank')
-    
+
+def validate_is_type_or_list(variable, klass):
+    if isinstance(variable,list) and (len(variable) == 0 or isinstance(variable[0],klass)):
+        return variable
+    elif isinstance(variable,klass):
+        return [variable]
+    else:
+        raise TypeError, '{0} must be a list of {1} or a {1}'.format(variable,klass)
+
+
 def check_and_create_output_dir(path):
     """
     checks if a path exists and whether its valid.  If it does not exist, create it
@@ -165,42 +175,69 @@ def folder_size(folder,human_readable=True):
 def get_logger(name,path):
     """
     Gets a logger of name `name` that prints to stderr and to path
+
+    :returns: (logger, True if the logger was initialized, else False)
     """
     log = logging.getLogger(name)
     #logging.basicConfig(level=logging.DEBUG)
     
     #check if we've already configured logger
-    if len(log.handlers) > 1:
-        return log
+    if len(log.handlers) > 0:
+        return log, False
     
     log.setLevel(logging.INFO)
-    # create file handler which logs even debug messages
+    # create file handler which logs debug messages
     if path:
         fh = logging.FileHandler(path)
-        fh.setLevel(logging.INFO)
+        fh.setLevel(logging.DEBUG)
         fh.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
         log.addHandler(fh)
-        #fh.set_name('cosmos_fh')
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO)
     ch.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S"))
-    #ch.set_name('cosmos_fh')
-
     log.addHandler(ch)
-    return log
+
+    return log, True
     
 
 def get_workflow_logger(workflow):
     """
     Returns a logger configured for a Workflow
     """
-    log_dir = os.path.join(workflow.output_dir,'log')
-    path = os.path.join(log_dir,'main.log')
-    if os.path.exists(workflow.output_dir):
-        check_and_create_output_dir(log_dir)
-        return (get_logger(workflow.name,path), path)
-    else:
-        return (get_logger(workflow.name,None), None)
+    log_dir = opj(workflow.output_dir,'log')
+    path = opj(log_dir,'cosmos.log')
+    check_and_create_output_dir(log_dir)
+    log, initialized = get_logger(str(workflow),path)
+    # if initialized:
+    #     log.info('Logger initialized.  Storing output in {0}'.format(path))
+    return log, path
+    # if os.path.exists(workflow.output_dir):
+    # else:
+    #     return (get_logger(workflow.id,None), None)
 
 
+
+
+### Networkx
+from networkx.algorithms.traversal import depth_first_search
+import networkx as nx
+
+def get_all_dependencies(G,nodes,include_source=False):
+    """
+    :param G: a networkx digraph
+    :param nodes: a list of source nodes
+    :param include_source: include the source node in the list that's returned
+    :return: a list of nodes that are decendent from any node in `nodes`
+    """
+    g2 = nx.DiGraph()
+    g2.add_nodes_from(G.nodes())
+    g2.add_edges_from(G.edges())
+    removed = []
+    for node in nodes:
+        if node not in removed:
+            dependents = list(depth_first_search.dfs_preorder_nodes(g2,node))
+            dependents = dependents if include_source else dependents[1:]
+            removed += dependents
+            g2.remove_nodes_from(dependents)
+    return removed

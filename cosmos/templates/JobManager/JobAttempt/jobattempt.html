@@ -20,16 +20,6 @@
 </div>
 <div class="box-content">
 
-
-<ul class="breadcrumb">
-  <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.task.stage.workflow.url }}">{{jobAttempt.task.stage.workflow}}</a> <span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.task.stage.url }}">{{jobAttempt.task.stage}}</a><span class="divider">/</span></li>
-  <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task}}</a><span class="divider">/</span></li>
-  <li class="active">{{jobAttempt}}</li>
-</ul>
-
-
     <dl class="dl-horizontal dl-multicolumn" data-colcount="2">
     <dt>Status</dt><dd>
         {% with qs=jobAttempt.queue_status %}
@@ -61,8 +51,9 @@
         {% endwith%}
     </dd>
     <dt>Status Details</dt><dd>{{jobAttempt.status_details}}</dd>
+    <dt>Command Script</dt><dd><em>{{jobAttempt.command_script_path}}</em></dd>
     <dt>Shell Script</dt><dd><pre class="linenums">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
-    <dt><em>Profile</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
+    <dt><em>Profile</em> Output</dt><dd><a href="{% url 'jobAttempt_profile_output' jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
     <dt>Output Directory</dt><dd><code>{{jobAttempt.task.job_output_dir}}</code></dd>
     <dt>Task Output File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{jobAttempt.task.output_file_size|b2e}}{%else%}off{%endif%}</dd>
     <dt>Output Files</dt><dd>
@@ -84,38 +75,34 @@
 
 <br/>
 
-<div class="row-fluid">
-    <div class="box span6">
-        <div class="box-header">
-            <h2><i class="icon-volume-up"></i><span class="break"></span>
-                STDOUT
-            </h2>
-        </div>
-        <div class="box-content">
-            <p class="filepath">{{jobAttempt.STDOUT_filepath}}</p>
-            <pre class="pre-scrollable alert alert-info">{{jobAttempt.STDOUT_txt}}</pre>
-        </div>
-    </div>
-
-    <div class="box span6">
-        <div class="box-header">
-            <h2><i class="icon-volume-off"></i><span class="break"></span>
-                STDERR
-            </h2>
-        </div>
-        <div class="box-content">
-            <p class="filepath">{{jobAttempt.STDERR_filepath}}</p>
-            <pre class="pre-scrollable alert alert-error">{{jobAttempt.STDERR_txt}}</pre>
-        </div>
-    </div>
+<div class="box-header">
+    <h2><i class="icon-volume-up"></i><span class="break"></span>
+        STDOUT
+    </h2>
 </div>
+<div class="box-content">
+    <p class="filepath">{{jobAttempt.STDOUT_filepath}}</p>
+    <pre class="pre-scrollable alert alert-info">{{jobAttempt.STDOUT_txt}}</pre>
+</div>
+
+<br/>
+
+<div class="box-header">
+    <h2><i class="icon-volume-off"></i><span class="break"></span>
+        STDERR
+    </h2>
+</div>
+<div class="box-content">
+    <p class="filepath">{{jobAttempt.STDERR_filepath}}</p>
+    <pre class="pre-scrollable alert alert-error">{{jobAttempt.STDERR_txt}}</pre>
+</div>
+
 <br/>
 
 <div class="box-header">
     <h2><i class="icon-wrench"></i><span class="break"></span>
         Resource Usage
     </h2>
-
 </div>
 <div class="box-content">
     <table class="table table-condensed tab">

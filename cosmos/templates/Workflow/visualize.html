@@ -13,8 +13,12 @@
   <li class="active">Visualize</li>
 </ul>
 
+<h2>Resolution: {{resolution}}</h2>
+
+<a href="{% url 'workflow_visualize' workflowDAG.workflow.id other_resolution %}">Change resolution to <b>{{other_resolution}}</b></a>
+
 <hr>
-<embed src="{% url 'visualize_as_img' workflowDAG.workflow.id %}" type="image/svg+xml"></embed>
+<embed src="{% url 'visualize_as_img' workflowDAG.workflow.id resolution %}" type="image/svg+xml"></embed>
 
 
 {{workflowDAGx}}

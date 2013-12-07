@@ -9,13 +9,11 @@ Setting Custom Job Submission Flags
 If you want to specify custom :term:`DRMS` specific flags, all you have to do is set
 :py:data:`cosmos.session.get_drmaa_native_specification` in your workflow script.
 
-.. hint::
-
-    By default, cosmos uses :py:meth:`cosmos.session.default_get_drmaa_native_specification` and you'll probably
-    want to take a look at its source code.
+By default, cosmos uses :py:meth:`cosmos.session.default_get_drmaa_native_specification` and you'll probably
+want to take a look at its source code.
 
 
-For example, to submit to a queue depending on the task's time_requirement:
+Here is an example example, which shows how to submit to a queue depending on the task's time_requirement:
 
 .. code-block:: python
 

@@ -3,7 +3,8 @@ from setuptools import find_packages
 import os
 import sys
 from subprocess import Popen,PIPE
-import cosmos
+
+from cosmos import __version__
 
 README = open('README.rst').read()
 
@@ -17,7 +18,7 @@ print >> sys.stderr, "Installing userfiles to ~/.cosmos"
 example_workflows = map(lambda x:os.path.join('example_workflows/',x),filter(lambda x:x[-3:]=='.py',os.listdir('example_workflows')))
 
 setup(name='cosmos',
-    version=cosmos.__version__,
+    version=__version__,
     description = "Workflow Manager",
     author='Erik Gafni',
     license='Non-commercial',
@@ -28,20 +29,18 @@ setup(name='cosmos',
     data_files=[(examples_installation_dir,example_workflows)],
     install_requires=[
         'distribute>=0.6.28',
-        'Django==1.4.3',
-        'MySQL-python==1.2.4',
-        'argparse==1.2.1',
+        'Django==1.6',
         'configobj==4.7.2',
         'decorator==3.4.0',
-        'django-extensions==1.0.3',
-        'django-picklefield==0.3.0',
-        'docutils==0.10',
+        'django-extensions',
+        'django-picklefield==0.3.1',
         'drmaa==0.5',
-        'ipython==0.13.1',
-        'networkx==1.7',
-        'pygraphviz==1.1',
-        'six==1.2.0',
-        'wsgiref==0.1.2',
-        'ordereddict'
+        'ipython',
+        'networkx',
+        'pygraphviz',
+        'ordereddict',
+        'pyparsing',
+        'pydot'
+        'sphinx-rtd-theme'
     ]
 )

@@ -185,7 +185,7 @@ def get_stat_and_status_fields():
     ('name of field2', column #2),
     ('name of field3', column #3)]
     
-    You can easily convert to a dict using dict(get_fields())
+    You can easily convert to a dict using dict(get_stat_and_status_fields())
     """
     return [ field for field in yield_fields(manpage) ]
 if __name__ == '__main__':

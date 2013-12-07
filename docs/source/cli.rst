@@ -39,7 +39,6 @@ Get Usage Help:
    
 Reset the SQL database
 ++++++++++++++++++++++
-.. warning:: This will *not* delete the files associated with workflow output.
 
 .. code-block:: bash
 

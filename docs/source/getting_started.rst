@@ -3,14 +3,14 @@
 Getting Started
 ===============
 
-We'll start by running a simple test workflow, exploring it via the web interface, and terminating it.  Then
+We'll start by running a simple test workflow, exploring it via the runweb interface, and terminating it.  Then
 you'll be ready to start learning how to write your own.
 
 Execute an Example Workflow
 ___________________________
    
 The console will generate a lot of output as the workflow runs.  This workflow tests out various
-features of Cosmos.  The number beside each object inside brackets, `[#]`, is the ID of that object.
+features of Cosmos.  The number beside each object inside brackets, `[#]`, is the database ID of that object.
 
 .. code-block:: bash
 
@@ -55,42 +55,41 @@ features of Cosmos.  The number beside each object inside brackets, `[#]`, is th
 Launch the Web Interface
 ________________________
 
-You can use the web interface to explore the history and debug all workflows.  To start it, run:
+You can use the runweb interface to explore the history and debug all workflows.  To start it, run:
 
 .. code-block:: bash
 
    cosmos runweb -p 8080
-  
-.. note::
 
-    Currently the system you're running the web interface on must be the same (or have :term:`DRMAA` access to) as the
-    system you're running the workflow on.
    
-Visit `<http://servername:8080>`_ to access it (or`<http://localhost:8080>`_ if you're running cosmos locally.
+Visit `<http://servername:8080>`_ to access it (or `<http://localhost:8080>`_ if you're running cosmos locally.
 
 
 .. figure:: /imgs/web_interface.png
    :width: 90%
    :align: center
 
-.. hint::
 
-    If the cosmos webserver is running, but you can't connect, it is likely because there is a firewall
-    in front of the server.  You can get around it by using **ssh port forwarding**, for example"
-    `$ ssh -L 8080:servername:8080 user@server`.  And if that fails, the Cosmos web interface works very well
-    using lynx.
+Troubleshooting
++++++++++++++++
+
+If the cosmos webserver is running, but you can't connect, it is likely because there is a firewall
+in front of the server.  You can get around it by using **ssh port forwarding**, for example"
+`$ ssh -L 8080:servername:8080 user@server`.  And if that fails, the Cosmos runweb interface works very well
+using lynx.
 
 .. warning::
 
-    The webserver is **NOT** secure.  If you need it secured, you'll have to set it up in a production
-    Django web server environment (for example, using **mod_wsgi** with **Apache2**).
+    The webserver is *NOT* secure.  If you need it secured, you'll have to set it up in a production
+    `Django web server environment <https://docs.djangoproject.com/en/1.2/howto/deployment/>`_
+    (for example, using *mod_wsgi* with *Apache2*).
 
 Terminating a Workflow
 ______________________
 
 To terminate a workflow, simply press ctrl+c (or send the process a SIGINT signal) in the terminal.
 Cosmos will terminate running jobs and mark them as failed.
-You can resume from the point in the workflow you left off later.
+You can resume from the point you left off in the workflow later.
 
 Resuming a workflow
 ____________________
@@ -98,13 +97,11 @@ ____________________
 A workflow can be resumed by re-running a script that originally.  The algorithm for resuming is as follows:
 
 1) Delete any failed tasks
-2) Add any tasks that do not exist in the database (Keyed be the task's stage name and tags)
+2) Add any tasks that do not exist in the database (does not have the task's stage name and tags)
 3) Run the workflow
 
-.. warning::
-    If a task in a stage with the same tags has already been executed successfully, it
-    will not be re-executed or altered, *even if the actual command has changed because
-    you modified the script*.  In the future Cosmos may emmit a warning when this occurs or automatically
-    re-run these tasks.  This can be
-    especially tricky when you try to change task that has no tags (this can happen when it's the only task
-    in it's stage), and has executed successfully.
+If a task in a stage with the same tags has already been executed successfully, it
+will not be re-executed or altered, *even if the actual command has changed because
+you modified the script*.  In the future Cosmos may emmit a warning when this occurs or automatically
+re-run these tasks.  This can be especially tricky when you try to change task that has no tag
+(this can only happen when it's the only task in it's stage), and has executed successfully.

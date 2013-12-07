@@ -4,8 +4,7 @@ Cosmos Shell
 ============
 
 Using various Django features and apps, you can quickly enter an ipython shell with access to all your workflow objects.
-
-.. note:: This is an advanced feature, and relies on `Django Queries <https://docs.djangoproject.com/en/dev/topics/db/queries/>`_
+This is an advanced feature, and relies on `Django Queries <https://docs.djangoproject.com/en/dev/topics/db/queries/>`_
 
 Launch the IPython shell
 ++++++++++++++++++++++++
@@ -44,7 +43,7 @@ You can even run a workflow:
 Filtering
 ++++++++++
 
-pk is a shortcut for primary key, so you can use this to quickly get objects you're seeing in the web interface,
+pk is a shortcut for primary key, so you can use this to quickly get objects you're seeing in the runweb interface,
 which is always displayed.  For example, if you see "Stage[200] Stage Name", you can query for it like so
 
 .. code-block:: python
@@ -81,13 +80,13 @@ You can delete records by simply calling `object.delete()`
 
     Do not call .delete() on a queryset, as it will not run a lot of important cleanup code.  i.e. don't do this:
 
-    >>> Task.objects.get(success=False).delete()
-    or
-    >>> Stage.objects.get(name="My Stage").delete()
+    >>> workflow.stages.delete()
+    >>> stage.tasks.delete()
+    >>> Stage.objects.filter(successful=True).delete()
 
     Instead, do the following, which will perform a lot of extra important code for each task:
 
-    >>> for t in Task.objects.get(success=False): t.delete()
-    or
-    >>> for s in Stage.objects.get(name="My Stage"): s .delete()
+    >>> for t in Task.objects.filter(success=False): t.delete()
+    >>> for t in stage.tasks: t.delete()
+    >>> for s in Stage.objects.filter(successful=True): s.delete()
 

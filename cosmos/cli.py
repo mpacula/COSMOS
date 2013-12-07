@@ -1,126 +1,50 @@
-"""
-Cosmos command line interface
-"""
-import argparse
-import os,sys
-from cosmos.Workflow.models import Workflow
-from cosmos.utils.helpers import confirm,representsInt
+import pprint
+import sys
+import os
+
+from cosmos.models import Workflow
+from cosmos.session import settings
 
 
-def ls(workflow):
+def add_workflow_args(parser):
+    parser.add_argument('-n', '--name',
+                        help="A name for this workflow", required=True)
+    parser.add_argument('-q', '--default_queue', type=str,
+                        help="Default queue.  Defaults to the value in cosmos.session.settings.")
+    parser.add_argument('-o', '--output_dir', type=str, default=None,
+                        help="The root output directory.  Output will be stored in root_output_dir/{workflow.name}.  "
+                             "Defaults to the value in cosmos.session.settings.")
+    parser.add_argument('-c', '--max_cores', type=int,
+                        help="Maximum number (based on the sum of cpu_requirement) of cores to use at once.  0 means"
+                             "unlimited", default=0)
+    parser.add_argument('-r', '--restart', action='store_true',
+                        help="Completely restart the workflow.  Note this will delete all records and output files of"
+                             "the workflow being restarted!")
+    parser.add_argument('-di', '--delete_intermediates', action='store_true',
+                        help="Deletes intermediate files to save scratch space.")
+    parser.add_argument('-y', '--prompt_confirm', action='store_false',
+                        help="Do not use confirmation prompts before restarting or deleting, and assume answer is always yes.")
+    parser.add_argument('-dry', '--dry_run', action='store_true', help="Don't actually run any jobs.  Experimental.")
+
+
+def parse_args(parser):
     """
-    List all workflows, or all stages in a workflow if a workflow.id is passed.  `workflow` can be a workflow.id
-    or the name of the workflow.
+    Runs the argument parser
 
-    $ cosmos ls 1
-    $ cosmos ls 1 3
+    :returns: a workflow instance and kwargs parsed by argparse
     """
-    if workflow:
-        print workflow
-        wf = Workflow.objects.get(pk=workflow) if representsInt(workflow) else Workflow.objects.get(name=workflow)
-        print wf
-        print wf.describe()
-        for s in wf.stages:
-            print "\t{0.order_in_workflow}) {0}".format(s)
-    else:
-        for w in Workflow.objects.all():
-            print w
+    parsed_args = parser.parse_args()
+    kwargs = dict(parsed_args._get_kwargs())
 
-def rm(workflows,prompt_confirm,stage_number,all_stages_after):
-    """
-    Deletes a workflow
+    #extract wf_kwargs from kwargs
+    wf_kwargs = dict([(k, kwargs[k]) for k
+                      in
+                      ['name', 'default_queue', 'output_dir', 'restart', 'delete_intermediates', 'prompt_confirm',
+                       'dry_run', 'max_cores']])
+    cmd_args = [a if ' ' not in a else "'" + a + "'" for a in sys.argv[1:]]
+    wf_kwargs['last_cmd_executed'] = '$ ' + ' '.join([os.path.basename(sys.argv[0])] + cmd_args)
 
-    $ cosmos rm 1       # deletes workflow 1
-    $ cosmos rm 1,2,3   # deletes workflows 1, 2 and 3
-    $ cosmos rm 1 3 -ay # deletes stage 3 and all stages that come after it, without prompting
-    """
-    workflows = [  Workflow.objects.get(pk=w) if representsInt(w) else Workflow.objects.get(name=w)
-                   for w in workflows.split(',') ]
-    for wf in workflows:
-        if stage_number:
-            stage = wf.stages.get(order_in_workflow=stage_number)
-            if not prompt_confirm or confirm('Are you sure you want to delete the stage "{0}/{1}"{2}?'.
-                                             format(wf,stage,' and all stages after it' if all_stages_after else ''),
-                                             default=False,timeout=60):
-                for s in wf.stages.filter(order_in_workflow__gt=stage.order_in_workflow-1) if all_stages_after else wf.stages.filter(order_in_workflow = stage.order_in_workflow):
-                    s.delete()
-        else:
-            if not prompt_confirm or confirm('Are you sure you want to delete {0}?'.format(wf),default=False,timeout=60):
-                wf.delete()
+    wf = Workflow.start(**wf_kwargs)
 
-#
-#def init():
-#    """
-#    Initializes Cosmos
-#    """
-#    if confirm('This will overwrite your original configuration, are you sure?',default=False):
-#        os.system('cosmos django syncdb && cosmos django collectstatic')
-def shell():
-    """
-    Open up an ipython shell with Cosmos objects preloaded
-    """
-    django_manage('shell_plus'.split(' '))
-
-def syncdb():
-    "Sets up the SQL database"
-    django_manage('syncdb --noinput'.split(' '))
-
-
-def collectstatic():
-    "Collects static files for the web interface"
-    django_manage('collectstatic --noinput'.split(' '))
-    
-def resetdb():
-    "DELETE ALL DATA in the database and then run a syncdb"
-    django_manage('reset_db -R default'.split(' '))
-    django_manage('syncdb --noinput'.split(' '))
-
-
-def runweb(port):
-    """
-    Start the webserver
-    """
-    django_manage('runserver 0.0.0.0:{0}'.format(port).split(' '))
-
-def django_manage(django_args):
-    "Django manage.py script"
-    from django.core.management import execute_from_command_line
-    execute_from_command_line([sys.argv[0]]+django_args)
-
-def main():
-    parser = argparse.ArgumentParser(description='Cosmos CLI')
-    subparsers = parser.add_subparsers(title="Commands", metavar="<command>")
-
-    subparsers.add_parser('resetdb',help=resetdb.__doc__).set_defaults(func=resetdb)
-
-    subparsers.add_parser('shell',help=shell.__doc__).set_defaults(func=shell)
-#    subparsers.add_parser('init',help=init.__doc__).set_defaults(func=init)
-
-    subparsers.add_parser('syncdb',help=syncdb.__doc__).set_defaults(func=syncdb)
-    sp=subparsers.add_parser('collectstatic',help=collectstatic.__doc__).set_defaults(func=collectstatic)
-
-    django_sp = subparsers.add_parser('django',help=django_manage.__doc__)
-    django_sp.set_defaults(func=django_manage)
-    django_sp.add_argument('django_args', nargs=argparse.REMAINDER)
-
-    sp=subparsers.add_parser('ls',help=ls.__doc__)
-    sp.set_defaults(func=ls)
-    sp.add_argument('workflow',type=str,help="Workflow id or name",nargs="?")
-
-    sp = subparsers.add_parser('rm',help=rm.__doc__)
-    sp.set_defaults(func=rm)
-    sp.add_argument('workflows',type=str,help="Workflow id or workflow name, can be comma separated")
-    sp.add_argument('stage_number',type=int,help="Delete this stage",nargs="?")
-    sp.add_argument('-a','--all_stages_after',action='store_true',help="If a stage_number is specified, delete all stages that come after that stage as well")
-    sp.add_argument('-y','--prompt_confirm',action='store_false',default=True)
-
-    runweb_sp = subparsers.add_parser('runweb',help=runweb.__doc__)
-    runweb_sp.set_defaults(func=runweb)
-    runweb_sp.add_argument('-p','--port',help='port to serve on',default='8080')
-
-    a = parser.parse_args()
-    kwargs = dict(a._get_kwargs())
-    del kwargs['func']
-    a.func(**kwargs)
-
-
+    wf.log.info('Parsed kwargs:\n{0}'.format(pprint.pformat(kwargs)))
+    return wf, kwargs

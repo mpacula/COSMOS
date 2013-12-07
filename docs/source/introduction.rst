@@ -4,7 +4,12 @@ Introduction
 ============
 
 Cosmos is a workflow management system for Python.  It allows you to efficiently program complex workflows of command line tools that automatically take
-advantage of a compute cluster, and provides a web interface to monitor, debug, and analyze your jobs.
+advantage of a compute cluster, and provides a runweb interface to monitor, debug, and analyze your jobs.  Cosmos is
+able to scale on a traditional cluster such as :term:`LSF` or :term:`SGE` with a shared filesystem.  It is especially
+powerful when combined with spot instances on `Amazon Web Services <aws.amazon.com>`_ and
+`StarCluster <http://star.mit.edu/cluster/docs/latest/>`_
+
+Cosmos is owned and copywrited by Harvard Medical School.
 
 Features
 ________

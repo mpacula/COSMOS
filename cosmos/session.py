@@ -1,24 +1,36 @@
 """
-A Cosmos session.  Must be the first import of any cosmos script.
+A Cosmos session.  Must be imported at the top of a cosmos script, after cosmos.config.configure() has been called
+sometime in the interpreted session
 """
-import os,sys
-from cosmos.config import settings
+import sys
+import config
+import os
+import shutil
+from cosmos.utils.helpers import confirm
+opj = os.path.join
+
+if config.settings is None:
+    if os.path.exists(config.config_path):
+        config.configure_from_file(config.config_path)
+    else:
+        if not os.path.exists(config.config_path):
+            msg = 'No configuration file exists (and cosmos has not been configured manually),' \
+                  'would you like to create a default one in {0}?'.format(config.config_path)
+            if confirm(msg, default=True):
+                if not os.path.exists(os.path.dirname(config.config_path)):
+                    os.mkdir(os.path.dirname(config.config_path))
+                shutil.copyfile(config.default_config_path, config.config_path)
+                print >> sys.stderr, "Done.  Before proceeding, please edit {0}".format(config.config_path)
+            else:
+                sys.exit(1)
+        # raise Exception('Cannot import session until Cosmos has been configured by calling cosmos.config.configure(), or'
+        #                 'setting up a configuration file in ~/.cosmos/config.ini')
+
+settings = config.settings
 
 #######################
 # DJANGO
 #######################
-
-#configure django settings
-from cosmos import django_settings
-from django.conf import settings as django_conf_settings, global_settings
-
-#custom template context processor for web interface
-django_conf_settings.configure(
-    TEMPLATE_CONTEXT_PROCESSORS=global_settings.TEMPLATE_CONTEXT_PROCESSORS + ('cosmos.utils.context_processor.contproc',),
-    **django_settings.__dict__)
-
-# User can override this to specify the drmaa_native_specification method called at job submission
-
 
 def default_get_drmaa_native_specification(jobAttempt):
     """
@@ -28,7 +40,7 @@ def default_get_drmaa_native_specification(jobAttempt):
     :param jobAttempt: the jobAttempt being submitted
     """
     task = jobAttempt.task
-    DRM = settings['DRM']
+    DRM = config.settings['DRM']
 
     cpu_req = task.cpu_requirement
     mem_req = task.memory_requirement
@@ -54,19 +66,20 @@ def default_get_drmaa_native_specification(jobAttempt):
 get_drmaa_native_specification = default_get_drmaa_native_specification
 
 ### print license info
-warning = """
-***********************************************************************************************************************
-    Cosmos is currently NOT part of the public domain.  It is owned by and copywrite Harvard Medical School
-    and if you do not have permission to access Cosmos then the code and its documentation are all
-    off limits and you are politely instructed to stop using Cosmos immediately and delete all files related to Cosmos.
-
-    Thank you,
-    Erik Gafni
-    Harvard Medical School
-    erik_gafni@hms.harvard.edu
-***********************************************************************************************************************
-"""
-printed_warning = False
-if not printed_warning:
-    print >> sys.stderr, warning
-    printed_warning=True
+# warning = """
+# ***********************************************************************************************************************
+#     Cosmos is currently NOT part of the public domain.  It is owned by and copywrite Harvard Medical School
+#     and if you do not have permission to access Cosmos then the code and its documentation are all
+#     off limits and you are politely instructed to stop using Cosmos immediately and delete all files related to Cosmos.
+#
+#     Thank you,
+#     Erik Gafni
+#     Harvard Medical School
+#     erik_gafni@hms.harvard.edu
+# ***********************************************************************************************************************
+# """
+# printed_warning = False
+# if config.settings['license_warning'] != 'False':
+#     if not printed_warning:
+#         print >> sys.stderr, warning
+#         printed_warning=True

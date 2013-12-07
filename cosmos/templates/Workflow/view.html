@@ -40,22 +40,24 @@
             <i class="icon-wrench"></i> </a>
     </div>
     <div class="box-icon">
-        <a href="{% url 'workflow_visualize' workflow.id %}" class="btn btn-mini btn-danger" rel="tooltip" title="Visualise DAG">
+        <a href="{% url 'workflow_visualize' workflow.id 'stage' %}" class="btn btn-mini btn-danger" rel="tooltip" title="Visualise DAG">
             <i class="icon-eye-open "></i> </a>
     </div>
 </div>
 <div class="box-content">
     <dl class="dl-horizontal dl-multicolumn" data-colcount="2">
+    <dt>Last Command</dt><dd>{{workflow.last_cmd_executed|safe}}</dd>
+    <dt>Description</dt><dd>{{workflow.description}}</dd>
     <dt>Output Dir</dt><dd>{{workflow.output_dir}}</dd>
+    <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
+    <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
+    <dt>Wall Time</dt><dd>{{workflow.wall_time.seconds|format_time}}</dd>
     <dt>Default Queue</dt><dd>
         {% if workflow.default_queue %}{{workflow.default_queue}}
         {% else %} None
         {% endif %}</dd>
     <dt>Max Reattempts</dt><dd>{{workflow.max_reattempts}}</dd>
     <dt>Delete Intermediates</dt><dd>{{workflow.delete_intermediates}}</dd>
-    <dt>Created on</dt><dd>{{workflow.created_on}}</dd>
-    <dt>Finished on</dt><dd>{{workflow.finished_on}}</dd>
-    <dt>Wall Time</dt><dd>{{workflow.wall_time.seconds|format_time}}</dd>
     <dt>Comments</dt><dd>{{workflow.comments|safe}}</dd>
     </dl>
 
