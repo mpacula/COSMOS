@@ -40,7 +40,7 @@ setup(name='cosmos',
         'pygraphviz',
         'ordereddict',
         'pyparsing',
-        'pydot'
+        'pydot',
         'sphinx-rtd-theme'
     ]
 )
