@@ -52,13 +52,6 @@ def rm(workflows, prompt_confirm, stage_number, all_stages_after):
                                              timeout=60):
                 wf.delete()
 
-#
-#def init():
-#    """
-#    Initializes Cosmos
-#    """
-#    if confirm('This will overwrite your original configuration, are you sure?',default=False):
-#        os.system('cosmos django syncdb && cosmos django collectstatic')
 def shell():
     """
     Open up an ipython shell with Cosmos objects preloaded
@@ -75,6 +68,10 @@ def collectstatic():
     "Collects static files for the web interface"
     django_manage('collectstatic --noinput'.split(' '))
 
+
+def migratedb():
+    "Migrates the sql database"
+    django_manage('migrate cosmos'.split(' '))
 
 def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"
@@ -107,6 +104,10 @@ def parse_args():
 
     subparsers.add_parser('syncdb', help=syncdb.__doc__).set_defaults(func=syncdb)
     sp = subparsers.add_parser('collectstatic', help=collectstatic.__doc__).set_defaults(func=collectstatic)
+
+
+    subparsers.add_parser('migratedb', help=migratedb.__doc__).set_defaults(func=migratedb)
+
 
     django_sp = subparsers.add_parser('django', help=django_manage.__doc__)
     django_sp.set_defaults(func=django_manage)

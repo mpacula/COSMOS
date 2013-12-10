@@ -23,6 +23,7 @@ class Task(models.Model):
         unique_together = (('tags','stage'))
 
     output_dir = models.CharField(max_length=255, default=None, null=True)
+    always_local = models.BooleanField(default=False, help_text="Always run this task as a subprocess, even if DRM is not local", null=False)
     pcmd = models.TextField(
         help_text='Preformatted command.  almost always will contain special strings for TaskFiles which will later be replaced by their proper system path at execution')
     exec_command = models.TextField(help_text='The actual command that is executed', null=True)

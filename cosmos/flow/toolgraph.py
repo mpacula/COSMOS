@@ -366,7 +366,8 @@ class ToolGraph(object):
                 cpu_requirement=tool.cpu_req if not self.cpu_req_override else self.cpu_req_override,
                 time_requirement=tool.time_req,
                 NOOP=tool.NOOP,
-                succeed_on_failure=tool.succeed_on_failure)
+                succeed_on_failure=tool.succeed_on_failure,
+                always_local=tool.always_local)
         except TaskError as e:
             raise TaskError('{0}. Task is {1}.'.format(e, tool))
 

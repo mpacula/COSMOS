@@ -57,6 +57,8 @@ class Tool(object):
     persist=False
     #: forwards this tool's input to get_output() calls
     forward_input = False
+    #: always run job as a subprocess even when DRM is not set to local
+    always_local = False
 
     def __init__(self,tags,stage=None,dag=None):
         """

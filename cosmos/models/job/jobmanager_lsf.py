@@ -9,6 +9,7 @@ from cosmos.models.job.jobmanager import JobManagerBase
 class JobStatusError(Exception):
     pass
 
+
 all_processes = []
 current_jobs = []
 
@@ -21,7 +22,8 @@ decode_lsf_state = dict([
     ('USUSP', 'job is user suspended'),
     ('DONE', 'job finished normally'),
     ('EXIT', 'job finished, but failed'),
-    ])
+])
+
 
 def preexec_function():
     # Ignore the SIGINT signal by setting the handler to the standard
@@ -29,31 +31,33 @@ def preexec_function():
     # terminate jobs when there is a ctrl+c event
     os.setpgrp()
 
+
 def get_bjobs():
     """
     returns a dict keyed by lsf job ids, who's values are a dict of bjob
     information about the job
     """
-    p = Popen(['bjobs','-a'],stdout=PIPE)
+    p = Popen(['bjobs', '-a'], stdout=PIPE)
     p.wait()
     lines = p.stdout.readlines()
     bjobs = {}
-    header = re.split("\s\s+",lines[0])
+    header = re.split("\s\s+", lines[0])
     for l in lines[1:]:
-        items = re.split("\s\s+",l)
-        bjobs[items[0]] = dict(zip(header,items))
+        items = re.split("\s\s+", l)
+        bjobs[items[0]] = dict(zip(header, items))
     return bjobs
+
 
 class JobManager(JobManagerBase):
     """
     Note there can only be one of these instantiated at a time
     """
-    
+
     class Meta:
         app_label = 'cosmos'
         db_table = 'cosmos_jobmanager'
 
-    def _submit_job(self,jobAttempt):
+    def _submit_job(self, jobAttempt):
         bsub = 'bsub -o {stdout} -e {stderr} {ns}'.format(
             stdout=jobAttempt.STDOUT_filepath,
             stderr=jobAttempt.STDERR_filepath,
@@ -64,7 +68,7 @@ class JobManager(JobManagerBase):
                   stderr=PIPE,
                   preexec_fn=preexec_function())
         p.wait()
-        lsf_id=re.search('Job <(\d+)>',p.stdout.read()).group(1)
+        lsf_id = re.search('Job <(\d+)>', p.stdout.read()).group(1)
         jobAttempt.drmaa_jobID = lsf_id
         current_jobs.append(lsf_id)
         all_processes.append(lsf_id)
@@ -73,16 +77,16 @@ class JobManager(JobManagerBase):
         bjobs = get_bjobs()
         for id in current_jobs:
             status = bjobs[id]['STAT']
-            if status in ['DONE','EXIT','UNKWN','ZOMBI']:
+            if status in ['DONE', 'EXIT', 'UNKWN', 'ZOMBI']:
                 current_jobs.remove(id)
                 ja = JobAttempt.objects.get(drmaa_jobID=id)
                 successful = True if status == 'DONE' else False
-                ja._hasFinished(successful,bjobs[id])
+                ja._hasFinished(successful, bjobs[id])
                 return ja
         return None
 
 
-    def get_jobAttempt_status(self,jobAttempt):
+    def get_jobAttempt_status(self, jobAttempt):
         """
         Queries the DRM for the status of the job
         """
@@ -93,7 +97,7 @@ class JobManager(JobManagerBase):
             'unknown'
 
 
-    def terminate_jobAttempt(self,jobAttempt):
+    def terminate_jobAttempt(self, jobAttempt):
         "Terminates a jobAttempt"
         os.system('bkill {0}'.format(jobAttempt.drmaa_jobID))
 
