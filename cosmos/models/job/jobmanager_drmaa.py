@@ -6,7 +6,6 @@ from django.utils.datastructures import SortedDict
 from cosmos.utils.helpers import enable_stderr,disable_stderr
 from cosmos.config import settings
 from cosmos.models.job.JobAttempt import JobAttempt
-from cosmos.models.job.jobmanager import JobManagerBase
 
 
 class JobStatusError(Exception):

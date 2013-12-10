@@ -1,12 +1,7 @@
 from cosmos import session
 import django.db.models
 from job.JobAttempt import JobAttempt
-if session.settings['DRM'] == 'local':
-    from job.jobmanager_local import JobManager
-elif session.settings['DRM'] == 'Native_LSF':
-    from job.jobmanager_lsf import JobManager
-else:
-    from job.jobmanager_drmaa import JobManager
+from job.jobmanager import JobManager
 
 
 from .workflow.Workflow import Workflow

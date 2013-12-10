@@ -40,7 +40,7 @@ class Workflow(models.Model):
 
     name = models.CharField(max_length=250, unique=True)
     output_dir = models.CharField(max_length=250, null=True)
-    jobManager = models.OneToOneField('cosmos.JobManager', null=True)
+    #jobmanager = models.OneToOneField('cosmos.JobManager', null=True)
     dry_run = models.BooleanField(default=False, help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255, default=None, null=True)
@@ -67,11 +67,16 @@ class Workflow(models.Model):
         validate_name(self.name)
 
         self.log, self.log_path = get_workflow_logger(self)
+        self.jobManager = JobManager(workflow=self)
 
     @property
     def tasks(self):
         """Tasks in this Workflow"""
         return Task.objects.filter(stage__in=self.stage_set.all())
+
+    @property
+    def jobAttempts(self):
+        return JobAttempt.objects.filter(task__stage__workflow=self)
 
     @property
     def task_edges(self):
@@ -258,7 +263,7 @@ class Workflow(models.Model):
         if output_dir and os.path.exists(output_dir):
             raise ValidationError('output directory {0} already exists'.format(output_dir))
 
-        wf = Workflow.objects.create(id=_wf_id, name=name, jobManager=JobManager.objects.create(), **kwargs)
+        wf = Workflow.objects.create(id=_wf_id, name=name, **kwargs)
         wf.save()
         check_and_create_output_dir(wf.output_dir)
 
@@ -472,7 +477,7 @@ class Workflow(models.Model):
         save_str_representation = str(self)
         wf_output_dir = self.output_dir
 
-        self.jobManager.delete()
+        #self.jobmanager.delete()
         self.bulk_delete_tasks(self.tasks)
         self.log.info('Bulk Deleting Stages...'.format(self.name))
         self.stages.delete()

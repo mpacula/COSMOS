@@ -6,38 +6,39 @@ from cosmos.utils.helpers import check_and_create_output_dir
 from cosmos.utils.helpers import spinning_cursor
 import time
 
+
+from drm_local import DRM_Local
+from jobmanager_lsf import JobManager_LSF
+
 class JobStatusError(Exception):
     pass
 
-class JobManagerBase(models.Model):
+class JobManager(models.Model):
     """
-    Note there can only be one of these instantiated at a time
+    A Job Manager, so that multiple job managers can be used.
     """
-    class Meta:
-        abstract = True
-        app_label = 'cosmos'
-        db_table = 'cosmos_jobmanager'
 
-    created_on = models.DateTimeField(null=True,default=None)
-    def __init__(self,*args,**kwargs):
-        kwargs['created_on'] = timezone.now()
-        super(JobManagerBase,self).__init__(*args,**kwargs)
+    def __init__(self, workflow):
+        from cosmos import session
+        self.local_jm = DRM_Local(workflow, self)
+        if session.settings['DRM'] == 'Native_LSF':
+            self.default_jm = JobManager_LSF(workflow, self)
+        elif session.settings['DRM'] == 'local':
+            self.default_jm = DRM_Local(workflow, self)
+        else:
+            self.default_jm = DRM_Local(workflow, self)
+        self.workflow = workflow
 
     @property
     def jobAttempts(self):
         "This JobManager's jobAttempts"
-        return JobAttempt.objects.filter(jobManager=self)
-
-    def delete(self,*args,**kwargs):
-        "Deletes this job manager"
-        self.jobAttempts.delete()
-        super(JobManagerBase,self).__init__(self,*args,**kwargs)
+        return JobAttempt.objects.filter(task__stage__workflow=self.workflow)
 
     def get_numJobsQueued(self):
         "The number of queued jobs."
         return self.jobAttempts.filter(queue_status = 'queued').count()
 
-    def __create_command_sh(self,jobAttempt):
+    def __create_command_sh(self, jobAttempt):
         """Create a sh script that will execute a command"""
         with open(jobAttempt.command_script_path,'wb') as f:
             f.write("#!/bin/bash\n")
@@ -54,7 +55,6 @@ class JobManagerBase(models.Model):
             command_script_path = jobAttempt.command_script_path
         )
 
-
     def add_jobAttempt(self, task, command, jobName = "Generic_Job_Name"):
         """
         Adds a new JobAttempt
@@ -68,6 +68,7 @@ class JobManagerBase(models.Model):
         self.__create_command_sh(jobAttempt)
         jobAttempt.save()
         return jobAttempt
+
 
     def get_jobAttempt_status(self,jobAttempt):
         """
@@ -103,50 +104,38 @@ class JobManagerBase(models.Model):
 
         :return: A finished jobAttempt, or None if all queued jobs are still running
         """
-        raise NotImplementedError
+        for jobAttempt in self.jobAttempts.filter(queue_status='queued'):
+            if jobAttempt.task.always_local:
+                exit_code = self.local_jm.poll(jobAttempt)
+            else:
+                exit_code = self.default_jm.poll(jobAttempt)
+                if exit_code is not None:
+                    jobAttempt._hasFinished(exit_code == exit_code, {'exit_code': exit_code})
+                    return jobAttempt
+
+    def get_status(self,jobAttempt):
+        if jobAttempt.task.always_local:
+            self.local_jm.status(jobAttempt)
+        else:
+            self.default_jm.status(jobAttempt)
+
+    def terminate(self, jobAttempt):
+        if jobAttempt.task.always_local:
+            self.local_jm.terminate(jobAttempt)
+        else:
+            self.default_jm.terminate(jobAttempt)
+
 
     def submit_job(self,jobAttempt):
         """Submits and runs a job"""
         if not jobAttempt.queue_status == 'not_queued':
             raise JobStatusError, 'JobAttempt has already been submitted'
 
-        self._submit_job(jobAttempt)
+        if jobAttempt.task.always_local:
+            self.local_jm.submit_job(jobAttempt)
+        else:
+            self.default_jm.submit_job(jobAttempt)
 
         jobAttempt.queue_status = 'queued'
         jobAttempt.save()
         return jobAttempt
-
-    def _submit_job(self,jobAttempt):
-        "Submit the jobAttempt to the DRM"
-        raise NotImplementedError
-
-
-    def toString(self):
-        return "JobManager %s, created on %s" % (self.id,self.created_on)
-
-#    def __waitForJob(self,job):
-#        """
-#        Waits for a job to finish
-#        Returns a drmaa info object
-#        """
-#        if job.queue_status != 'queued':
-#            raise JobStatusError('JobAttempt is not in the queue.  Make sure you submit() the job first, and make sure it hasn\'t alreay been collected.')
-#        try:
-#            extra_jobinfo = session.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-#        except Exception as e:
-#            if e == "code 24: no usage information was returned for the completed job":
-#                extra_jobinfo = None
-#
-#        job.hasFinished(extra_jobinfo)
-#        job.save()
-#        return job
-
-
-#    def close_session(self):
-#        #TODO delete all jobtemplates
-#        session.drmaa_session.exit()
-
-#    def terminate_all_queued_or_running_jobAttempts(self):
-#        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):
-#            self.terminate_jobAttempt(jobAttempt)
-#

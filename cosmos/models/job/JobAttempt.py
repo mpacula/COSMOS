@@ -19,10 +19,10 @@ class JobAttempt(models.Model):
         ('queued','JobAttempt is in the JobAttempt Queue and is waiting to run, is running, or has finished'),
         ('completed','JobAttempt has completed'), #this means job.finished() has been executed.  use drmaa_state to find out if job was successful or failed.
     )
-    created_on = models.DateTimeField(null=True,default=None)
-    finished_on = models.DateTimeField(null=True,default=None)
+    created_on = models.DateTimeField(null=True, default=None)
+    finished_on = models.DateTimeField(null=True, default=None)
 
-    jobManager = models.ForeignKey('cosmos.JobManager')
+    #jobmanager = models.ForeignKey('cosmos.JobManager')
     task = models.ForeignKey('cosmos.Task')
     jobinfo_output_dir = models.CharField(max_length=255, default=None, null=True)
 
@@ -120,9 +120,10 @@ class JobAttempt(models.Model):
                 self.jobinfo_output_dir = opj(self.task.output_dir, 'jobinfo')
 
 
-    # @property
-    # def jobinfo_output_dir(self):
-    #
+    @property
+    def jobManager(self):
+        return self.workflow.jobManager
+
 
     @staticmethod
     def profile_fields_as_list():

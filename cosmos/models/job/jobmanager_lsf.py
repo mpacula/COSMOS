@@ -3,7 +3,6 @@ import os
 import re
 
 from cosmos.models.job.JobAttempt import JobAttempt
-from cosmos.models.job.jobmanager import JobManagerBase
 
 
 class JobStatusError(Exception):
@@ -48,14 +47,13 @@ def get_bjobs():
     return bjobs
 
 
-class JobManager(JobManagerBase):
+class JobManager_LSF():
     """
     Note there can only be one of these instantiated at a time
     """
+    def __init__(self, workflow):
+        self.workflow = workflow
 
-    class Meta:
-        app_label = 'cosmos'
-        db_table = 'cosmos_jobmanager'
 
     def _submit_job(self, jobAttempt):
         bsub = 'bsub -o {stdout} -e {stderr} {ns}'.format(
