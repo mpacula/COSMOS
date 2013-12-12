@@ -1,31 +1,39 @@
-
 import os
 import re
 import hashlib
 from django.db import models
 from cosmos.utils.helpers import folder_size
+import shutil
+from urllib import pathname2url
 
 class TaskFileValidationError(Exception): pass
+
+
 class TaskFileError(Exception): pass
 
+
 i = 0
+
+
 def get_tmp_id():
     global i
     i += 1
     return i
 
+
 class TaskFile(models.Model, object):
     """
     Task File
     """
+
     class Meta:
         app_label = 'cosmos'
         db_table = 'cosmos_taskfile'
 
-    path = models.CharField(max_length=250, null=True)
     name = models.CharField(max_length=50, null=True)
-    fmt = models.CharField(max_length=30, null=True) #file format
     basename = models.CharField(max_length=50, null=True)
+    fmt = models.CharField(max_length=30, null=True) #file format
+    path = models.CharField(max_length=250, null=True)
     persist = models.BooleanField(default=False)
     deleted_because_intermediate = models.BooleanField(default=False)
     must_exist = models.BooleanField(default=True)
@@ -62,7 +70,6 @@ class TaskFile(models.Model, object):
         if not re.search("^[\w\.]+$", self.name):
             raise TaskFileValidationError, 'The taskfile.name can only contain letters, numbers, and periods. Failed name is "{0}"'.format(
                 self.name)
-
 
     @property
     def workflow(self):
@@ -104,3 +111,10 @@ class TaskFile(models.Model, object):
             self.save()
         else:
             raise TaskFileError, "{0} should not be deleted because persist=True".format(self)
+
+    def delete(self, *args, **kwargs):
+        """
+        Deletes this task and all files associated with it
+        """
+        shutil.rmtree(self.path)
+        super(TaskFile, self).delete(*args, **kwargs)

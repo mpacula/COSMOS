@@ -54,7 +54,6 @@ class JobManager_LSF():
     def __init__(self, workflow):
         self.workflow = workflow
 
-
     def _submit_job(self, jobAttempt):
         bsub = 'bsub -o {stdout} -e {stderr} {ns}'.format(
             stdout=jobAttempt.STDOUT_filepath,

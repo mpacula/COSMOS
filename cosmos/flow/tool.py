@@ -77,6 +77,8 @@ class Tool(object):
         if self.default_params is None: self.default_params = {}
 
         self.stage = stage
+        for k,v in tags.copy().items():
+            tags[k] = str(v)
         self.tags = tags
         self.dag = dag
 
@@ -228,21 +230,6 @@ class Tool(object):
         #if tuple is returned, second element is a dict to format with
         extra_format_dict = r[1] if len(r) == 2 and r else {}
         pcmd = r[0] if len(r) == 2 else r
-
-        # #replace $OUT with a string representation of a taskfile
-        # out_names = re.findall('\$OUT\.([\.\w]+)',pcmd)
-        # for out_name in out_names:
-        #     try:
-        #         pcmd = pcmd.replace('$OUT.{0}'.format(out_name),str(self.get_output(out_name)))
-        #     except GetOutputError as e:
-        #         raise ToolValidationError('Invalid key in $OUT.key ({0}), available output_file keys in {1} are {2}'.format(out_name,self,self.get_output_file_names()))
-        #
-        # #Validate all output_files have an $OUT
-        # for tf in self.output_files:
-        #     if tf.name not in out_names:
-        #         raise ToolValidationError,\
-        #             'An output taskfile with name {1} is in {0}.output_files but not referenced with $OUT in the tool\'s command.'.\
-        #                 format(self,tf.name)
                 
         #format() return string with callargs
         callargs['self'] = self

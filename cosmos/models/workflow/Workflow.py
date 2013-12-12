@@ -12,6 +12,7 @@ from django.db.models import Q, Sum
 from django.db.utils import IntegrityError
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from picklefield.fields import PickledObjectField
 
 from cosmos import session
 from cosmos.models import JobAttempt, JobManager
@@ -49,6 +50,7 @@ class Workflow(models.Model):
     delete_intermediates = models.BooleanField(default=False, help_text="Delete intermediate files")
     last_cmd_executed = models.CharField(max_length=255, default=None, null=True)
     description = models.CharField(max_length=255, default=None, null=True)
+    info = PickledObjectField(null=False, default={})
     comments = models.TextField(null=True, default=None)
     stage_graph = models.TextField(null=True, default=None)
 
@@ -59,10 +61,7 @@ class Workflow(models.Model):
         kwargs['created_on'] = timezone.now()
         super(Workflow, self).__init__(*args, **kwargs)
 
-        # set default output_dir
-        if self.output_dir is None:
-            self.output_dir = opj(session.settings['default_root_output_dir'],
-                                  '{1}'.format(self, self.name.replace(' ', '_')))
+        assert self.output_dir is not None, 'output_dir cannot be None'
 
         validate_name(self.name)
 
@@ -142,11 +141,10 @@ class Workflow(models.Model):
         kwargs.setdefault('delete_intermediates', False)
         kwargs.setdefault('comments', None)
         kwargs.setdefault('max_cores', 0)
+        kwargs.setdefault('info', {})
 
         restart = kwargs.pop('restart', False)
         prompt_confirm = kwargs.pop('prompt_confirm', True)
-
-        #name = re.sub("\s","_",name)
 
         if restart:
             wf = Workflow.__restart(name=name, prompt_confirm=prompt_confirm, **kwargs)
@@ -159,10 +157,9 @@ class Workflow(models.Model):
         wf._delete_stale_objects()
 
         #terminate on ctrl+c
-        def ctrl_c(signal, frame):
-            wf.terminate()
-
         try:
+            def ctrl_c(signal, frame):
+                wf.terminate()
             signal.signal(signal.SIGINT, ctrl_c)
         except ValueError: #signal only works in parse_args thread and django complains
             pass
@@ -259,11 +256,18 @@ class Workflow(models.Model):
         """
         if Workflow.objects.filter(id=_wf_id).count():
             raise ValidationError('Workflow with this _wf_id already exists')
-        output_dir = kwargs.setdefault('output_dir', None)
-        if output_dir and os.path.exists(output_dir):
-            raise ValidationError('output directory {0} already exists'.format(output_dir))
+
+        # set default output_dir
+        kwargs.setdefault('output_dir',None)
+        if kwargs['output_dir'] is None:
+            kwargs['output_dir'] = opj(session.settings['default_root_output_dir'],
+                                  '{1}'.format(kwargs['output_dir'], name.replace(' ', '_')))
+
+        if os.path.exists(kwargs['output_dir']):
+            raise ValidationError('Workflow output directory {0} already exists'.format(kwargs['output_dir']))
 
         wf = Workflow.objects.create(id=_wf_id, name=name, **kwargs)
+
         wf.save()
         check_and_create_output_dir(wf.output_dir)
 
@@ -281,8 +285,6 @@ class Workflow(models.Model):
         :param name: (str) The name of the stage, must be unique within this Workflow. Required.
         """
         #TODO name can't be "log" or change log dir to .log
-        name = re.sub("\s", "_", name)
-
         stage, created = self.stages.get_or_create(workflow=self, name=name)
         min, max = self.stages.aggregate(
             models.Max('order_in_workflow'),
@@ -319,7 +321,7 @@ class Workflow(models.Model):
         jobAttempts = self.jobManager.jobAttempts.filter(queue_status='queued')
         self.log.info("Sending Terminate signal to all running jobs.")
         for ja in jobAttempts:
-            self.jobManager.terminate_jobAttempt(ja)
+            self.jobManager.terminate(ja)
 
         #this basically a bulk task._has_finished and jobattempt.hasFinished
         task_ids = jobAttempts.values('task')
@@ -572,13 +574,11 @@ class Workflow(models.Model):
                 + "<STDERR>\n{0}\n</STDERR>".format(failed_jobAttempt.STDERR_txt)
             )
             if numAttempts < self.max_reattempts:
-                for f in os.listdir(task.job_output_dir):
-                    if f != 'jobinfo':
-                        p = opj(task.job_output_dir, f)
-                        if os.path.isdir(p):
-                            shutil.rmtree(p)
-                        else:
-                            os.unlink(p)
+                for f in task.output_files:
+                    if os.path.isdir(f.path):
+                        shutil.rmtree(f.path)
+                    elif os.path.exists(f.path):
+                        os.unlink(f.path)
                 self._run_task(task)
                 return True
             else:
@@ -677,6 +677,7 @@ class Workflow(models.Model):
         self.log.info("Finished {0}, last stage's output dir: {1}".format(self,
                                                                           self.stages.order_by('-order_in_workflow')[
                                                                               0].output_dir))
+
     @property
     def successful(self):
         return self.stages.filter(successful=False).count() == 0
@@ -739,7 +740,7 @@ class Workflow(models.Model):
                     yield s, t, o
 
     def __str__(self):
-        return 'Workflow[{0}] {1}'.format(self.id, re.sub('_', ' ', self.name))
+        return 'Workflow[{0}] {1}'.format(self.id, self.name)
 
     def describe(self):
         return """output_dir: {0.output_dir}""".format(self)

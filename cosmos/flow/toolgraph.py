@@ -6,7 +6,7 @@ import networkx as nx
 from cosmos.utils.helpers import groupby, get_all_dependencies, validate_is_type_or_list
 from cosmos.models import Task, TaskError
 from cosmos.flow.tool import Tool, INPUT
-
+from cosmos.utils.helpers import validate_name
 
 class Relationship(object):
     """Abstract Class for the various rel strategies"""
@@ -60,18 +60,11 @@ class ToolGraph(object):
         self.cpu_req_override = cpu_req_override
         self.mem_req_factor = mem_req_factor
 
-    def input(self, inputs, name=None):
-        assert isinstance(inputs[0], INPUT)
-        for i,inp in enumerate(inputs):
-            if len(inp.tags)==0:
-                inp.tags['input'] = i
-
-        return self.source(inputs, name)
-
     def source(self, tools, name=None):
+        assert isinstance(tools, list), 'tools must be a list'
+        assert len(tools) > 0, '`tools` cannot be empty'
         if name is None:
             name = tools[0].name
-        assert isinstance(tools, list), 'tools must be a list'
         tags = [tuple(t.tags.items()) for t in tools]
         assert len(tags) == len(
             set(tags)), 'Duplicate inputs tags detected for {0}.  Tags within a stage must be unique.'.format(INPUT)
@@ -89,7 +82,13 @@ class ToolGraph(object):
         """
         Creates a Stage in this TaskGraph
         """
-        stage = ToolStage(tool, parents, rel, name, extra_tags)
+        if name is None:
+            if hasattr(tool, 'name'):
+                name = tool.name
+            else:
+                name = tool.__name__
+        stage = ToolStage(name, tool, parents, rel, extra_tags)
+
         assert stage.name not in [n.name for n in self.stage_G.nodes()], 'Duplicate stage names detected: {0}'.format(
             stage.name)
 
@@ -173,8 +172,7 @@ class ToolGraph(object):
         for tool in self.tool_G:
             for key in tool.tags:
                 if not re.match('\w', key):
-                    raise ValueError("{0}.{1}'s tag's keys are not alphanumeric: {3}".format(stage,tool, tool.tags))
-
+                    raise ValueError("{0}.{1}'s tag's keys are not alphanumeric: {3}".format(stage, tool, tool.tags))
 
         return self
 
@@ -373,7 +371,7 @@ class ToolGraph(object):
 
 
 class ToolStage():
-    def __init__(self, tool=None, parents=None, rel=None, name=None, extra_tags=None, tools=None, is_source=False):
+    def __init__(self, name, tool=None, parents=None, rel=None, extra_tags=None, tools=None, is_source=False):
         if parents is None:
             parents = []
         if tools is None:
@@ -395,10 +393,9 @@ class ToolStage():
         self.is_source = is_source
 
         self.extra_tags = extra_tags
-        self.name = name or self.tool.__name__
+        self.name = name
 
-        if not re.search(r"^\w+$", self.name):
-            raise ValueError, 'Stage name `{0}` must be alphanumeric'.format(self.name)
+        validate_name(self.name, 'name')
 
 
     @property

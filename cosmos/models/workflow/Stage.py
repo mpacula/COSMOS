@@ -51,9 +51,9 @@ class Stage(models.Model):
         if hasattr(session, 'stage_output_dir'):
             self.output_dir = session.stage_output_dir(self)
         else:
-            self.output_dir = os.path.join(self.workflow.output_dir, self.name.replace(' ', '_'))
+            self.output_dir = os.path.join(self.workflow.output_dir)
 
-        check_and_create_output_dir(self.output_dir)
+        #check_and_create_output_dir(self.output_dir)
 
     def set_status(self, new_status, save=True):
         "Set Stage status"
@@ -304,9 +304,9 @@ class Stage(models.Model):
         Bulk deletes this stage and all files associated with it.
         """
         self.log.info('Deleting Stage {0}.'.format(self.name))
-        if os.path.exists(self.output_dir):
-            self.log.info('Deleting directory {0}...'.format(self.output_dir))
-            os.system('rm -rf {0}'.format(self.output_dir))
+        # if os.path.exists(self.output_dir):
+        #     self.log.info('Deleting directory {0}...'.format(self.output_dir))
+        #     os.system('rm -rf {0}'.format(self.output_dir))
         self.workflow.bulk_delete_tasks(self.tasks)
         super(Stage, self).delete(*args, **kwargs)
         self.log.info('{0} Deleted.'.format(self))
@@ -318,4 +318,4 @@ class Stage(models.Model):
         return ('stage_view', [str(self.workflow.id), self.name])
 
     def __str__(self):
-        return 'Stage[{0}] {1}'.format(self.id, re.sub('_', ' ', self.name))
+        return '<Stage[{0}] {1}>'.format(self.id, self.name)

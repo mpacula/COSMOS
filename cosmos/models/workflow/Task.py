@@ -264,8 +264,8 @@ class Task(models.Model):
         for ja in self.jobattempt_set.all(): ja.delete()
         self.task_tags.delete()
         self.output_files.delete()
-        if os.path.exists(self.output_dir):
-            os.system('rm -rf {0}'.format(self.output_dir))
+        for f in self.output_files:
+            f.delete()
         super(Task, self).delete(*args, **kwargs)
 
     def __str__(self):

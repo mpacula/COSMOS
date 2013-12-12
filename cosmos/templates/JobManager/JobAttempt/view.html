@@ -5,7 +5,7 @@
 
 
 <ul class="breadcrumb">
-  <li><a href="/Workflow/">Workflows</a> <span class="divider">/</span></li>
+  <li><a href="{% url "cosmos_index" %}">Workflows</a> <span class="divider">/</span></li>
   <li><a href="{{jobAttempt.task.stage.workflow.url }}">{{jobAttempt.task.stage.workflow}}</a> <span class="divider">/</span></li>
   <li><a href="{{jobAttempt.task.stage.url }}">{{jobAttempt.task.stage}}</a><span class="divider">/</span></li>
   <li><a href="{{jobAttempt.task.url }}">{{jobAttempt.task}}</a><span class="divider">/</span></li>

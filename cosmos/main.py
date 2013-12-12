@@ -54,7 +54,7 @@ def rm(workflows, prompt_confirm, stage_number, all_stages_after):
 
 def shell():
     """
-    Open up an ipython shell with Cosmos objects preloaded
+    Launches an ipython session with Cosmos models already imported
     """
     django_manage('shell_plus'.split(' '))
 
@@ -62,6 +62,7 @@ def shell():
 def syncdb():
     "Sets up the SQL database"
     django_manage('syncdb --noinput'.split(' '))
+    django_manage('migrate cosmos'.split(' '))
 
 
 def collectstatic():
@@ -77,6 +78,7 @@ def resetdb():
     "DELETE ALL DATA in the database and then run a syncdb"
     django_manage('reset_db -R default'.split(' '))
     django_manage('syncdb --noinput'.split(' '))
+    django_manage('migrate cosmos'.split(' '))
 
 
 def runweb(port):

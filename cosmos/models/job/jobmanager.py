@@ -74,11 +74,11 @@ class JobManager(models.Model):
         """
         Queries the DRM for the status of the job
         """
-        raise NotImplementedError
+        if jobAttempt.task.always_local:
+            self.local_jm.status(jobAttempt)
+        else:
+            self.default_jm.status(jobAttempt)
 
-    def terminate_jobAttempt(self,jobAttempt):
-        "Terminates a jobAttempt"
-        raise NotImplementedError
 
     def yield_all_queued_jobs(self):
         "Yield all queued jobs."
@@ -109,9 +109,10 @@ class JobManager(models.Model):
                 exit_code = self.local_jm.poll(jobAttempt)
             else:
                 exit_code = self.default_jm.poll(jobAttempt)
-                if exit_code is not None:
-                    jobAttempt._hasFinished(exit_code == exit_code, {'exit_code': exit_code})
-                    return jobAttempt
+
+            if exit_code is not None:
+                jobAttempt._hasFinished(exit_code == 0, {'exit_code': exit_code})
+                return jobAttempt
 
     def get_status(self,jobAttempt):
         if jobAttempt.task.always_local:
