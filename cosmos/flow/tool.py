@@ -56,7 +56,7 @@ class Tool(object):
     #: If delete_interemediates is on, they will not be deleted.
     persist=False
     #: forwards this tool's input to get_output() calls
-    forward_input = False
+    # forward_input = False
     #: always run job as a subprocess even when DRM is not set to local
     always_local = False
 
@@ -112,15 +112,15 @@ class Tool(object):
     def children(self):
         return self.dag.tool_G.successors(self)
 
-    @property
-    def child(self):
-        cs = self.children
-        if len(cs) > 1:
-            raise ToolError('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
-        elif len(cs) == 0:
-            raise ToolError('{0} has no parents'.format(self))
-        else:
-            return cs[0]
+    # @property
+    # def child(self):
+    #     cs = self.children
+    #     if len(cs) > 1:
+    #         raise ToolError('{0} has more than one parent.  The parents are: {1}'.format(self,self.parents))
+    #     elif len(cs) == 0:
+    #         raise ToolError('{0} has no parents'.format(self))
+    #     else:
+    #         return cs[0]
 
     @property
     def parents(self):
@@ -141,12 +141,12 @@ class Tool(object):
             if o.name == name:
                 return o
 
-        if self.forward_input:
-            outs = filter(lambda x:x,[ p.get_output(name,error_if_missing=False) for p in self.parents ])
-            if error_if_missing and len(outs) > 1:
-                raise ExpectedError,'Too many inputs were forwarded, only one parent should have the input being forwarded'
-            if len(outs) > 0:
-                return outs[0]
+        # if self.forward_input:
+        #     outs = filter(lambda x:x,[ p.get_output(name,error_if_missing=False) for p in self.parents ])
+        #     if error_if_missing and len(outs) > 1:
+        #         raise ExpectedError,'Too many inputs were forwarded, only one parent should have the input being forwarded'
+        #     if len(outs) > 0:
+        #         return outs[0]
 
         if error_if_missing:
             raise ToolError, 'Output named `{0}` does not exist in {1}'.format(name,self)

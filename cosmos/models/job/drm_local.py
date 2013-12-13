@@ -4,7 +4,6 @@ import os
 import psutil
 import json
 
-
 class DRM_Local():
     """
     Note there can only be one of these instantiated at a time
@@ -18,7 +17,8 @@ class DRM_Local():
         p = Popen(self.jobmanager._create_cmd_str(jobAttempt).split(' '),
                   stdout=open(jobAttempt.STDOUT_filepath, 'w'),
                   stderr=open(jobAttempt.STDERR_filepath, 'w'),
-                  preexec_fn=preexec_function())
+                  preexec_fn=preexec_function()
+                  )
         jobAttempt.drmaa_jobID = p.pid
         jobAttempt.save()
 

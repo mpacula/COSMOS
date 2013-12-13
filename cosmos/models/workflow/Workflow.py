@@ -41,7 +41,6 @@ class Workflow(models.Model):
 
     name = models.CharField(max_length=250, unique=True)
     output_dir = models.CharField(max_length=250, null=True)
-    #jobmanager = models.OneToOneField('cosmos.JobManager', null=True)
     dry_run = models.BooleanField(default=False, help_text="don't execute anything")
     max_reattempts = models.SmallIntegerField(default=3)
     default_queue = models.CharField(max_length=255, default=None, null=True)
@@ -257,11 +256,9 @@ class Workflow(models.Model):
         if Workflow.objects.filter(id=_wf_id).count():
             raise ValidationError('Workflow with this _wf_id already exists')
 
-        # set default output_dir
-        kwargs.setdefault('output_dir',None)
-        if kwargs['output_dir'] is None:
+        if kwargs.setdefault('output_dir',None) is None:
             kwargs['output_dir'] = opj(session.settings['default_root_output_dir'],
-                                  '{1}'.format(kwargs['output_dir'], name.replace(' ', '_')))
+                                  name.replace(' ', '_'))
 
         if os.path.exists(kwargs['output_dir']):
             raise ValidationError('Workflow output directory {0} already exists'.format(kwargs['output_dir']))
@@ -269,7 +266,7 @@ class Workflow(models.Model):
         wf = Workflow.objects.create(id=_wf_id, name=name, **kwargs)
 
         wf.save()
-        check_and_create_output_dir(wf.output_dir)
+        #check_and_create_output_dir(wf.output_dir)
 
         wf.log.info('Created Workflow {0}.'.format(wf))
 
@@ -461,7 +458,9 @@ class Workflow(models.Model):
 
         self.log.info('Deleting Task output directories')
         for d in task_output_dirs:
-            os.system('rm -rf {0}'.format(d))
+            if not hasattr(session,'task_output_dir'): #don't delete directories if this has been specified
+                if os.path.exists(d):
+                    shutil.rmtree(d)
 
         # Update stages that are not longer successful
         self.stages.filter(successful=True, task__successful=False).update(

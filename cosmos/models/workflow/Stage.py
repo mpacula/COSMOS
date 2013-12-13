@@ -318,4 +318,4 @@ class Stage(models.Model):
         return ('stage_view', [str(self.workflow.id), self.name])
 
     def __str__(self):
-        return '<Stage[{0}] {1}>'.format(self.id, self.name)
+        return 'Stage[{0}] {1}'.format(self.id, self.name)

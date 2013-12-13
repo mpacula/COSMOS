@@ -89,33 +89,32 @@ class Task(models.Model):
                 self.output_dir = session.task_output_dir(self)
             else:
                 basedir = self.tags_as_query_string().replace('&', '__').replace('=', '_')
-                self.output_dir = opj(self.stage.output_dir, basedir)
-
+                self.output_dir = opj(self.workflow.output_Dir, self.stage.name, basedir)
 
         # if len(self.tags) == 0:
         #     raise TaskValidationError, '{0} has no tags, at least one tag is required'.format(self)
 
-    @staticmethod
-    def create(stage, pcmd, **kwargs):
-        """
-        Creates a task.
-        """
-        task = Task(stage=stage, pcmd=pcmd, **kwargs)
-
-        if Task.objects.filter(stage=task.stage, tags=task.tags).count() > 0:
-            task.delete()
-            raise ValidationError("Tasks belonging to a stage with the same tags detected! tags: {0}".format(task.tags))
-
-        task.save()
-
-        check_and_create_output_dir(task.output_dir)
-        check_and_create_output_dir(task.job_output_dir)
-
-        #Create task tags
-        for key, value in task.tags.items():
-            TaskTag.objects.create(task=task, key=key, value=value)
-
-        return task
+    # @staticmethod
+    # def create(stage, pcmd, **kwargs):
+    #     """
+    #     Creates a task.
+    #     """
+    #     task = Task(stage=stage, pcmd=pcmd, **kwargs)
+    #
+    #     if Task.objects.filter(stage=task.stage, tags=task.tags).count() > 0:
+    #         task.delete()
+    #         raise ValidationError("Tasks belonging to a stage with the same tags detected! tags: {0}".format(task.tags))
+    #
+    #     task.save()
+    #
+    #     check_and_create_output_dir(task.output_dir)
+    #     check_and_create_output_dir(task.job_output_dir)
+    #
+    #     #Create task tags
+    #     for key, value in task.tags.items():
+    #         TaskTag.objects.create(task=task, key=key, value=value)
+    #
+    #     return task
 
     @property
     def workflow(self):
@@ -263,7 +262,6 @@ class Task(models.Model):
         #todo delete stuff in output_paths that may be extra files
         for ja in self.jobattempt_set.all(): ja.delete()
         self.task_tags.delete()
-        self.output_files.delete()
         for f in self.output_files:
             f.delete()
         super(Task, self).delete(*args, **kwargs)
