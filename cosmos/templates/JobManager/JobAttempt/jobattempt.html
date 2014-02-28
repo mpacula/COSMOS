@@ -62,7 +62,7 @@
     </dd>
     <dt>Status Details</dt><dd>{{jobAttempt.status_details}}</dd>
     <dt>Shell Script</dt><dd><pre class="linenums">{{jobAttempt.get_command_shell_script_text}}</pre></dd>
-    <dt><em>Profile</em> Output</dt><dd><a href="{% url 'jobAttempt_profile_output' jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
+    <dt><em>Profile</em> Output</dt><dd><a href="{% url jobAttempt_profile_output jobAttempt.id%}"><code>{{jobAttempt.profile_output_path}}</code></a></dd>
     <dt>Output Directory</dt><dd><code>{{jobAttempt.task.job_output_dir}}</code></dd>
     <dt>Task Output File Size</dt><dd>{%if cosmos_settings.show_task_file_sizes%}{{jobAttempt.task.output_file_size|b2e}}{%else%}off{%endif%}</dd>
     <dt>Output Files</dt><dd>

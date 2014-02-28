@@ -1,6 +1,5 @@
-#from django.conf.urls.defaults import patterns, include, url          # 'defaults' deprecated
-
-from django.conf.urls                import patterns, include, url     
+from django.conf.urls.defaults import patterns, include, url          # 'defaults' deprecated in Django 1.5
+#from django.conf.urls                import patterns, include, url     
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 # Uncomment the next two lines to enable the admin:
