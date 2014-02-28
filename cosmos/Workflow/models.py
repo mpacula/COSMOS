@@ -31,6 +31,7 @@ import signals
 from cosmos.Workflow.templatetags import extras
 
 #from ordereddict import OrderedDict                 # included Python 2.7
+from collections import OrderedDict
 
 status_choices=(
                 ('successful','Successful'),
