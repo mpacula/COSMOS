@@ -63,7 +63,9 @@ def shell():
 
 def syncdb():
     "Sets up the SQL database"
-    django_manage('syncdb --noinput'.split(' '))
+    #django_manage('syncdb --noinput'.split(' '))
+    from django.core.management import execute_from_command_line
+    execute_from_command_line([sys.argv[0],'syncdb','--noinput'])
 
 
 def collectstatic():
@@ -85,6 +87,8 @@ def runweb(port):
 def django_manage(django_args):
     "Django manage.py script"
     from django.core.management import execute_from_command_line
+    print "In django_manage argv is: {0}".format([sys.argv[0]]+django_args)
+    
     execute_from_command_line([sys.argv[0]]+django_args)
 
 def main():

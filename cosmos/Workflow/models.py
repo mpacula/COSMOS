@@ -3,22 +3,34 @@ Workflow models
 """
 from cosmos import session
 from cosmos.config import settings
+
 from django.db import models, transaction
 from django.db.models import Q,Count
 from django.db.utils import IntegrityError
 from cosmos.Job.models import JobAttempt,JobManager
+
 import os,sys,re,signal
+
 from cosmos.utils.helpers import validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
 from cosmos.utils import helpers
+
 from django.core.exceptions import ValidationError
+
 from picklefield.fields import PickledObjectField, dbsafe_decode
+
 from django.utils import timezone
+
 import networkx as nx
+
 import pygraphviz as pgv
+
 import hashlib
+
 import signals
+
 from cosmos.Workflow.templatetags import extras
-from ordereddict import OrderedDict
+
+#from ordereddict import OrderedDict                 # included Python 2.7
 
 status_choices=(
                 ('successful','Successful'),
@@ -28,10 +40,10 @@ status_choices=(
                 )
 
 
-class TaskError(Exception): pass
-class TaskValidationError(Exception): pass
+class TaskError              (Exception): pass
+class TaskValidationError    (Exception): pass
 class TaskFileValidationError(Exception): pass
-class WorkflowError(Exception): pass
+class WorkflowError          (Exception): pass
 
 i = 0
 def get_tmp_id():
@@ -39,23 +51,24 @@ def get_tmp_id():
     i +=1
     return i
 
-class TaskFile(models.Model,object):
+class TaskFile(models.Model, object):
     """
     Task File
     """
-    path = models.CharField(max_length=250,null=True)
-    name = models.CharField(max_length=50,null=True)
-    fmt = models.CharField(max_length=30,null=True) #file format
-    basename = models.CharField(max_length=50,null=True)
-    persist = models.BooleanField(default=False)
+    path     = models.CharField(max_length=250, null=True)
+    name     = models.CharField(max_length= 50, null=True)
+    fmt      = models.CharField(max_length= 30, null=True) #file format
+    basename = models.CharField(max_length= 50, null=True)
+
+    persist                      = models.BooleanField(default=False)
     deleted_because_intermediate = models.BooleanField(default=False)
 
 
     def __init__(self,*args,**kwargs):
         """
-        :param name: This is the name of the file, and is used as the key for obtaining it.  No Tool an
-            have multiple TaskFiles with the same name.  Defaults to ``fmt``.
-        :param fmt: The format of the file.  Defaults to the extension of ``path``.
+        :param name: This is the name of the file, and is used as the key for obtaining it.
+                     No Tool an have multiple TaskFiles with the same name.  Defaults to ``fmt``.
+        :param fmt:  The format of the file.  Defaults to the extension of ``path``.
         :param path: The path to the file.  Required.
         :param basename: (str) The name to use for the file for auto-generated paths.  You must explicitly
             specify the extension of the filename, if you want one i.e. 'myfile.txt' not 'myfile'
@@ -127,21 +140,28 @@ class TaskFile(models.Model,object):
 
 class Workflow(models.Model):
     """   
-    This is the master object.  It contains a list of :class:`Stage` which represent a pool of jobs that have no dependencies on each other
-    and can be executed at the same time. 
+    This is the master object.  It contains a list of :class:`Stage` which represent a pool of jobs
+    that have no dependencies on each other and can be executed at the same time. 
     """
-    name = models.CharField(max_length=250,unique=True)
-    output_dir = models.CharField(max_length=250)
-    jobManager = models.OneToOneField('Job.JobManager',null=True)
-    dry_run = models.BooleanField(default=False,help_text="don't execute anything")
-    max_reattempts = models.SmallIntegerField(default=3)
-    default_queue = models.CharField(max_length=255,default=None,null=True)
-    delete_intermediates = models.BooleanField(default=False,help_text="Delete intermediate files")
-    #cmd_executed = models.CharField(max_length=255,default=None,null=True)
-    comments = models.TextField(null=True,default=None)
+    name                 = models.CharField(max_length=250, unique=True)
+    output_dir           = models.CharField(max_length=250)
 
-    created_on = models.DateTimeField(null=True,default=None)
-    finished_on = models.DateTimeField(null=True,default=None)
+    jobManager           = models.OneToOneField('Job.JobManager',null=True)
+
+    dry_run              = models.BooleanField(default=False,help_text="don't execute anything")
+
+    max_reattempts       = models.SmallIntegerField(default=3)
+
+    default_queue        = models.CharField(max_length=255,default=None,null=True)
+
+    delete_intermediates = models.BooleanField(default=False,help_text="Delete intermediate files")
+
+    #cmd_executed = models.CharField(max_length=255,default=None,null=True)
+
+    comments             = models.TextField(null=True,default=None)
+
+    created_on           = models.DateTimeField(null=True, default=None)
+    finished_on          = models.DateTimeField(null=True, default=None)
 
     def __init__(self, *args, **kwargs):
         kwargs['created_on'] = timezone.now()
@@ -867,13 +887,19 @@ class Stage(models.Model):
     
     .. note:: A Stage should not be directly instantiated, use :py:func:`Workflow.models.Workflow.add_stage` to create a new stage.
     """
-    name = models.CharField(max_length=200)
-    workflow = models.ForeignKey(Workflow)
+    name        = models.CharField(max_length=200)
+
+    workflow    = models.ForeignKey(Workflow)
+
     order_in_workflow = models.IntegerField(null=True)
-    status = models.CharField(max_length=200,choices=status_choices,default='no_attempt')
-    successful = models.BooleanField(default=False)
-    started_on = models.DateTimeField(null=True,default=None)
-    created_on = models.DateTimeField(null=True,default=None)
+
+#   status      = models.CharField(max_length=200,choices=status_choices,default='no_attempt')
+    status      = models.TextField(default='no_attempt')
+
+    successful  = models.BooleanField(default=False)
+
+    started_on  = models.DateTimeField(null=True,default=None)
+    created_on  = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
 
     class Meta:
@@ -1164,17 +1190,17 @@ class TaskTag(models.Model):
     """
     A SQL row that duplicates the information of Task.tags that can be used for filtering, etc.
     """
-    task = models.ForeignKey('Task')
-    key = models.CharField(max_length=63)
-    value = models.CharField(max_length=255)
+    task  = models.ForeignKey('Task')
+    key   = models.CharField(max_length=255) # was 63 why?
+    value = models.TextField() # was CharField
 
     def __str__(self):
         return "<TaskTag[self.id] {self.key}: {self.value} for Task[{task.id}]>".format(self=self,task=self.task)
 
 class TaskEdge(models.Model):
-    parent = models.ForeignKey('Task',related_name='parent_edge_set')
-    child = models.ForeignKey('Task',related_name='child_edge_set')
-#    tags = PickledObjectField(null=True,default={})
+    parent = models.ForeignKey('Task', related_name='parent_edge_set')
+    child  = models.ForeignKey('Task', related_name='child_edge_set')
+#    tags  = PickledObjectField(null=True,default={})
     "The keys associated with the relationship.  ex, the group_by parameter of a many2one"
 
     def __str__(self):
@@ -1186,25 +1212,33 @@ class Task(models.Model):
     
     tags must be unique for all tasks in the same stage
     """
-    stage = models.ForeignKey(Stage,help_text="The stage this task belongs to.")
-    pcmd = models.TextField(help_text='Preformatted command.  almost always will contain special strings for TaskFiles which will later be replaced by their proper system path at execution')
-    exec_command = models.TextField(help_text='The actual command that is executed',null=True)
+    stage              = models.ForeignKey(Stage,help_text="The stage this task belongs to.")
+
+    pcmd               = models.TextField(help_text='Preformatted command.  almost always will contain special strings for TaskFiles which will later be replaced by their proper system path at execution')
+    exec_command       = models.TextField(help_text='The actual command that is executed',null=True)
+
     memory_requirement = models.IntegerField(help_text="Memory to reserve for jobs in MB",default=None,null=True)
-    cpu_requirement = models.SmallIntegerField(help_text="Number of CPUs to reserve for this job",default=None,null=True)
-    time_requirement = models.IntegerField(help_text="Time required to run in minutes.  If a job runs longer it may be automatically killed.",default=None,null=True)
-    successful = models.BooleanField(default=False,help_text="True if the task has been executed successfully, else False")
-    status = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
-    status_details = models.CharField(max_length=100,default='',help_text='Extra information about this task\'s status')
-    NOOP = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
+    cpu_requirement    = models.SmallIntegerField(help_text="Number of CPUs to reserve for this job",default=None,null=True)
+    time_requirement   = models.IntegerField(help_text="Time required to run in minutes.  If a job runs longer it may be automatically killed.",default=None,null=True)
+
+    successful         = models.BooleanField(default=False,help_text="True if the task has been executed successfully, else False")
+
+    status             = models.CharField(max_length=100,choices = status_choices,default='no_attempt')
+#   status_details     = models.CharField(max_length=100,default='',help_text='Extra information about this task\'s status')
+    status_details     = models.TextField(default='',help_text='Extra information about this task\'s status')
+
+    NOOP               = models.BooleanField(default=False,help_text="No operation.  Likely used to store an input file, this task is not meant to be executed.")
     succeed_on_failure = models.BooleanField(default=False, help_text="If True, Task will succeed and workflow will progress even if its JobAttempts fail.")
-    # cleared_output_files = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
+
+    # cleared_output_files     = models.BooleanField(default=False,help_text="If True, output files have been deleted/cleared.")
     # dont_delete_output_files = models.BooleanField(default=False,help_text="If True, prevents output files from being deleted even when this task becomes an intermediate and workflow.delete_intermediates == True.")
 
     _parents = models.ManyToManyField('Task',related_name='_children')
 
-    tags = PickledObjectField(null=False,default={})
+    tags        = PickledObjectField(null=False,default={})
     #on_success = PickledObjectField(null=False)
-    created_on = models.DateTimeField(null=True,default=None)
+
+    created_on  = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
 
     _output_files = models.ManyToManyField(TaskFile,related_name='task_output_set',null=True,default=None) #dictionary of outputs
