@@ -30,8 +30,11 @@ import signals
 
 from cosmos.Workflow.templatetags import extras
 
-from ordereddict import OrderedDict                 # for Python 2.6
-#from collections import OrderedDict                # default in Python 2.7
+if (sys.version_info >= (2,7)):
+    from collections import OrderedDict    # default in Python 2.7
+else:
+    from ordereddict import OrderedDict    # for Python 2.6
+
 
 status_choices=(
                 ('successful','Successful'),
