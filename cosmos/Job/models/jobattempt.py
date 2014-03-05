@@ -19,19 +19,19 @@ class JobAttempt(models.Model):
         ('queued','JobAttempt is in the JobAttempt Queue and is waiting to run, is running, or has finished'),
         ('completed','JobAttempt has completed'), #this means job.finished() has been executed.  use drmaa_state to find out if job was successful or failed.
     )
-    created_on = models.DateTimeField(null=True,default=None)
+    created_on  = models.DateTimeField(null=True,default=None)
     finished_on = models.DateTimeField(null=True,default=None)
 
     jobManager = models.ForeignKey('Job.JobManager')
-    task = models.ForeignKey('Workflow.Task')
+    task       = models.ForeignKey('Workflow.Task')
 
     #job status and input fields
-    queue_status = models.CharField(max_length=150, default="not_queued",choices = queue_status_choices)
-    successful = models.BooleanField(default=False)
-    status_details = models.CharField(max_length=100,default='',help_text='Extra information about status')
-    command = models.TextField(max_length=1000,default='')
+    queue_status        = models.CharField(max_length=150, default="not_queued",choices = queue_status_choices)
+    successful          = models.BooleanField(default=False)
+    status_details      = models.CharField(max_length=100,default='',help_text='Extra information about status')
+    command             = models.TextField(max_length=1000,default='')
     command_script_path = models.TextField(max_length=1000)
-    jobName = models.CharField(max_length=150,validators = [RegexValidator(regex='^[A-Z0-9_]*$')])
+    jobName             = models.CharField(max_length=150,validators = [RegexValidator(regex='^[A-Z0-9_]*$')])
 
     #drmaa related input fields
     drmaa_native_specification = models.CharField(max_length=400, default='')
@@ -40,46 +40,54 @@ class JobAttempt(models.Model):
     drmaa_jobID = models.BigIntegerField(null=True) #drmaa drmaa_jobID, note: not database primary key
 
     #time
-    system_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in kernel mode')
-    user_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in user mode.   This  includes  guest time,  guest_time  (time  spent  running a virtual CPU, see below), so that applications that are not aware of the guest time field do not lose that time from their calculations')
-    cpu_time = models.IntegerField(null=True,help_text='system_time + user_time')
-    wall_time = models.IntegerField(null=True,help_text='Elapsed real (wall clock) time used by the process.')
+    system_time = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in kernel mode.')
+    user_time   = models.IntegerField(null=True,help_text='Amount of time that this process has been scheduled in user   mode.')
+    cpu_time    = models.IntegerField(null=True,help_text='system_time + user_time')
+    wall_time   = models.IntegerField(null=True,help_text='Elapsed real (wall clock) time used by the process.')
     percent_cpu = models.IntegerField(null=True,help_text='(cpu_time / wall_time) * 100')
 
     #memory
-    avg_rss_mem = models.IntegerField(null=True,help_text='Average resident set size (Kb)')
-    max_rss_mem = models.IntegerField(null=True,help_text='Maximum resident set size (Kb)')
-    single_proc_max_peak_rss = models.IntegerField(null=True,help_text='Maximum single process rss used (Kb)')
-    avg_virtual_mem = models.IntegerField(null=True,help_text='Average virtual memory used (Kb)')
-    max_virtual_mem = models.IntegerField(null=True,help_text='Maximum virtual memory used (Kb)')
+    avg_rss_mem                      = models.IntegerField(null=True,help_text='Average resident set size (Kb)')
+    max_rss_mem                      = models.IntegerField(null=True,help_text='Maximum resident set size (Kb)')
+    single_proc_max_peak_rss         = models.IntegerField(null=True,help_text='Maximum single process rss used (Kb)')
+
+    avg_virtual_mem                  = models.IntegerField(null=True,help_text='Average virtual memory used (Kb)')
+    max_virtual_mem                  = models.IntegerField(null=True,help_text='Maximum virtual memory used (Kb)')
     single_proc_max_peak_virtual_mem = models.IntegerField(null=True,help_text='Maximum single process virtual memory used (Kb)')
-    major_page_faults = models.IntegerField(null=True,help_text='The number of major faults the process has made which have required loading a memory page from disk')
-    minor_page_faults = models.IntegerField(null=True,help_text='The number of minor faults the process has made which have not required loading a memory page from disk')
-    avg_data_mem = models.IntegerField(null=True,help_text='Average size of data segments (Kb)')
-    max_data_mem = models.IntegerField(null=True,help_text='Maximum size of data segments (Kb)')
-    avg_lib_mem = models.IntegerField(null=True,help_text='Average library memory size (Kb)')
-    max_lib_mem = models.IntegerField(null=True,help_text='Maximum library memory size (Kb)')
-    avg_locked_mem = models.IntegerField(null=True,help_text='Average locked memory size (Kb)')
-    max_locked_mem = models.IntegerField(null=True,help_text='Maximum locked memory size (Kb)')
-    avg_num_threads = models.IntegerField(null=True,help_text='Average number of threads')
-    max_num_threads = models.IntegerField(null=True,help_text='Maximum number of threads')
-    avg_pte_mem = models.IntegerField(null=True,help_text='Average page table entries size (Kb)')
-    max_pte_mem = models.IntegerField(null=True,help_text='Maximum page table entries size (Kb)')
+
+    major_page_faults                = models.IntegerField(null=True,help_text='The number of major faults the process has made which have required loading a memory page from disk')
+    minor_page_faults                = models.IntegerField(null=True,help_text='The number of minor faults the process has made which have not required loading a memory page from disk')
+
+    avg_pte_mem                      = models.IntegerField(null=True,help_text='Average page table entries size (Kb)')
+    max_pte_mem                      = models.IntegerField(null=True,help_text='Maximum page table entries size (Kb)')
+
+    avg_locked_mem                   = models.IntegerField(null=True,help_text='Average locked memory size (Kb)')
+    max_locked_mem                   = models.IntegerField(null=True,help_text='Maximum locked memory size (Kb)')
+
+    avg_data_mem                     = models.IntegerField(null=True,help_text='Average size of data segments (Kb)')
+    max_data_mem                     = models.IntegerField(null=True,help_text='Maximum size of data segments (Kb)')
+
+    avg_lib_mem                      = models.IntegerField(null=True,help_text='Average library memory size (Kb)')
+    max_lib_mem                      = models.IntegerField(null=True,help_text='Maximum library memory size (Kb)')
 
     #io
     nonvoluntary_context_switches = models.IntegerField(null=True,help_text='Number of non voluntary context switches')
-    voluntary_context_switches = models.IntegerField(null=True,help_text='Number of voluntary context switches')
-    block_io_delays = models.IntegerField(null=True,help_text='Aggregated block I/O delays')
-    avg_fdsize = models.IntegerField(null=True,help_text='Average number of file descriptor slots allocated')
-    max_fdsize = models.IntegerField(null=True,help_text='Maximum number of file descriptor slots allocated')
+    voluntary_context_switches    = models.IntegerField(null=True,help_text='Number of voluntary context switches')
+    block_io_delays               = models.IntegerField(null=True,help_text='Aggregated block I/O delays')
+
+    avg_fdsize                    = models.IntegerField(null=True,help_text='Average number of file descriptor slots allocated')
+    max_fdsize                    = models.IntegerField(null=True,help_text='Maximum number of file descriptor slots allocated')
 
     #misc
-    num_polls = models.IntegerField(null=True,help_text='Number of times the resource usage statistics were polled from /proc')
-    names = models.CharField(max_length=255,null=True,help_text='Names of all descendnt processes (there is always a python process for the profile.py script)')
-    num_processes = models.IntegerField(null=True,help_text='Total number of descendant processes that were spawned')
-    pids = models.CharField(max_length=255,null=True,help_text='Pids of all the descendant processes')
-    exit_status = models.IntegerField(null=True,help_text='Exit status of the primary process being profiled')
-    SC_CLK_TCK = models.IntegerField(null=True,help_text='sysconf(_SC_CLK_TCK), an operating system variable that is usually equal to 100, or centiseconds')
+    exit_status                   = models.IntegerField(null=True,help_text='Exit status of the primary process being profiled')
+    #names                        = models.CharField(max_length=255,null=True,help_text='Names of all descendnt processes (there is always a python process for the profile.py script)')
+    #pids                         = models.CharField(max_length=255,null=True,help_text='Pids of all the descendant processes')
+    num_polls                     = models.IntegerField(null=True,help_text='Number of times the resource usage statistics were polled from /proc')
+    num_processes                 = models.IntegerField(null=True,help_text='Total number of descendant processes that were spawned')
+    SC_CLK_TCK                    = models.IntegerField(null=True,help_text='sysconf(_SC_CLK_TCK), an operating system variable that is usually equal to 100, or centiseconds')
+
+    avg_num_threads               = models.IntegerField(null=True,help_text='Average number of threads')
+    max_num_threads               = models.IntegerField(null=True,help_text='Maximum number of threads')
 
 
     profile_fields = [('time',[
@@ -99,7 +107,8 @@ class JobAttempt(models.Model):
                           'avg_fdsize', 'max_fdsize',
                           ]),
                       ('misc', [
-                          'exit_status','names', 'pids', 'num_polls','num_processes','SC_CLK_TCK',
+                          #'exit_status','names', 'pids', 'num_polls','num_processes','SC_CLK_TCK',
+                           'exit_status',                 'num_polls','num_processes','SC_CLK_TCK',
                           'avg_num_threads','max_num_threads',
                           ])
     ]
