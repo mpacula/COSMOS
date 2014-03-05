@@ -47,6 +47,7 @@ urlpatterns = patterns('',
 
     url(r'^$', 'cosmos.utils.views.index',name='home'),
 )
+
 from django.conf import settings
 urlpatterns += staticfiles_urlpatterns()
 

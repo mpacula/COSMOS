@@ -117,7 +117,9 @@ def parse_cmd(txt,**kwargs):
         x = map(lambda x: re.sub(r"\\$",'',x.strip()).strip(),x)
         x = filter(lambda x: not x == '',x)
         x = ' \\\n'.join(x)
-        x = re.sub(';[ ]*\\\\','\n',x)   # remove backslash from comma-ended string by Jae 10/21/2013
+        x = re.sub(';[ ]*\\\\',';',x)   # remove backslash from comma-ended string by Jae 10/21/2013
+        x = re.sub('#;','',x)           # make blank comment line
+
     except (KeyError,TypeError):
         formatError(txt,kwargs)
     return x
