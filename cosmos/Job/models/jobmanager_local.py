@@ -1,9 +1,11 @@
-from cosmos import session
+import os
+import signal
+
+#from cosmos import session
 from jobattempt import JobAttempt
 from jobmanager import JobManagerBase
 from subprocess import Popen
-import signal
-import os
+
 
 class JobStatusError(Exception):
     pass
@@ -12,9 +14,11 @@ all_processes = {}
 current_processes = {}
 
 def preexec_function():
-    # Ignore the SIGINT signal by setting the handler to the standard
-    # signal handler SIG_IGN.  This allows Cosmos to cleanly
-    # terminate jobs when there is a ctrl+c event
+    """
+    Ignore the SIGINT signal by setting the handler to the standard
+    signal handler SIG_IGN.  This allows Cosmos to cleanly
+    terminate jobs when there is a ctrl+c event
+    """
     os.setpgrp()
 
 class JobManager(JobManagerBase):
@@ -23,16 +27,16 @@ class JobManager(JobManagerBase):
     """
     class Meta:
         app_label = 'Job'
-        db_table = 'Job_jobmanager'
+        db_table  = 'Job_jobmanager'
 
     def _submit_job(self,jobAttempt):
         p = Popen(self._create_cmd_str(jobAttempt).split(' '),
                   stdout=open(jobAttempt.STDOUT_filepath,'w'),
-                stderr=open(jobAttempt.STDERR_filepath,'w'),
-                preexec_fn=preexec_function())
-        jobAttempt.drmaa_jobID = p.pid
+                  stderr=open(jobAttempt.STDERR_filepath,'w'),
+                  preexec_fn=preexec_function())
+        jobAttempt.drmaa_jobID   = p.pid
         current_processes[p.pid] = p
-        all_processes[p.pid] = p
+        all_processes[p.pid]     = p
 
     def _check_for_finished_job(self):
         for k,p in current_processes.items():
@@ -56,7 +60,6 @@ class JobManager(JobManagerBase):
                 return 'finished, exit code {0}'.format(r)
         except KeyError:
             return 'has not been queued'
-
 
     def terminate_jobAttempt(self,jobAttempt):
         "Terminates a jobAttempt"

@@ -1,13 +1,21 @@
 """
 Workflow models
 """
-from cosmos import session
+#from cosmos import session
 from cosmos.config import settings
+
+from cosmos.Job.models.jobattempt import JobAttempt
+if   settings['DRM'] == 'local':
+    from cosmos.Job.models.jobmanager_local import JobManager
+elif settings['DRM'] == 'LSF':
+    from cosmos.Job.models.jobmanager_lsf   import JobManager
+else:
+    from cosmos.Job.models.jobmanager_drmaa import JobManager
 
 from django.db import models, transaction
 from django.db.models import Q,Count
 from django.db.utils import IntegrityError
-from cosmos.Job.models import JobAttempt,JobManager
+
 
 import os,sys,re,signal
 

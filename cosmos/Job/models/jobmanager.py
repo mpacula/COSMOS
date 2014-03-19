@@ -3,10 +3,36 @@ import os,sys,time
 from django.db    import models
 from django.utils import timezone
 
-from cosmos               import session
+#from cosmos               import session
+#from cosmos.config        import settings
 from cosmos.utils.helpers import mkdir_p, spinning_cursor
 
-from . import JobAttempt
+from jobattempt import JobAttempt
+
+def get_drmaa_spec(jobAttempt):
+    """
+    Default method for the DRM specific resource usage flags passed in the jobtemplate's drmaa_native_specification.
+    Can be overridden by the user when starting a workflow.
+
+    :param jobAttempt: the jobAttempt being submitted
+    """
+    task = jobAttempt.task
+    drm  = cosmos.config.settings['DRM']
+
+    cpu_req  = task.cpu_requirement
+    mem_req  = task.memory_requirement
+    time_req = task.time_requirement
+    queue    = task.workflow.default_queue
+
+    if drm == 'LSF':           # for Orchestra Runs
+        if time_req <= 12*60: queue = 'short'
+        else:                 queue = 'long'                
+        return '-R "rusage[mem={0}] span[hosts=1]" -n {1} -W 0:{2} -q {3}'.format(mem_req, cpu_req, time_req, queue)
+    elif drm == 'GE':
+        return '-l spock_mem={mem_req}M,num_proc={cpu_req}'.format(mem_req=mem_req, cpu_req=cpu_req)
+
+    else:
+        raise Exception('DRM not supported')
 
 
 class JobStatusError(Exception):
@@ -128,15 +154,16 @@ class JobManagerBase(models.Model):
         if not jobAttempt.queue_status == 'not_queued': 
             raise JobStatusError, 'JobAttempt has already been submitted'
 
-        self._submit_job(jobAttempt)  # will be defined in the sub-files
+        jobAttempt.drmaa_native_specification = get_drmaa_native_spec(jobAttempt)
 
-        jobAttempt.drmaa_native_specification = session.get_drmaa_native_specification(jobAttempt)
+        self._run_job(jobAttempt)  # will be defined in the sub-files
+
         jobAttempt.queue_status = 'queued'
         jobAttempt.save()
 
         return jobAttempt
 
-    def _submit_job(self,jobAttempt):
+    def _run_job(self,jobAttempt):
         raise NotImplementedError
 
 

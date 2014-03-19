@@ -1,11 +1,19 @@
 import os,re,json,glob
 
+from cosmos import django_settings
+
+from django.conf import settings as django_conf_settings, global_settings
+
+#custom template context processor for web interface
+django_conf_settings.configure(
+    TEMPLATE_CONTEXT_PROCESSORS=global_settings.TEMPLATE_CONTEXT_PROCESSORS + ('cosmos.utils.context_processor.contproc',), **django_settings.__dict__)
+
 from django.db              import models
 from django.core.validators import RegexValidator
 from django.utils           import timezone
 from picklefield.fields     import PickledObjectField
 
-from cosmos import session
+#from cosmos import session
 
 class JobAttempt(models.Model):
     """
@@ -13,7 +21,7 @@ class JobAttempt(models.Model):
     """
     class Meta:
         app_label = 'Job'
-        db_table = 'Job_jobattempt'
+        db_table  = 'Job_jobattempt'
 
     queue_status_choices = (
         ('not_queued','JobAttempt has not been submitted to the JobAttempt Queue yet'),

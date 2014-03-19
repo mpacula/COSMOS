@@ -3,7 +3,7 @@ import sys
 
 from django.utils.datastructures import SortedDict
 
-from cosmos               import session
+#from cosmos               import session
 from cosmos.utils.helpers import enable_stderr,disable_stderr
 from cosmos.config        import settings
 
@@ -26,7 +26,7 @@ if settings['DRM'] == 'LSF':
 # Need to import after DRMAA_LIBRARY_PATH
 import drmaa
 
-if session.settings['DRM'] != 'local':
+if settings['DRM'] != 'local':
     drmaa_enabled = False
     try:
         drmaa_session = drmaa.Session()
@@ -84,7 +84,7 @@ class JobManager(JobManagerBase):
                 s = 'JobAttempt {} not in queue'.format(str(jobAttempt.drmaa_jobID))  #job doesnt exist in queue anymore but didn't succeed or fail
         return s
 
-    def _submit_job(self,jobAttempt):
+    def _run_job(self,jobAttempt):
         """
         Submit currnet jobAttempt
 
@@ -98,7 +98,7 @@ class JobManager(JobManagerBase):
         cmd = self._create_cmd_str(jobAttempt)
 
         jt                  = drmaa_session.createJobTemplate()
-        jt.workingDirectory = session.settings['working_directory']
+        jt.workingDirectory = settings['working_directory']
         jt.remoteCommand    = cmd.split(' ')[0]
         jt.args             = cmd.split(' ')[1:]
         jt.jobName          = jobAttempt.task.stage.name
@@ -106,9 +106,10 @@ class JobManager(JobManagerBase):
         jt.errorPath        = ':'+jobAttempt.STDERR_filepath
         jt.jobEnvironment   = os.environ
 
-        jt.nativeSpecification = session.get_drmaa_native_specification(jobAttempt)
+        jt.nativeSpecification = jobAttempt.drmaa_native_specification
 
-        jobAttempt.drmaa_jobID                = drmaa_session.runJob(jt)
+        jobAttempt.drmaa_jobID = drmaa_session.runJob(jt)
+
         jt.delete() #prevents memory leak
 
 
