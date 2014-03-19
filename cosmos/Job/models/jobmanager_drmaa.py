@@ -1,12 +1,15 @@
-from cosmos import session
 import os
 import sys
-from django.utils.datastructures import SortedDict
-from cosmos.utils.helpers import enable_stderr,disable_stderr
-from cosmos.config import settings
 
-from jobattempt import JobAttempt
-from jobmanager import JobManagerBase
+from django.utils.datastructures import SortedDict
+
+from cosmos               import session
+from cosmos.utils.helpers import enable_stderr,disable_stderr
+from cosmos.config        import settings
+
+from jobattempt           import JobAttempt
+from jobmanager           import JobManagerBase
+
 
 class JobStatusError(Exception):
     pass
@@ -20,6 +23,7 @@ os.environ['DRMAA_LIBRARY_PATH'] = settings['drmaa_library_path']
 if settings['DRM'] == 'LSF':
     os.environ['LSF_DRMAA_CONF'] = os.path.join(settings['cosmos_library_path'],'lsf_drmaa.conf')
 
+# Need to import after DRMAA_LIBRARY_PATH
 import drmaa
 
 if session.settings['DRM'] != 'local':
@@ -34,16 +38,16 @@ if session.settings['DRM'] != 'local':
 
 
 decode_drmaa_state = SortedDict([
-    (drmaa.JobState.UNDETERMINED, 'process status cannot be determined'),
-    (drmaa.JobState.QUEUED_ACTIVE, 'job is queued and active'),
-    (drmaa.JobState.SYSTEM_ON_HOLD, 'job is queued and in system hold'),
-    (drmaa.JobState.USER_ON_HOLD, 'job is queued and in user hold'),
+    (drmaa.JobState.UNDETERMINED,        'process status cannot be determined'),
+    (drmaa.JobState.QUEUED_ACTIVE,       'job is queued and active'),
+    (drmaa.JobState.SYSTEM_ON_HOLD,      'job is queued and in system hold'),
+    (drmaa.JobState.USER_ON_HOLD,        'job is queued and in user hold'),
     (drmaa.JobState.USER_SYSTEM_ON_HOLD, 'job is queued and in user and system hold'),
-    (drmaa.JobState.RUNNING, 'job is running'),
-    (drmaa.JobState.SYSTEM_SUSPENDED, 'job is system suspended'),
-    (drmaa.JobState.USER_SUSPENDED, 'job is user suspended'),
-    (drmaa.JobState.DONE, 'job finished normally'),
-    (drmaa.JobState.FAILED, 'job finished, but failed'),
+    (drmaa.JobState.RUNNING,             'job is running'),
+    (drmaa.JobState.SYSTEM_SUSPENDED,    'job is system suspended'),
+    (drmaa.JobState.USER_SUSPENDED,      'job is user suspended'),
+    (drmaa.JobState.DONE,                'job finished normally'),
+    (drmaa.JobState.FAILED,              'job finished, but failed'),
     ])
 
 class JobManager(JobManagerBase):
@@ -52,16 +56,12 @@ class JobManager(JobManagerBase):
     """
     class Meta:
         app_label = 'Job'
-        db_table = 'Job_jobmanager'
-
-    def get_jobAttempt_status(self,jobAttempt):
-        """
-        Queries the DRM for the status of the job
-        """
-        raise NotImplementedError
+        db_table  = 'Job_jobmanager'
 
     def terminate_jobAttempt(self,jobAttempt):
-        "Terminates a jobAttempt"
+        """
+        Terminates a jobAttempt
+        """
         try:
             drmaa_session.control(str(jobAttempt.drmaa_jobID), drmaa.JobControlAction.TERMINATE)
             return True
@@ -81,43 +81,35 @@ class JobManager(JobManagerBase):
                 else:
                     s = decode_drmaa_state[drmaa.JobState.FAILED]
             else:
-                s = 'not sure' #job doesnt exist in queue anymore but didn't succeed or fail
+                s = 'JobAttempt {} not in queue'.format(str(jobAttempt.drmaa_jobID))  #job doesnt exist in queue anymore but didn't succeed or fail
         return s
 
-    def __drmaa_createJobTemplate(self,jobAttempt):
+    def _submit_job(self,jobAttempt):
         """
-        Creates a JobTemplate for jobAttempt
+        Submit currnet jobAttempt
 
         Possible attrs are:
         ['args','blockEmail','deadlineTime','delete','email','errorPath','hardRunDurationLimit'
         'hardWallclockTimeLimit','inputPath','jobCategory','jobEnvironment','jobName','jobSubmissionState',
         'joinFiles','nativeSpecification','outputPath','remoteCommand','softRunDurationLimit','softWallclockTimeLimit',
         'startTime','transferFiles','workingDirectory','cpu_time']
-
         """
+
         cmd = self._create_cmd_str(jobAttempt)
 
-        jt = drmaa_session.createJobTemplate()
+        jt                  = drmaa_session.createJobTemplate()
         jt.workingDirectory = session.settings['working_directory']
-        #jt.remoteCommand = self.command_script_path
-        #jt.args = self.command_script_text.split(' ')[1:]
-        jt.remoteCommand = cmd.split(' ')[0]
-        jt.args = cmd.split(' ')[1:]
-        #jt.workingDirectory = os.getcwd()
-        jt.jobName = jobAttempt.task.stage.name
-        jt.outputPath = ':'+jobAttempt.STDOUT_filepath
-        jt.errorPath = ':'+jobAttempt.STDERR_filepath
+        jt.remoteCommand    = cmd.split(' ')[0]
+        jt.args             = cmd.split(' ')[1:]
+        jt.jobName          = jobAttempt.task.stage.name
+        jt.outputPath       = ':'+jobAttempt.STDOUT_filepath
+        jt.errorPath        = ':'+jobAttempt.STDERR_filepath
+        jt.jobEnvironment   = os.environ
 
-        jt.jobEnvironment = os.environ
         jt.nativeSpecification = session.get_drmaa_native_specification(jobAttempt)
 
-        return jt
-
-    def _submit_job(self,jobAttempt):
-        jobTemplate = self.__drmaa_createJobTemplate(jobAttempt)
-        jobAttempt.drmaa_jobID = drmaa_session.runJob(jobTemplate)
-        jobAttempt.drmaa_native_specification = jobTemplate.nativeSpecification
-        jobTemplate.delete() #prevents memory leak
+        jobAttempt.drmaa_jobID                = drmaa_session.runJob(jt)
+        jt.delete() #prevents memory leak
 
 
     def _check_for_finished_job(self):

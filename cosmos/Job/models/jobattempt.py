@@ -1,10 +1,11 @@
-import glob
-from cosmos import session
-from django.db import models
-import os,re,json
-from picklefield.fields import PickledObjectField
+import os,re,json,glob
+
+from django.db              import models
 from django.core.validators import RegexValidator
-from django.utils import timezone
+from django.utils           import timezone
+from picklefield.fields     import PickledObjectField
+
+from cosmos import session
 
 class JobAttempt(models.Model):
     """
@@ -71,23 +72,23 @@ class JobAttempt(models.Model):
     max_lib_mem                      = models.IntegerField(null=True,help_text='Maximum library memory size (Kb)')
 
     #io
-    nonvoluntary_context_switches = models.IntegerField(null=True,help_text='Number of non voluntary context switches')
-    voluntary_context_switches    = models.IntegerField(null=True,help_text='Number of voluntary context switches')
-    block_io_delays               = models.IntegerField(null=True,help_text='Aggregated block I/O delays')
+    nonvoluntary_context_switches    = models.IntegerField(null=True,help_text='Number of non voluntary context switches')
+    voluntary_context_switches       = models.IntegerField(null=True,help_text='Number of voluntary context switches')
+    block_io_delays                  = models.IntegerField(null=True,help_text='Aggregated block I/O delays')
 
-    avg_fdsize                    = models.IntegerField(null=True,help_text='Average number of file descriptor slots allocated')
-    max_fdsize                    = models.IntegerField(null=True,help_text='Maximum number of file descriptor slots allocated')
+    avg_fdsize                       = models.IntegerField(null=True,help_text='Average number of file descriptor slots allocated')
+    max_fdsize                       = models.IntegerField(null=True,help_text='Maximum number of file descriptor slots allocated')
 
     #misc
-    exit_status                   = models.IntegerField(null=True,help_text='Exit status of the primary process being profiled')
-    #names                        = models.CharField(max_length=255,null=True,help_text='Names of all descendnt processes (there is always a python process for the profile.py script)')
-    #pids                         = models.CharField(max_length=255,null=True,help_text='Pids of all the descendant processes')
-    num_polls                     = models.IntegerField(null=True,help_text='Number of times the resource usage statistics were polled from /proc')
-    num_processes                 = models.IntegerField(null=True,help_text='Total number of descendant processes that were spawned')
-    SC_CLK_TCK                    = models.IntegerField(null=True,help_text='sysconf(_SC_CLK_TCK), an operating system variable that is usually equal to 100, or centiseconds')
+    exit_status                      = models.IntegerField(null=True,help_text='Exit status of the primary process being profiled')
+    #names                           = models.CharField(max_length=255,null=True,help_text='Names of all descendnt processes (there is always a python process for the profile.py script)')
+    #pids                            = models.CharField(max_length=255,null=True,help_text='Pids of all the descendant processes')
+    num_polls                        = models.IntegerField(null=True,help_text='Number of times the resource usage statistics were polled from /proc')
+    num_processes                    = models.IntegerField(null=True,help_text='Total number of descendant processes that were spawned')
+    SC_CLK_TCK                       = models.IntegerField(null=True,help_text='sysconf(_SC_CLK_TCK), an operating system variable that is usually equal to 100, or centiseconds')
 
-    avg_num_threads               = models.IntegerField(null=True,help_text='Average number of threads')
-    max_num_threads               = models.IntegerField(null=True,help_text='Maximum number of threads')
+    avg_num_threads                  = models.IntegerField(null=True,help_text='Average number of threads')
+    max_num_threads                  = models.IntegerField(null=True,help_text='Maximum number of threads')
 
 
     profile_fields = [('time',[
@@ -115,7 +116,6 @@ class JobAttempt(models.Model):
 
     extra_jobinfo = PickledObjectField(null=True,default=None)
 
-
     def __init__(self,*args,**kwargs):
         kwargs['created_on'] = timezone.now()
         super(JobAttempt,self).__init__(*args,**kwargs)
@@ -126,17 +126,23 @@ class JobAttempt(models.Model):
 
     @staticmethod
     def profile_fields_as_list():
-        ':returns: [profile_fields], a simple list of profile_field names, without their type information'
+        """
+        :returns: [profile_fields], a simple list of profile_field names, without their type information
+        """
         return reduce(lambda x,y: x+y,[tf[1] for tf in JobAttempt.profile_fields])
 
     @property
     def workflow(self):
-        "This jobattempt's workflow"
+        """
+        This jobattempt's workflow
+        """
         self.task.workflow
 
     @property
     def resource_usage(self):
-        ":returns: (name,value,help,type)"
+        """
+        :returns: (name,value,help,type)
+        """
         for type,fields in self.profile_fields:
             for field in fields:
                 val = getattr(self,field)
@@ -144,12 +150,16 @@ class JobAttempt(models.Model):
 
     @property
     def resource_usage_short(self):
-        ":returns: (name,value)"
+        """
+        :returns: (name,value)
+        """
         for field in JobAttempt.profile_fields_as_list():
             yield field, getattr(self,field)
 
     def update_from_profile_output(self):
-        """Updates the resource usage from profile output"""
+        """
+        Updates the resource usage from profile output
+        """
         try:
             p = json.load(file(self.profile_output_path,'r'))
             for k,v in p.items():
@@ -166,16 +176,22 @@ class JobAttempt(models.Model):
 
     @property
     def STDOUT_filepath(self):
-        """Returns the path to the STDOUT file"""
+        """
+        Returns the path to the STDOUT file
+        """
         return os.path.join(self.jobinfo_output_dir,'cosmos_id_{0}.stdout'.format(self.id))
     @property
     def STDERR_filepath(self):
-        """Returns the path to the STDERR file"""
+        """
+        Returns the path to the STDERR file
+        """
         return os.path.join(self.jobinfo_output_dir,'cosmos_id_{0}.stderr'.format(self.id))
 
     @property
     def STDOUT_txt(self):
-        "The contents of the STDOUT file, or the string 'File does not exist.'"
+        """
+        The contents of the STDOUT file
+        """
         path = self.STDOUT_filepath
         if path is None or not os.path.exists(path):
             return 'STDOUT file does not exist: {0}'.format(path)
@@ -184,7 +200,9 @@ class JobAttempt(models.Model):
                 return f.read()
     @property
     def STDERR_txt(self):
-        "The contents of the STDERR file, or the string 'File does not exist.'"
+        """
+        The contents of the STDERR file
+        """
         path = self.STDERR_filepath
         if path is None or not os.path.exists(path):
             return 'STDERR file does not exist: {0}'.format(path)
@@ -193,19 +211,24 @@ class JobAttempt(models.Model):
                 return f.read()
     @property
     def profile_output_path(self):
-        "Path to store a job's profile.py output"
+        """
+        Path to store a job's profile.py output
+        """
         return os.path.join(self.jobinfo_output_dir,str(self.id)+'.profile')
 
     def get_command_shell_script_text(self):
-        "Return the contents of the command.sh file"
+        """
+        Return the contents of the command.sh file
+        """
         if not os.path.exists(self.command_script_path):
             return "Error: {0} does not exist".format(self.command_script_path)
         with open(self.command_script_path,'rb') as f:
             return f.read()
 
     def _hasFinished(self,successful,extra_jobinfo,status_details=''):
-        """Function for JobManager to Run when this JobAttempt finishes"""
-
+        """
+        Function for JobManager to Run when this JobAttempt finishes
+        """
         # Make sure output files actually exist: in picard.collectmultiplemetrics, output is a basename, not an exact name
         if successful:
             for o in self.task.output_files:

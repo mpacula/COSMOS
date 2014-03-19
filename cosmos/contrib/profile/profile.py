@@ -103,7 +103,8 @@ class Profile:
     
     def run(self):
         """
-        Runs a process and records the memory usage of it and all of its descendants"""
+        Runs a process and records the memory usage of it and all of its descendants
+        """
         #self.proc = subprocess.Popen(self.command,shell=True)
         self.proc = subprocess.Popen(["/bin/bash",self.command])
         while True:

@@ -11,7 +11,7 @@ from cosmos.Job.models import JobAttempt,JobManager
 
 import os,sys,re,signal
 
-from cosmos.utils.helpers import validate_name,validate_not_null, check_and_create_output_dir, folder_size, get_workflow_logger
+from cosmos.utils.helpers import validate_name,validate_not_null, mkdir_p, folder_size, get_workflow_logger
 from cosmos.utils import helpers
 
 from django.core.exceptions import ValidationError
@@ -369,7 +369,7 @@ class Workflow(models.Model):
         if Workflow.objects.filter(id=_wf_id).count(): raise ValidationError('Workflow with this _wf_id already exists')
 
         output_dir = os.path.join(root_output_dir,name.replace(' ','_'))
-        check_and_create_output_dir(output_dir)
+        mkdir_p(output_dir)
 
         wf = Workflow.objects.create(id=_wf_id,name=name, jobManager = JobManager.objects.create(),output_dir=output_dir, **kwargs)
 
@@ -625,7 +625,7 @@ class Workflow(models.Model):
                 f.path = os.path.join(task.job_output_dir,basename)
                 f.save()
             if f.fmt == 'dir':
-                check_and_create_output_dir(f.path)
+                mkdir_p(f.path)
 
         #Replace TaskFile hashes with their paths
         for m in re.findall('(#F\[(.+?):(.+?):(.+?)\])',task.exec_command):
@@ -916,7 +916,7 @@ class Stage(models.Model):
         validate_not_null(self.workflow)
 
         validate_name(self.name,self.name)
-        #check_and_create_output_dir(self.output_dir)
+        #mkdir_p(self.output_dir)
 
     def set_status(self,new_status,save=True):
         "Set Stage status"
@@ -1293,8 +1293,8 @@ class Task(models.Model):
 
         task.save()
 
-        check_and_create_output_dir(task.output_dir)
-        check_and_create_output_dir(task.job_output_dir)
+        mkdir_p(task.output_dir)
+        mkdir_p(task.job_output_dir)
 
         #Create task tags    
         for key,value in task.tags.items():

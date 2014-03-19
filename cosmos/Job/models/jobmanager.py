@@ -1,11 +1,13 @@
-from cosmos import session
-from django.db import models
+import os,sys,time
+
+from django.db    import models
 from django.utils import timezone
-import os,sys
+
+from cosmos               import session
+from cosmos.utils.helpers import mkdir_p, spinning_cursor
+
 from . import JobAttempt
-from cosmos.utils.helpers import check_and_create_output_dir
-from cosmos.utils.helpers import spinning_cursor
-import time
+
 
 class JobStatusError(Exception):
     pass
@@ -24,32 +26,46 @@ class JobManagerBase(models.Model):
 
     @property
     def jobAttempts(self):
-        "This JobManager's jobAttempts"
+        """
+        This JobManager's jobAttempts
+        """
         return JobAttempt.objects.filter(jobManager=self)
 
     def delete(self,*args,**kwargs):
-        "Deletes this job manager"
+        """
+        Deletes this job manager
+        """
         self.jobAttempts.delete()
         super(JobManagerBase,self).__init__(self,*args,**kwargs)
 
     def get_numJobsQueued(self):
-        "The number of queued jobs."
+        """
+        The number of queued jobs.
+        """
         return self.jobAttempts.filter(queue_status = 'queued').count()
 
     def __create_command_sh(self,jobAttempt):
-        """Create a sh script that will execute a command"""
-        with open(jobAttempt.command_script_path,'wb') as f:
-            f.write("#!/bin/bash\n")
-            f.write(jobAttempt.command)
-        os.system('chmod 700 {0}'.format(jobAttempt.command_script_path))
+        """
+        Create a shell script that will execute a command
+        """
+        try:
+            with open(jobAttempt.command_script_path,'wb') as f:
+                f.write("#!/bin/bash\n")
+                f.write(jobAttempt.command)
+            os.system('chmod 700 {0}'.format(jobAttempt.command_script_path))        
+        except:
+            print "Could not create shell script at {}".format(jobAttempt.command_script_path)
+            raise
 
     def _create_cmd_str(self,jobAttempt):
-        "The command to be stored in the command.sh script"
-        return "python {profile} -f {profile_out} {command_script_path}".format(
+        """
+        The command to be stored in the command.sh script
+        """        
+        return "python {profile} -f {profile_out} {cmd_script_path}".format(
             profile = os.path.join(session.settings['cosmos_library_path'],'contrib/profile/profile.py'),
-            db = jobAttempt.profile_output_path+'.sqlite',
-            profile_out = jobAttempt.profile_output_path,
-            command_script_path = jobAttempt.command_script_path
+            #db             = jobAttempt.profile_output_path+'.sqlite',
+            profile_out     = jobAttempt.profile_output_path,
+            cmd_script_path = jobAttempt.command_script_path
         )
 
 
@@ -62,9 +78,11 @@ class JobManagerBase(models.Model):
         """
         jobAttempt = JobAttempt(jobManager=self, task=task, command = command, jobName = jobName)
         jobAttempt.command_script_path = os.path.join(jobAttempt.jobinfo_output_dir,'command.sh')
-        check_and_create_output_dir(jobAttempt.jobinfo_output_dir)
+        mkdir_p(jobAttempt.jobinfo_output_dir)
+
         self.__create_command_sh(jobAttempt)
         jobAttempt.save()
+
         return jobAttempt
 
     def get_jobAttempt_status(self,jobAttempt):
@@ -95,8 +113,8 @@ class JobManagerBase(models.Model):
 
     def _check_for_finished_job(self):
         """
-        Checks to see if one of the queued jobAttempts are finished.  If a jobAttempt is finished, this method
-        is responsible for calling:
+        Checks to see if one of the queued jobAttempts are finished.  
+        If a jobAttempt is finished, this method is responsible for calling:
         jobAttempt._hasFinished()
 
         :return: A finished jobAttempt, or None if all queued jobs are still running
@@ -104,17 +122,21 @@ class JobManagerBase(models.Model):
         raise NotImplementedError
 
     def submit_job(self,jobAttempt):
-        """Submits and runs a job"""
-        if not jobAttempt.queue_status == 'not_queued': raise JobStatusError, 'JobAttempt has already been submitted'
+        """
+        Submits and runs a job
+        """
+        if not jobAttempt.queue_status == 'not_queued': 
+            raise JobStatusError, 'JobAttempt has already been submitted'
 
-        self._submit_job(jobAttempt)
+        self._submit_job(jobAttempt)  # will be defined in the sub-files
 
+        jobAttempt.drmaa_native_specification = session.get_drmaa_native_specification(jobAttempt)
         jobAttempt.queue_status = 'queued'
         jobAttempt.save()
+
         return jobAttempt
 
     def _submit_job(self,jobAttempt):
-        "Submit the jobAttempt to the DRM"
         raise NotImplementedError
 
 
@@ -137,7 +159,6 @@ class JobManagerBase(models.Model):
 #        job.hasFinished(extra_jobinfo)
 #        job.save()
 #        return job
-
 
 #    def close_session(self):
 #        #TODO delete all jobtemplates
