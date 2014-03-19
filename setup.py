@@ -46,6 +46,7 @@ setup(name='cosmos',
        'pygraphviz==1.1',
        'six==1.2.0',
        'wsgiref==0.1.2',
-       'ordereddict'
+       'ordereddict',
+       'ipdb==0.8'
    ]
 )

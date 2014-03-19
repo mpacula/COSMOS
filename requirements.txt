@@ -17,3 +17,4 @@ networkx==1.8.1 #1.7
 pygraphviz==1.2. #1.1
 six==1.5.2 #1.2.0
 wsgiref==0.1.2
+ipdb==0.8
