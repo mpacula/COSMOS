@@ -1,9 +1,13 @@
-from distutils.core import setup
-from setuptools import find_packages
 import os
 import sys
-from subprocess import Popen,PIPE
+
+from distutils.core import setup
+from setuptools     import find_packages
+from subprocess     import Popen,PIPE
+
 import cosmos
+
+__version__ = "0.5.0"
 
 README = open('README.rst').read()
 
@@ -17,7 +21,7 @@ print >> sys.stderr, "Installing userfiles to ~/.cosmos"
 example_workflows = map(lambda x:os.path.join('example_workflows/',x),filter(lambda x:x[-3:]=='.py',os.listdir('example_workflows')))
 
 setup(name='cosmos',
-    version=cosmos.__version__,
+    version=__version__,
     description = "Workflow Manager",
     author='Erik Gafni',
     license='Non-commercial',

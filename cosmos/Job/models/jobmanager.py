@@ -3,36 +3,35 @@ import os,sys,time
 from django.db    import models
 from django.utils import timezone
 
-#from cosmos               import session
-#from cosmos.config        import settings
+from cosmos               import session
 from cosmos.utils.helpers import mkdir_p, spinning_cursor
 
 from jobattempt import JobAttempt
 
-def get_drmaa_spec(jobAttempt):
-    """
-    Default method for the DRM specific resource usage flags passed in the jobtemplate's drmaa_native_specification.
-    Can be overridden by the user when starting a workflow.
-
-    :param jobAttempt: the jobAttempt being submitted
-    """
-    task = jobAttempt.task
-    drm  = cosmos.config.settings['DRM']
-
-    cpu_req  = task.cpu_requirement
-    mem_req  = task.memory_requirement
-    time_req = task.time_requirement
-    queue    = task.workflow.default_queue
-
-    if drm == 'LSF':           # for Orchestra Runs
-        if time_req <= 12*60: queue = 'short'
-        else:                 queue = 'long'                
-        return '-R "rusage[mem={0}] span[hosts=1]" -n {1} -W 0:{2} -q {3}'.format(mem_req, cpu_req, time_req, queue)
-    elif drm == 'GE':
-        return '-l spock_mem={mem_req}M,num_proc={cpu_req}'.format(mem_req=mem_req, cpu_req=cpu_req)
-
-    else:
-        raise Exception('DRM not supported')
+# def get_drmaa_spec(jobAttempt):
+#     """
+#     Default method for the DRM specific resource usage flags passed in the jobtemplate's drmaa_native_specification.
+#     Can be overridden by the user when starting a workflow.
+#
+#     :param jobAttempt: the jobAttempt being submitted
+#     """
+#     task = jobAttempt.task
+#     drm  = settings['DRM']
+#
+#     cpu_req  = task.cpu_requirement
+#     mem_req  = task.memory_requirement
+#     time_req = task.time_requirement
+#     queue    = task.workflow.default_queue
+#
+#     if drm == 'LSF':           # for Orchestra Runs
+#         if time_req <= 12*60: queue = 'short'
+#         else:                 queue = 'long'                
+#         return '-R "rusage[mem={0}] span[hosts=1]" -n {1} -W 0:{2} -q {3}'.format(mem_req, cpu_req, time_req, queue)
+#     elif drm == 'GE':
+#         return '-l spock_mem={mem_req}M,num_proc={cpu_req}'.format(mem_req=mem_req, cpu_req=cpu_req)
+#
+#     else:
+#         raise Exception('DRM not supported')
 
 
 class JobStatusError(Exception):
@@ -88,7 +87,7 @@ class JobManagerBase(models.Model):
         The command to be stored in the command.sh script
         """        
         return "python {profile} -f {profile_out} {cmd_script_path}".format(
-            profile = os.path.join(session.settings['cosmos_library_path'],'contrib/profile/profile.py'),
+            profile = os.path.join(settings['cosmos_library_path'],'contrib/profile/profile.py'),
             #db             = jobAttempt.profile_output_path+'.sqlite',
             profile_out     = jobAttempt.profile_output_path,
             cmd_script_path = jobAttempt.command_script_path
@@ -154,7 +153,7 @@ class JobManagerBase(models.Model):
         if not jobAttempt.queue_status == 'not_queued': 
             raise JobStatusError, 'JobAttempt has already been submitted'
 
-        jobAttempt.drmaa_native_specification = get_drmaa_native_spec(jobAttempt)
+        jobAttempt.drmaa_native_specification = session.drmaa_spec(jobAttempt)
 
         self._run_job(jobAttempt)  # will be defined in the sub-files
 
