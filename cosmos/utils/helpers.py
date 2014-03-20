@@ -10,25 +10,25 @@ import errno
 
 class ValidationException(Exception): pass
 
-real_stdout = os.dup(1)
-real_stderr = os.dup(2)
-devnull = os.open('/dev/null', os.O_WRONLY)
+# real_stdout = os.dup(1)
+# real_stderr = os.dup(2)
+# devnull = os.open('/dev/null', os.O_WRONLY)
 
-def disable_stderr():
-    sys.stderr.flush()
-    os.dup2(devnull,2)
+# def disable_stderr():
+#     sys.stderr.flush()
+#     os.dup2(devnull,2)
 
-def enable_stderr():
-    sys.stderr.flush()
-    os.dup2(real_stderr,2)
+# def enable_stderr():
+#     sys.stderr.flush()
+#     os.dup2(real_stderr,2)
 
-def disable_stdout():
-    sys.stderr.flush()
-    os.dup2(devnull,1)
+# def disable_stdout():
+#     sys.stderr.flush()
+#     os.dup2(devnull,1)
 
-def enable_stdout():
-    sys.stderr.flush()
-    os.dup2(real_stdout,1)
+# def enable_stdout():
+#     sys.stderr.flush()
+#     os.dup2(real_stdout,1)
 
 
 def representsInt(s):

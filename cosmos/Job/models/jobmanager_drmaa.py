@@ -4,7 +4,7 @@ import sys
 from django.utils.datastructures import SortedDict
 
 #from cosmos               import session
-from cosmos.utils.helpers import enable_stderr,disable_stderr
+#from cosmos.utils.helpers import enable_stderr,disable_stderr
 from cosmos.config        import settings
 
 from jobattempt           import JobAttempt
