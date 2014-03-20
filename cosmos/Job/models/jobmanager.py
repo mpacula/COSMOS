@@ -4,34 +4,10 @@ from django.db    import models
 from django.utils import timezone
 
 from cosmos               import session
+from cosmos.config        import settings
 from cosmos.utils.helpers import mkdir_p, spinning_cursor
 
 from jobattempt import JobAttempt
-
-# def get_drmaa_spec(jobAttempt):
-#     """
-#     Default method for the DRM specific resource usage flags passed in the jobtemplate's drmaa_native_specification.
-#     Can be overridden by the user when starting a workflow.
-#
-#     :param jobAttempt: the jobAttempt being submitted
-#     """
-#     task = jobAttempt.task
-#     drm  = settings['DRM']
-#
-#     cpu_req  = task.cpu_requirement
-#     mem_req  = task.memory_requirement
-#     time_req = task.time_requirement
-#     queue    = task.workflow.default_queue
-#
-#     if drm == 'LSF':           # for Orchestra Runs
-#         if time_req <= 12*60: queue = 'short'
-#         else:                 queue = 'long'                
-#         return '-R "rusage[mem={0}] span[hosts=1]" -n {1} -W 0:{2} -q {3}'.format(mem_req, cpu_req, time_req, queue)
-#     elif drm == 'GE':
-#         return '-l spock_mem={mem_req}M,num_proc={cpu_req}'.format(mem_req=mem_req, cpu_req=cpu_req)
-#
-#     else:
-#         raise Exception('DRM not supported')
 
 
 class JobStatusError(Exception):
@@ -155,7 +131,8 @@ class JobManagerBase(models.Model):
 
         jobAttempt.drmaa_native_specification = session.drmaa_spec(jobAttempt)
 
-        self._run_job(jobAttempt)  # will be defined in the sub-files
+        # Will be redefined in sub files
+        self._run_job(jobAttempt)  
 
         jobAttempt.queue_status = 'queued'
         jobAttempt.save()
@@ -168,29 +145,3 @@ class JobManagerBase(models.Model):
 
     def toString(self):
         return "JobManager %s, created on %s" % (self.id,self.created_on)
-
-#    def __waitForJob(self,job):
-#        """
-#        Waits for a job to finish
-#        Returns a drmaa info object
-#        """
-#        if job.queue_status != 'queued':
-#            raise JobStatusError('JobAttempt is not in the queue.  Make sure you submit() the job first, and make sure it hasn\'t alreay been collected.')
-#        try:
-#            extra_jobinfo = session.drmaa_session.wait(job.drmaa_jobID, drmaa.Session.TIMEOUT_WAIT_FOREVER)
-#        except Exception as e:
-#            if e == "code 24: no usage information was returned for the completed job":
-#                extra_jobinfo = None
-#
-#        job.hasFinished(extra_jobinfo)
-#        job.save()
-#        return job
-
-#    def close_session(self):
-#        #TODO delete all jobtemplates
-#        session.drmaa_session.exit()
-
-#    def terminate_all_queued_or_running_jobAttempts(self):
-#        for jobAttempt in JobAttempt.objects.filter(jobManager=self,queue_status='queued'):
-#            self.terminate_jobAttempt(jobAttempt)
-#

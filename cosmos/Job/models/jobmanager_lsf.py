@@ -49,9 +49,10 @@ class JobManager(JobManagerBase):
     
     class Meta:
         app_label = 'Job'
-        db_table = 'Job_jobmanager'
+        db_table  = 'Job_jobmanager'
 
-    def _submit_job(self,jobAttempt):
+    ## Override JobManager.submit_job::_run_job() at jobmanager.py
+    def _run_job(self,jobAttempt):
         bsub = 'bsub -o {stdout} -e {stderr} {ns}'.format(
             stdout=jobAttempt.STDOUT_filepath,
             stderr=jobAttempt.STDERR_filepath,

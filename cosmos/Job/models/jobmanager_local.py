@@ -29,7 +29,8 @@ class JobManager(JobManagerBase):
         app_label = 'Job'
         db_table  = 'Job_jobmanager'
 
-    def _submit_job(self,jobAttempt):
+    ## Override submit_job::_run_job at jobmanager.py
+    def _run_job(self,jobAttempt):
         p = Popen(self._create_cmd_str(jobAttempt).split(' '),
                   stdout=open(jobAttempt.STDOUT_filepath,'w'),
                   stderr=open(jobAttempt.STDERR_filepath,'w'),
