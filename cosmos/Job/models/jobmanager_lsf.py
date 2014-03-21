@@ -1,4 +1,4 @@
-import os,re
+import os,sys,re
 import shlex,subprocess
 
 from jobattempt import JobAttempt
@@ -75,10 +75,15 @@ class JobManager(JobManagerBase):
         # Get (id,stat) from 'bjobs -a' command
         cmd1 = "bjobs -a"
         cmd2 = "awk 'NR>1{print $1,$3}'" # get jobid, stat for the current user
-
-        p1  = Popen(shlex.split(cmd1),stdout=PIPE);
-        out = subprocess.check_output(shlex.split(cmd2),stdin=p1.stdout)
-        p1.communicate()
+        cmd3 = cmd1 + " | " + cmd2
+        
+        if sys.version_info[:2] >= (2,7):
+            p1  = Popen(shlex.split(cmd1),stdout=PIPE);
+            out = subprocess.check_output(shlex.split(cmd2),stdin=p1.stdout)
+            p1.communicate()
+        else:
+            p1  = Popen(cmd3,shell=True,stdout=PIPE);  # security issue here.
+            out = p1.communicate()[0]
 
         # change (id, stat) lists into dict
         bjobs_stat =  dict(map(lambda x: x.split(' '), filter(None, out.split('\n'))))
