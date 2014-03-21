@@ -3,7 +3,10 @@ import shlex,subprocess
 
 from jobattempt import JobAttempt
 from jobmanager import JobManagerBase
-from subprocess import Popen, PIPE, check_output
+from subprocess import Popen, PIPE
+
+if sys.version_info[:2] >= (2,7):
+    from subprocess import check_output
 
 class JobStatusError(Exception):
     pass
