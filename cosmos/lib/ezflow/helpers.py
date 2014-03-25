@@ -23,7 +23,6 @@ p1=val1 p2=val2
         print >> sys.stderr, "\tWith: {0}".format(pprint.pformat(d))
         raise
 
-
 #part of inspect.method which is not in python 2.6
 def ismethod(object):
     """Return true if the object is an instance method.

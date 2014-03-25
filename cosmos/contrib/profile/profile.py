@@ -103,8 +103,10 @@ class Profile:
     
     def run(self):
         """
-        Runs a process and records the memory usage of it and all of its descendants"""
-        self.proc = subprocess.Popen(self.command,shell=True)
+        Runs a process and records the memory usage of it and all of its descendants
+        """
+        #self.proc = subprocess.Popen(self.command,shell=True)
+        self.proc = subprocess.Popen(["/bin/bash",self.command])
         while True:
             self.poll_all_procs(pids=self.all_pids)
             
@@ -253,7 +255,7 @@ if __name__ == '__main__':
     #Argparse
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('-f', '--file', type=argparse.FileType('w'), help='File to store output of profile to.')
-    parser.add_argument('-i', '--interval', type=int, default=1, help='How often to poll the resource usage information in /proc, in seconds.')
+    parser.add_argument('-i', '--interval', type=int, default=30, help='How often to poll the resource usage information in /proc, in seconds.')
     parser.add_argument('-db', '--dbfile', type=str, default=':memory:', help='File to store sqlite data to (default is in memory).  Will overwrite if the database already exists.')
     parser.add_argument('command', nargs=argparse.REMAINDER,help="The command to run. Required.")
     args = parser.parse_args()

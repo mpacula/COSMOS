@@ -6,25 +6,29 @@ import itertools
 import pprint
 import sys
 import signal
+import errno
 
 class ValidationException(Exception): pass
 
-real_stdout = os.dup(1)
-real_stderr = os.dup(2)
-#devnull = os.open('/tmp/erik_drmaa_garbage', os.O_WRONLY)
-devnull = os.open('/dev/null', os.O_WRONLY)
-def disable_stderr():
-    sys.stderr.flush()
-    os.dup2(devnull,2)
-def enable_stderr():
-    sys.stderr.flush()
-    os.dup2(real_stderr,2)
-def disable_stdout():
-    sys.stderr.flush()
-    os.dup2(devnull,1)
-def enable_stdout():
-    sys.stderr.flush()
-    os.dup2(real_stdout,1)
+# real_stdout = os.dup(1)
+# real_stderr = os.dup(2)
+# devnull = os.open('/dev/null', os.O_WRONLY)
+
+# def disable_stderr():
+#     sys.stderr.flush()
+#     os.dup2(devnull,2)
+
+# def enable_stderr():
+#     sys.stderr.flush()
+#     os.dup2(real_stderr,2)
+
+# def disable_stdout():
+#     sys.stderr.flush()
+#     os.dup2(devnull,1)
+
+# def enable_stdout():
+#     sys.stderr.flush()
+#     os.dup2(real_stdout,1)
 
 
 def representsInt(s):
@@ -39,8 +43,8 @@ def representsInt(s):
         return False
 
 def confirm(prompt=None, default=False, timeout=0):
-    """prompts for yes or no defaultonse from the user. Returns True for yes and
-    False for no.
+    """
+    prompts for yes or no defaultonse from the user. Returns True for yes and False for no.
 
     'default' should be set to the default value assumed by the caller when
     user simply types ENTER.
@@ -105,25 +109,33 @@ def formatError(txt,dict):
     
 
 def groupby(iterable,fxn):
-    """aggregates an iterable using a function"""
+    """
+    Aggregates an iterable using a function
+    """
     return itertools.groupby(sorted(iterable,key=fxn),fxn)
 
 def parse_cmd(txt,**kwargs):
-    """removes empty lines and white spaces, and appends a \ to the end of every line.
-    also .format()s with the **kwargs dictioanry"""
+    """
+    Removes empty lines and white spaces, and appends a \ to the end of every line.
+    also .format()s with the **kwargs dictioanry
+    """
     try:
         x = txt.format(**kwargs)
         x = x.split('\n')
         x = map(lambda x: re.sub(r"\\$",'',x.strip()).strip(),x)
         x = filter(lambda x: not x == '',x)
         x = ' \\\n'.join(x)
+        x = re.sub(';[ ]*\\\\',';',x)   # remove backslash from comma-ended string by Jae 10/21/2013
+        x = re.sub('#;','',x)           # make blank comment line
     except (KeyError,TypeError):
-        formatError(txt,kwargs)
+        pass#formatError(txt,kwargs)
     return x
 
 
 def spinning_cursor(i):
-    ":reutrn: a string that represents part of a spinning cursor"
+    """
+    :reutrn: a string that represents part of a spinning cursor
+    """
     cursor='/-\|'
     while 1:
         return cursor[i % len(cursor)]
@@ -140,27 +152,27 @@ def validate_not_null(field):
     if field == None:
         raise ValidationException('Required field left blank')
     
-def check_and_create_output_dir(path):
+def mkdir_p(path):
     """
     checks if a path exists and whether its valid.  If it does not exist, create it
     """
-    if os.path.exists(path):
-        if not os.path.isdir(path):
-            raise ValidationException('Path is not a directory')
-    else:
-        os.system('mkdir -p {0}'.format(path))
-        #os.mkdir(path)
+    try:
+        os.mkdir(path)
+    except OSError as exc: # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else: raise
 
-def execute(cmd):
+def _execute(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     c = p.communicate()
     return c[0],c[1]
 
 def folder_size(folder,human_readable=True):
     if human_readable:
-        return re.match('(.+?)\s',execute('du -hs {0}'.format(folder))[0]).group(1)
+        return re.match('(.+?)\s', _execute('du -hs {0}'.format(folder))[0]).group(1)
     else:
-        return re.match('(.+?)\s',execute('du -s {0}'.format(folder))[0]).group(1)
+        return re.match('(.+?)\s', _execute('du  -s {0}'.format(folder))[0]).group(1)
 
 def get_logger(name,path):
     """
@@ -195,11 +207,10 @@ def get_workflow_logger(workflow):
     """
     Returns a logger configured for a Workflow
     """
-    log_dir = os.path.join(workflow.output_dir,'log')
-    path = os.path.join(log_dir,'main.log')
+    f = os.path.join(workflow.output_dir,'log/main.log')
     if os.path.exists(workflow.output_dir):
-        check_and_create_output_dir(log_dir)
-        return (get_logger(workflow.name,path), path)
+        mkdir_p(os.path.join(workflow.output_dir,'log'))
+        return (get_logger(workflow.name,f), f)
     else:
         return (get_logger(workflow.name,None), None)
 

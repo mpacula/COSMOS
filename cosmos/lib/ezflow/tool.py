@@ -229,8 +229,8 @@ Calls map_inputs() and processes the output of cmd()
         for tf in self.output_files:
             if tf.name not in out_names:
                 raise ToolValidationError,\
-                    'An output taskfile with name {1} is in {0}.output_files but not referenced with $OUT in the tool\'s command.'.\
-                        format(self,tf.name)
+                    'An output taskfile with name {1} is in {0}.output_files but not referenced with $OUT in the tool\'s command: out_names= {2}'.\
+                        format(self,tf.name,out_names)
                 
         #format() return string with callargs
         callargs['self'] = self

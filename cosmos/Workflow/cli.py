@@ -1,8 +1,10 @@
+import os,sys
 import pprint
+
+from cosmos.config import settings
+
 from models import Workflow
-import sys
-from cosmos.session import settings
-import os
+
 
 def add_workflow_args(parser):
     parser.add_argument('-n','--name',help="A unique name for this workflow. All spaces are converted to underscores.",required=True)
