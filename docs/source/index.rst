@@ -3,12 +3,9 @@ Welcome
 
 .. warning::
 
-    Cosmos is currently NOT part of the public domain.  It is owned by and copywrite Harvard Medical School
-    and if you do not have permission to access Cosmos then the code and its documentation are all
-    off limits and you are politely instructed to stop using Cosmos immediately and delete all files related to Cosmos.
-
-        Thank you,
-        Erik Gafni
+    COSMOS is copyright by Harvard Medical School, available for
+    academic and research non-commercial purposes.  It is not part of
+    the public domain.
 
 .. comment::
 
