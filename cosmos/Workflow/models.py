@@ -504,7 +504,7 @@ class Workflow(models.Model):
         for i,t in enumerate(tasks): t.id = id_start + i
 
         # try:
-        Task.objects.bulk_create(tasks)
+        Task.objects.bulk_create(tasks,batch_size=100)
         # except IntegrityError as e:
         #     for tpl, tasks in helpers.groupby(tasks + list(self.tasks), lambda t: (t.tags,t.stage)):
         #         if len(list(tasks)) > 1:
@@ -524,7 +524,7 @@ class Workflow(models.Model):
             for k,v in t.tags.items():
                 tasktags.append(TaskTag(task=t,key=k,value=v))
         self.log.info("Bulk adding {0} TaskTags...".format(len(tasktags)))
-        TaskTag.objects.bulk_create(tasktags)
+        TaskTag.objects.bulk_create(tasktags,batch_size=100)
 
         ### Reset status of stages with new tasks
 #        reset_stages_pks = set(map(lambda t: t.stage.pk, tasks))
@@ -543,7 +543,7 @@ class Workflow(models.Model):
         for i,t in enumerate(taskfiles):
             t.id = id_start + i
         try:
-            TaskFile.objects.bulk_create(taskfiles)
+            TaskFile.objects.bulk_create(taskfiles,batch_size=100)
         except IntegrityError as e:
             return '{0}.  There are probably multiple tasks with the same output files'.format(e)
 
@@ -556,7 +556,7 @@ class Workflow(models.Model):
         ### Bulk add parents
         task_edges = map(lambda e: TaskEdge(parent=e[0],child=e[1]),edges)
         self.log.info("Bulk adding {0} TaskEdges...".format(len(task_edges)))
-        TaskEdge.objects.bulk_create(task_edges)
+        TaskEdge.objects.bulk_create(task_edges,batch_size=100)
 
     @transaction.commit_on_success
     def bulk_delete_tasks(self,tasks):
@@ -792,7 +792,7 @@ class Workflow(models.Model):
 
     def __str__(self):
         return 'Workflow[{0}] {1}'.format(self.id,re.sub('_',' ',self.name))
-
+    
     def describe(self):
         return """output_dir: {0.output_dir}""".format(self)
 
