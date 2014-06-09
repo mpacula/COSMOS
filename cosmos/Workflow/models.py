@@ -162,7 +162,7 @@ class Workflow(models.Model):
 
     dry_run              = models.BooleanField(default=False,help_text="don't execute anything")
 
-    max_reattempts       = models.SmallIntegerField(default=3)
+    max_reattempts       = models.SmallIntegerField(default=6)
 
     default_queue        = models.CharField(max_length=255,default=None,null=True)
 
