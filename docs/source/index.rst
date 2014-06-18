@@ -10,7 +10,7 @@ Gafni, Luquette, Lancaster, Hawkins, Jung, Souilmi, Wall, Tonellato "COSMOS: Pyt
 
 Downloading COSMOS
 -------------------
-COSMOS is available for `download <http://cosmos.hms.harvard.edu/download/>`_ for academic and research purposes.
+COSMOS is available for `download <http://cosmos.hms.harvard.edu/download.html>`_ for academic and research purposes.
 
 .. warning::
 
