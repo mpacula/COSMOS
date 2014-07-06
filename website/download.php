@@ -1,5 +1,5 @@
 <?php
-$path = './Cosmos0.5.1.zip'; 
+$path = './downloads/COSMOS-1.0.0.tar.gz'; 
 if ($_POST['agree']=='Yes') 
 {
     header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
