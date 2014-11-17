@@ -7,7 +7,7 @@ from subprocess     import Popen,PIPE
 
 import cosmos
 
-__version__ = "0.5.0"
+__version__ = "1.0.0"
 
 README = open('README.rst').read()
 
@@ -65,8 +65,9 @@ else:
 setup(name='cosmos',
     version=__version__,
     description = "Workflow Manager",
-    author='Erik Gafni',
+    author='Laboratory for Personalized Medicine @ Harvard Medical School',
     license='Non-commercial',
+    url="https://cosmos.hms.harvard.edu/",
     long_description=README,
     packages=find_packages(),
     scripts=['bin/cosmos'],
