@@ -1,77 +1,55 @@
-import os
-import sys
-
 from distutils.core import setup
-from setuptools     import find_packages
-from subprocess     import Popen,PIPE
+import os
+import re
 
-import cosmos
-
-__version__ = "1.0.0"
-
-README = open('README.rst').read()
-
-def all_files(path,num_root_dir_to_skip=1):
-    all= map(lambda x: x.strip(),Popen(['find',path],stdout=PIPE).stdout.readlines())
-    return map(lambda x: '/'.join(x.split('/')[num_root_dir_to_skip:]), filter(os.path.isfile,all))
-
-examples_installation_dir = os.path.expanduser('~/.cosmos/example_workflows')
-print >> sys.stderr, "Installing userfiles to ~/.cosmos"
-
-example_workflows = map(lambda x:os.path.join('example_workflows/',x),filter(lambda x:x[-3:]=='.py',os.listdir('example_workflows')))
-
-if sys.version_info[:2] >= (2,7):	
-    install_requires=[
-             'distribute>=0.6.28',
-             'Django==1.6.2',
-             'MySQL-python==1.2.5',
-             'argparse==1.1',
-             'configobj==4.7.2',
-             'decorator==3.4.0',
-             'django-extensions==1.3.3',
-             'django-picklefield==0.3.1',
-             'docutils==0.10',
-             'drmaa==0.7.6',
-             'ipython==0.13.1',
-             'networkx==1.7',
-             'pygraphviz==1.1',
-             'six==1.2.0',
-             'wsgiref==0.1.2',
-             'ordereddict',
-             'ipdb==0.8'
-     ]
-else:
-    install_requires=[
-             'distribute>=0.6.28',
-             'Django==1.6.2',
-             'MySQL-python==1.2.4',
-             'argparse==1.2.1',
-             'configobj==4.7.2',
-             'decorator==3.4.0',
-             'django-extensions==1.0.3',
-             'django-picklefield==0.3.0',
-             'docutils==0.10',
-             'drmaa==0.5',
-             'ipython==0.13.1',
-             'networkx==1.7',
-             'pygraphviz==1.1',
-             'six==1.2.0',
-             'wsgiref==0.1.2',
-             'ordereddict',
-             'ipdb==0.8'
-   ]
+from setuptools import find_packages
 
 
-setup(name='cosmos',
+with open(os.path.join(os.path.dirname(__file__), 'cosmos/VERSION'), 'r') as fh:
+    __version__ = fh.read().strip()
+
+
+def find_all(path, reg_expr, inverse=False, remove_prefix=False):
+    if not path.endswith('/'):
+        path = path + '/'
+    for root, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            match = re.search(reg_expr, filename) is not None
+            if inverse:
+                match = not match
+            if match:
+                out = os.path.join(root, filename)
+                if remove_prefix:
+                    out = out.replace(path, '')
+                yield out
+
+setup(
+    name="cosmos-wfm",
     version=__version__,
-    description = "Workflow Manager",
-    author='Laboratory for Personalized Medicine @ Harvard Medical School',
-    license='Non-commercial',
+    description="Workflow Management System",
     url="https://cosmos.hms.harvard.edu/",
-    long_description=README,
+    author="Erik Gafni",
+    author_email="egafni@gmail.com",
+    maintainer="Erik Gafni",
+    maintainer_email="egafni@gmail.com",
+    license="GPLv3",
+    install_requires=[
+        'gntp',
+        "psprofile",
+        "Flask",
+        'blinker',
+        "sqlalchemy",
+        'Flask-Admin',
+        'Flask-SQLAlchemy',
+        'networkx',
+        'configparser',
+        "enum34",
+        "Flask-Failsafe",
+        "six",
+        "SQLAlchemy-Utils",
+        "pyparsing==1.5.7"
+    ],
     packages=find_packages(),
-    scripts=['bin/cosmos'],
-    package_data={'cosmos':['default_config.ini','lsf_drmaa.conf']+all_files('cosmos/static')+all_files('cosmos/templates')},
-    data_files=[(examples_installation_dir,example_workflows)],
-    install_requires=install_requires
+    include_package_data=True,
+    package_data={'cosmos': list(find_all('cosmos/', '.py|.pyc$', inverse=True, remove_prefix=True))}
 )

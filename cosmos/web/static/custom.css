@@ -1,0 +1,39 @@
+#menu-bar p, #menu-bar a {
+    color: white;
+    -webkit-text-shadow: none;
+    text-shadow: none;
+}
+
+.container-full {
+  margin: 0 auto;
+  width: 100%;
+}
+
+.table-condensed {
+}
+
+body, h1, h2, h3, h4, h5, p {
+    font-family: monospace;
+}
+
+table {
+    font-family: monospace;
+    cell-padding: 1;
+}
+
+a:visited
+{
+    color:#395c82
+}
+
+.table-striped tbody tr.row_highlight>td {
+    background-color: lightyellow;
+}
+.progress {
+  margin-bottom: 2px;
+}
+
+/*tr.highlight*/
+/*{*/
+    /*background-color: #FFFFE0 !important*/
+/*}*/
